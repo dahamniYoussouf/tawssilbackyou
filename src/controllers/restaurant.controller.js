@@ -80,37 +80,96 @@ exports.nearby = async (req, res) => {
       });
     }
 
-    const result = await Restaurant.findAll({
-      attributes: {
-        include: [
-          [
-            literal(`ST_Distance(location, ST_GeogFromText('POINT(${longitude} ${latitude})'))`),
-            'distance'
-          ]
-        ]
-      },
-      where: literal(
-        `ST_DWithin(location, ST_GeogFromText('POINT(${longitude} ${latitude})'), ${searchRadius})`
-      ),
-      order: literal('distance ASC'),
-      limit: 50 
-    });
+    console.log('Searching restaurants near:', { latitude, longitude, searchRadius });
 
-    res.json({
-      success: true,
-      count: result.length,
-      radius: searchRadius,
-      center: { latitude, longitude },
-      data: result
-    });
+    try {
+      // First, try the PostGIS approach
+      const result = await Restaurant.findAll({
+        attributes: {
+          include: [
+            [
+              literal(`ST_Distance(location, ST_GeogFromText('POINT(${longitude} ${latitude})'))`),
+              'distance'
+            ]
+          ]
+        },
+        where: literal(
+          `ST_DWithin(location, ST_GeogFromText('POINT(${longitude} ${latitude})'), ${searchRadius})`
+        ),
+        order: literal('distance ASC'),
+        limit: 50 
+      });
+
+      res.json({
+        success: true,
+        count: result.length,
+        radius: searchRadius,
+        center: { latitude, longitude },
+        data: result
+      });
+
+    } catch (postGISError) {
+      console.log('PostGIS query failed, trying fallback method:', postGISError.message);
+      
+      // Fallback: Get all restaurants and filter with JavaScript
+      const allRestaurants = await Restaurant.findAll({
+        limit: 1000 // Reasonable limit for fallback
+      });
+
+      // Calculate distance using Haversine formula
+      const nearbyRestaurants = allRestaurants.filter(restaurant => {
+        if (!restaurant.location || !restaurant.location.coordinates) {
+          return false;
+        }
+        
+        const [restLng, restLat] = restaurant.location.coordinates;
+        const distance = calculateDistance(latitude, longitude, restLat, restLng);
+        
+        // Add distance to the restaurant object
+        restaurant.dataValues.distance = distance;
+        
+        return distance <= searchRadius;
+      });
+
+      // Sort by distance
+      nearbyRestaurants.sort((a, b) => a.dataValues.distance - b.dataValues.distance);
+
+      res.json({
+        success: true,
+        count: nearbyRestaurants.length,
+        radius: searchRadius,
+        center: { latitude, longitude },
+        data: nearbyRestaurants.slice(0, 50), // Limit to 50 results
+        fallback: true,
+        message: 'Using fallback distance calculation'
+      });
+    }
+
   } catch (err) {
     console.error('Erreur recherche proximité:', err);
     res.status(500).json({ 
       error: 'Erreur lors de la recherche de restaurants à proximité',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+      message: err.message // Add this for debugging
     });
   }
 };
+
+// Haversine formula for distance calculation (fallback)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+           Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+           Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; // Distance in meters
+}
+
+function toRad(degrees) {
+  return degrees * (Math.PI/180);
+}
 
 exports.getById = async (req, res) => {
   try {
