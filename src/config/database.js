@@ -1,7 +1,7 @@
 const { Sequelize } = require("sequelize");
 
 const sequelize = new Sequelize(
-  process.env.DATABASE_URL,
+  'postgresql://postgres.ruuirjmkvdjonkddxwfi:63bCnsvMf125qUXm@aws-1-eu-north-1.pooler.supabase.com:5432/postgres',
   {
     dialect: "postgres",
     dialectOptions: {
