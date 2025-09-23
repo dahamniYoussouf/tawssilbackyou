@@ -33,6 +33,46 @@ const Restaurant = sequelize.define('Restaurant', {
         msg: 'La localisation est requise'
       }
     }
+  },
+  rating: {
+    type: DataTypes.DECIMAL(2, 1),
+    allowNull: true,
+    defaultValue: 0.0,
+    validate: {
+      min: 0.0,
+      max: 5.0
+    },
+    comment: 'Note sur 5 étoiles'
+  },
+delivery_time_min: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    validate: {
+      min: 0
+    },
+    comment: 'Temps de livraison minimum en minutes'
+  },
+  delivery_time_max: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    validate: {
+      min: 0
+    },
+    comment: 'Temps de livraison maximum en minutes'
+  },
+  image_url: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    validate: {
+      isUrl: true
+    },
+    comment: 'URL de l\'image principale du restaurant'
+  },
+  is_active: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    allowNull: false,
+    comment: 'Restaurant actif ou non'
   }
 }, {
   tableName: 'restaurants',
@@ -57,6 +97,26 @@ Restaurant.prototype.getCoordinates = function() {
     };
   }
   return null;
+};
+
+Restaurant.prototype.getDeliveryTimeRange = function() {
+  if (this.delivery_time_min && this.delivery_time_max) {
+    return `${this.delivery_time_min}-${this.delivery_time_max} min`;
+  }
+  return null;
+};
+
+Restaurant.prototype.isOpen = function() {
+  if (!this.opening_hours) return true; 
+  
+  const now = new Date();
+  const day = now.toLocaleLowerCase().substring(0, 3); 
+  const currentTime = now.getHours() * 100 + now.getMinutes(); 
+  
+  const todayHours = this.opening_hours[day];
+  if (!todayHours) return false;
+  
+  return currentTime >= todayHours.open && currentTime <= todayHours.close;
 };
 
 module.exports = Restaurant;
