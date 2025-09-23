@@ -100,12 +100,32 @@ exports.nearby = async (req, res) => {
       limit: 50 
     });
 
+    const formatted = result.map(r => {
+      const coords = r.location?.coordinates || [];
+      return {
+        uuid: r.uuid,
+        name: r.name,
+        description: r.description,
+        address: r.address,
+        lat: coords[1] || null,   
+        lng: coords[0] || null,   
+        rating: r.rating,
+        delivery_time_min: r.delivery_time_min,
+        delivery_time_max: r.delivery_time_max,
+        image_url: r.image_url,
+        is_active: r.is_active,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        distance: r.dataValues.distance
+      };
+    });
+
     res.json({
       success: true,
-      count: result.length,
+      count: formatted.length,
       radius: searchRadius,
-      center: { latitude, longitude },
-      data: result
+      center: { lat:latitude, lng:longitude },
+      data: formatted
     });
   } catch (err) {
     console.error('Erreur recherche proximité:', err);
