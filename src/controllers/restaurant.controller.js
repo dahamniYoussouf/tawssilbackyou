@@ -3,7 +3,7 @@ const { Op, fn, col, literal } = require('sequelize');
 
 exports.create = async (req, res) => {
   try {
-    const { name, description, address, lat, lng } = req.body;
+    const { name, description, address, lat, lng, rating, delivery_time_min, delivery_time_max, image_url, is_active} = req.body;
     
     if (!lat || !lng) {
       return res.status(400).json({ 
@@ -21,7 +21,12 @@ exports.create = async (req, res) => {
       name,
       description,
       address,
-      location: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }
+      location: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
+      rating,
+      delivery_time_min,
+      delivery_time_max,
+      image_url,
+      is_active
     });
 
     res.status(201).json({
@@ -57,7 +62,6 @@ exports.nearby = async (req, res) => {
   try {
     const { lat, lng, radius = 2000 } = req.query;
     
-    // Validation des paramètres
     if (!lat || !lng) {
       return res.status(400).json({ 
         error: 'Les paramètres lat et lng sont requis' 
@@ -89,19 +93,44 @@ exports.nearby = async (req, res) => {
           ]
         ]
       },
-      where: literal(
-        `ST_DWithin(location, ST_GeogFromText('POINT(${longitude} ${latitude})'), ${searchRadius})`
-      ),
+      where: {
+        [Op.and]: [
+          { is_active: true },
+          literal(
+            `ST_DWithin(location, ST_GeogFromText('POINT(${longitude} ${latitude})'), ${searchRadius})`
+          )
+        ]
+      },
       order: literal('distance ASC'),
       limit: 50 
     });
 
+    const formatted = result.map(r => {
+      const coords = r.location?.coordinates || [];
+      return {
+        uuid: r.uuid,
+        name: r.name,
+        description: r.description,
+        address: r.address,
+        lat: coords[1] || null,   
+        lng: coords[0] || null,   
+        rating: r.rating,
+        delivery_time_min: r.delivery_time_min,
+        delivery_time_max: r.delivery_time_max,
+        image_url: r.image_url,
+        is_active: r.is_active,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        distance: r.dataValues.distance
+      };
+    });
+
     res.json({
       success: true,
-      count: result.length,
+      count: formatted.length,
       radius: searchRadius,
-      center: { latitude, longitude },
-      data: result
+      center: { lat:latitude, lng:longitude },
+      data: formatted
     });
   } catch (err) {
     console.error('Erreur recherche proximité:', err);

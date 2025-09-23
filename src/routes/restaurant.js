@@ -5,7 +5,7 @@ const restaurantCtrl = require('../controllers/restaurant.controller');
 
 
 router.post('/create', restaurantCtrl.create);
-router.get('/nearby2', restaurantCtrl.nearby);
+router.get('/nearby', restaurantCtrl.nearby);
 
 
 
