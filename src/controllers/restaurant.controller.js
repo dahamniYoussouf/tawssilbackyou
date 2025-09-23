@@ -118,9 +118,6 @@ exports.nearby = async (req, res) => {
         delivery_time_min: r.delivery_time_min,
         delivery_time_max: r.delivery_time_max,
         image_url: r.image_url,
-        is_active: r.is_active,
-        created_at: r.created_at,
-        updated_at: r.updated_at,
         distance: r.dataValues.distance
       };
     });
