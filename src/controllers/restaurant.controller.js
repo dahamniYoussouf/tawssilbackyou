@@ -3,7 +3,7 @@ const { Op, fn, col, literal } = require('sequelize');
 
 exports.create = async (req, res) => {
   try {
-    const { name, description, address, lat, lng } = req.body;
+    const { name, description, address, lat, lng, rating, delivery_time_min, delivery_time_max, image_url, is_active} = req.body;
     
     if (!lat || !lng) {
       return res.status(400).json({ 
@@ -21,7 +21,12 @@ exports.create = async (req, res) => {
       name,
       description,
       address,
-      location: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] }
+      location: { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] },
+      rating,
+      delivery_time_min,
+      delivery_time_max,
+      image_url,
+      is_active
     });
 
     res.status(201).json({
@@ -57,7 +62,6 @@ exports.nearby = async (req, res) => {
   try {
     const { lat, lng, radius = 2000 } = req.query;
     
-    // Validation des paramètres
     if (!lat || !lng) {
       return res.status(400).json({ 
         error: 'Les paramètres lat et lng sont requis' 
