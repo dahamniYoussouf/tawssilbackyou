@@ -7,6 +7,12 @@ const Restaurant = sequelize.define('Restaurant', {
     primaryKey: true,
     autoIncrement: true
   },
+   uuid: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4, 
+    allowNull: false,
+    unique: true
+  },
   name: {
     type: DataTypes.STRING,
     allowNull: false
