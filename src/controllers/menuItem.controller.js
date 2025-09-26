@@ -84,3 +84,26 @@ export const remove = async (req, res, next) => {
     next(err);
   }
 };
+
+export const getByRestaurantAndCategory = async (req, res, next) => {
+  try {
+    const { restaurantId, categoryId } = req.query;
+
+    const where = {};
+    if (restaurantId) where.restaurant_id = restaurantId;
+    if (categoryId) where.category_id = categoryId;
+
+    const items = await MenuItem.findAll({
+      where,
+      order: [["created_at", "DESC"]],
+    });
+
+    res.json({
+      success: true,
+      count: items.length,
+      data: items,
+    });
+  } catch (err) {
+    next(err);
+  }
+};

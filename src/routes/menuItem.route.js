@@ -14,4 +14,7 @@ router.put("/update/:id", updateMenuItemValidator, validate, menuItemCtrl.update
 router.delete("/delete/:id", deleteMenuItemValidator, validate, menuItemCtrl.remove);
 router.get("/getall", menuItemCtrl.getAll);
 
+router.get("/filter", menuItemCtrl.getByRestaurantAndCategory);
+
+
 export default router;
