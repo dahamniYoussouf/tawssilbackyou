@@ -1,22 +1,8 @@
+import "./processHandlers.js";
 import dotenv from "dotenv";
-import express from "express";
-import cors from "cors";
-import bodyParser from "body-parser";
-
-import restaurant from "./src/routes/restaurant.js";
-import uploadRoutes from "./src/routes/uploadRoutes.js";
-import geocodeRoutes from "./src/routes/geocode.js";  
+import app from "./src/app.js";
 
 dotenv.config();
-
-const app = express();
-
-app.use(bodyParser.json());
-app.use(cors());
-
-app.use("/restaurant", restaurant);
-app.use("/api", uploadRoutes);
-app.use("/api", geocodeRoutes);  
 
 const port = process.env.PORT || 3000;
 

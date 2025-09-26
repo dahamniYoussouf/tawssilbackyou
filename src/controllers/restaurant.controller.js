@@ -1,21 +1,9 @@
-const Restaurant = require('../models/Restaurant');
-const { Op, fn, col, literal } = require('sequelize');
+import Restaurant from "../models/Restaurant.js";
+import { Op, fn, col, literal } from "sequelize";
 
-exports.create = async (req, res) => {
+export const create = async (req, res, next) => {
   try {
-    const { name, description, address, lat, lng, rating, delivery_time_min, delivery_time_max, image_url, is_active} = req.body;
-    
-    if (!lat || !lng) {
-      return res.status(400).json({ 
-        error: 'Les coordonnées (lat, lng) sont requises' 
-      });
-    }
-
-    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-      return res.status(400).json({ 
-        error: 'Coordonnées invalides' 
-      });
-    }
+    const { name, description, address, lat, lng, rating, delivery_time_min, delivery_time_max, image_url, is_active, is_premium, status, opening_hours} = req.body;
 
     const resto = await Restaurant.create({
       name,
@@ -26,63 +14,48 @@ exports.create = async (req, res) => {
       delivery_time_min,
       delivery_time_max,
       image_url,
-      is_active
+      is_active, 
+      is_premium,
+      status, 
+      opening_hours
     });
 
     res.status(201).json({
-      success: true,
-      data: resto
+      success: true
+      
     });
   } catch (err) {
-    console.error('Erreur création restaurant:', err);
-    res.status(500).json({ 
-      error: 'Erreur lors de la création du restaurant',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
+      next(err);
   }
 };
 
-exports.getAll = async (req, res) => {
+export const getAll = async (req, res, next) => {
   try {
     const restaurants = await Restaurant.findAll({
-      order: [['createdAt', 'DESC']]
+      order: [['created_at', 'DESC']]
     });
     
+     const formatted = restaurants.map(r => ({
+      ...r.toJSON(),
+      is_open: r.isOpen() 
+    }));
+
     res.json({
       success: true,
-      data: restaurants
+      data: formatted
     });
   } catch (err) {
-    console.error('Erreur récupération restaurants:', err);
-    res.status(500).json({ error: err.message });
+            next(err);
   }
 };
 
-exports.nearby = async (req, res) => {
+export const nearby = async (req, res, next) => {
   try {
     const { lat, lng, radius = 2000 } = req.query;
-    
-    if (!lat || !lng) {
-      return res.status(400).json({ 
-        error: 'Les paramètres lat et lng sont requis' 
-      });
-    }
 
     const latitude = parseFloat(lat);
     const longitude = parseFloat(lng);
     const searchRadius = parseInt(radius);
-
-    if (isNaN(latitude) || isNaN(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-      return res.status(400).json({ 
-        error: 'Coordonnées invalides' 
-      });
-    }
-
-    if (isNaN(searchRadius) || searchRadius <= 0 || searchRadius > 50000) {
-      return res.status(400).json({ 
-        error: 'Le rayon doit être entre 1 et 50000 mètres' 
-      });
-    }
 
     const result = await Restaurant.findAll({
       attributes: {
@@ -101,14 +74,17 @@ exports.nearby = async (req, res) => {
           )
         ]
       },
-      order: literal('distance ASC'),
+      order: [
+        ['is_premium', 'DESC'],       
+        [literal('distance'), 'ASC']   
+      ],
       limit: 50 
     });
 
     const formatted = result.map(r => {
       const coords = r.location?.coordinates || [];
       return {
-        uuid: r.uuid,
+        id: r.id,
         name: r.name,
         description: r.description,
         address: r.address,
@@ -118,7 +94,10 @@ exports.nearby = async (req, res) => {
         delivery_time_min: r.delivery_time_min,
         delivery_time_max: r.delivery_time_max,
         image_url: r.image_url,
-        distance: r.dataValues.distance
+        distance: r.dataValues.distance,
+        is_premium: r.is_premium,
+        status:r.status, 
+        is_open: r.isOpen() 
       };
     });
 
@@ -129,100 +108,78 @@ exports.nearby = async (req, res) => {
       center: { lat:latitude, lng:longitude },
       data: formatted
     });
-  } catch (err) {
-    console.error('Erreur recherche proximité:', err);
-    res.status(500).json({ 
-      error: 'Erreur lors de la recherche de restaurants à proximité',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+  } catch (err) {       
+    next(err);
+}
+};
+
+
+export const update = async (req, res, next) => {
+  try {
+    const { id } = req.params; 
+    const {
+      name,
+      description,
+      address,
+      lat,
+      lng,
+      rating,
+      delivery_time_min,
+      delivery_time_max,
+      image_url,
+      is_active,
+      is_premium,
+      status,
+      opening_hours
+    } = req.body;
+
+    const resto = await Restaurant.findOne({ where: { id } });
+
+    if (!resto) {
+      return res.status(404).json({ success: false, message: "Restaurant not found" });
+    }
+
+    await resto.update({
+      name,
+      description,
+      address,
+      location: lat && lng ? { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] } : resto.location,
+      rating,
+      delivery_time_min,
+      delivery_time_max,
+      image_url,
+      is_active,
+      is_premium,
+      status,
+      opening_hours
     });
+
+    res.json({
+      success: true,
+    });
+  } catch (err) {
+    next(err);
   }
 };
 
-exports.getById = async (req, res) => {
+
+export const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const restaurant = await Restaurant.findByPk(id);
-    
-    if (!restaurant) {
-      return res.status(404).json({ 
-        error: 'Restaurant non trouvé' 
-      });
+
+    const deleted = await Restaurant.destroy({
+      where: { id }
+    });
+
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: "Restaurant not found" });
     }
-    
-    res.json({
+
+    res.status(200).json({
       success: true,
-      data: restaurant
+      message: "Restaurant deleted successfully"
     });
   } catch (err) {
-    console.error('Erreur récupération restaurant:', err);
-    res.status(500).json({ error: err.message });
-  }
-};
-
-exports.update = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, description, address, lat, lng } = req.body;
-    
-    const restaurant = await Restaurant.findByPk(id);
-    if (!restaurant) {
-      return res.status(404).json({ 
-        error: 'Restaurant non trouvé' 
-      });
-    }
-
-    const updateData = {};
-    if (name) updateData.name = name;
-    if (description) updateData.description = description;
-    if (address) updateData.address = address;
-    
-    if (lat && lng) {
-      const latitude = parseFloat(lat);
-      const longitude = parseFloat(lng);
-      
-      if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-        return res.status(400).json({ 
-          error: 'Coordonnées invalides' 
-        });
-      }
-      
-      updateData.location = { 
-        type: 'Point', 
-        coordinates: [longitude, latitude] 
-      };
-    }
-
-    await restaurant.update(updateData);
-    
-    res.json({
-      success: true,
-      data: restaurant
-    });
-  } catch (err) {
-    console.error('Erreur mise à jour restaurant:', err);
-    res.status(500).json({ error: err.message });
-  }
-};
-
-exports.delete = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const restaurant = await Restaurant.findByPk(id);
-    
-    if (!restaurant) {
-      return res.status(404).json({ 
-        error: 'Restaurant non trouvé' 
-      });
-    }
-    
-    await restaurant.destroy();
-    
-    res.json({
-      success: true,
-      message: 'Restaurant supprimé avec succès'
-    });
-  } catch (err) {
-    console.error('Erreur suppression restaurant:', err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };

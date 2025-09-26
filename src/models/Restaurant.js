@@ -1,17 +1,13 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../config/database');
+import { DataTypes } from "sequelize";
+import { sequelize } from "../config/database.js";
 
 const Restaurant = sequelize.define('Restaurant', {
   id: {
-    type: DataTypes.BIGINT,
-    primaryKey: true,
-    autoIncrement: true
-  },
-   uuid: {
     type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4, 
+    defaultValue: DataTypes.UUIDV4,
     allowNull: false,
-    unique: true
+    primaryKey: true,
+    comment: "Primary key (UUID)",
   },
   name: {
     type: DataTypes.STRING,
@@ -25,7 +21,13 @@ const Restaurant = sequelize.define('Restaurant', {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  location: {
+  location:
+  process.env.NODE_ENV === "test"
+        ? {
+            type: DataTypes.JSON,
+            allowNull: true,
+          }
+        : {
     type: DataTypes.GEOGRAPHY('POINT', 4326),
     allowNull: false,
     validate: {
@@ -73,7 +75,22 @@ delivery_time_min: {
     defaultValue: true,
     allowNull: false,
     comment: 'Restaurant actif ou non'
-  }
+  },
+  is_premium: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    allowNull: false,
+    comment: 'Restaurant premium ou non'
+  },
+  status: {
+  type: DataTypes.ENUM("pending", "approved", "suspended", "archived"),
+  defaultValue: "pending"
+  },
+  opening_hours: {
+  type: DataTypes.JSON,
+  allowNull: true,
+  comment: "Opening hours per day, e.g.: { Mon: {open: 9:00 a.m., close: 6:00 p.m.}, Tue: {...} }"
+}
 }, {
   tableName: 'restaurants',
   timestamps: true,
@@ -106,17 +123,17 @@ Restaurant.prototype.getDeliveryTimeRange = function() {
   return null;
 };
 
-Restaurant.prototype.isOpen = function() {
-  if (!this.opening_hours) return true; 
-  
+Restaurant.prototype.isOpen = function () {
+  if (!this.opening_hours) return false;
+
   const now = new Date();
-  const day = now.toLocaleLowerCase().substring(0, 3); 
-  const currentTime = now.getHours() * 100 + now.getMinutes(); 
-  
+  const day = now.toLocaleDateString("en-US", { weekday: "short" }).toLowerCase();
+  const currentTime = now.getHours() * 100 + now.getMinutes();
+
   const todayHours = this.opening_hours[day];
   if (!todayHours) return false;
-  
+
   return currentTime >= todayHours.open && currentTime <= todayHours.close;
 };
 
-module.exports = Restaurant;
+export default Restaurant;

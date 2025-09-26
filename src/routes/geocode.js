@@ -1,16 +1,15 @@
 import express from "express";
 import axios from "axios";
+import { geocodeValidator } from "../validators/geocodeValidator.js";
+import { validate } from "../middlewares/validate.js";
 
 const router = express.Router();
 
-router.post('/geocode', async (req, res) => {
+
+router.post('/geocode',geocodeValidator, validate, async (req, res, next) => {
   try {
     const { address } = req.body;
     
-    if (!address) {
-      return res.status(400).json({ error: "Adresse manquante" });
-    }
-
     const url = `https://nominatim.openstreetmap.org/search`;
     const response = await axios.get(url, {
       params: {
@@ -33,8 +32,7 @@ router.post('/geocode', async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Erreur serveur" });
+        next(err);
   }
 });
 

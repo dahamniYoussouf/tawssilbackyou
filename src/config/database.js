@@ -1,19 +1,31 @@
-const { Sequelize } = require("sequelize");
+import { Sequelize } from "sequelize";
 
-const sequelize = new Sequelize(
-  'postgresql://postgres.ruuirjmkvdjonkddxwfi:63bCnsvMf125qUXm@aws-1-eu-north-1.pooler.supabase.com:5432/postgres',
-  {
-    dialect: "postgres",
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false,
+let sequelize;
+
+if (process.env.NODE_ENV === "test") {
+  sequelize = new Sequelize("sqlite::memory:", {
+    dialect: "sqlite",
+    logging: false,
+  });
+} else {
+  sequelize = new Sequelize(
+    "postgresql://postgres.ruuirjmkvdjonkddxwfi:63bCnsvMf125qUXm@aws-1-eu-north-1.pooler.supabase.com:5432/postgres",
+    {
+      dialect: "postgres",
+      dialectOptions: {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false,
+        },
       },
-    },
-  }
-);
+      logging: false,
+    }
+  );
+}
 
-module.exports = sequelize;
+export { sequelize };
+export default sequelize;
+
 
 // const { Sequelize } = require('sequelize');
 
