@@ -117,14 +117,51 @@ export const nearby = async (req, res, next) => {
 };
 
 
-export const nearbyfilter = async (req, res, next) => {
+export const nearbyFilter = async (req, res, next) => {
   try {
-    const { lat, lng, radius = 2000, q, category } = req.query;
+    const { address, lat, lng, radius = 2000, q, category } = req.query;
+    let latitude, longitude;
 
-    const latitude = parseFloat(lat);
-    const longitude = parseFloat(lng);
-    const searchRadius = parseInt(radius);
+    // 🌍 Handle address-based search (geocoding)
+    if (address && address.trim()) {
+      if (!address.trim()) {
+        return res.status(400).json({ error: "Adresse requise" });
+      }
 
+      // Geocoding with Nominatim
+      const response = await axios.get("https://nominatim.openstreetmap.org/search", {
+        params: { q: address, format: "json", limit: 1 },
+        headers: { "User-Agent": "food-delivery-app" }
+      });
+
+      if (response.data.length === 0) {
+        return res.status(404).json({ error: "Adresse introuvable" });
+      }
+
+      const { lat: geocodedLat, lon: geocodedLon } = response.data[0];
+      latitude = parseFloat(geocodedLat);
+      longitude = parseFloat(geocodedLon);
+    } 
+    // 📍 Handle coordinate-based search
+    else if (lat && lng) {
+      latitude = parseFloat(lat);
+      longitude = parseFloat(lng);
+      
+      // Validate coordinates
+      if (isNaN(latitude) || isNaN(longitude)) {
+        return res.status(400).json({ error: "Coordonnées invalides" });
+      }
+    } 
+    // ❌ Neither address nor coordinates provided
+    else {
+      return res.status(400).json({ 
+        error: "Adresse ou coordonnées (lat, lng) requises" 
+      });
+    }
+
+    const searchRadius = parseInt(radius, 10);
+
+    // 🟢 Base WHERE conditions
     const whereConditions = {
       [Op.and]: [
         { is_active: true },
@@ -134,42 +171,45 @@ export const nearbyfilter = async (req, res, next) => {
       ]
     };
 
-    // 🔎 Filtre par nom
+    // 🔎 Filter by name
     if (q && q.trim()) {
       whereConditions[Op.and].push({
-        name: { [Op.iLike]: `%${q.trim()}%` }  // PostgreSQL
+        name: { [Op.iLike]: `%${q.trim()}%` }
       });
     }
 
+    // 🍽️ Filter by category via MenuItem
     let includeOptions = [];
     if (category && category.trim()) {
       includeOptions.push({
         model: MenuItem,
-        as: "menu_items",                
-        attributes: [],                 
-        where: { category_id: category.trim() },  
-        required: true                   
+        as: "menu_items",
+        attributes: [],
+        where: { category_id: category.trim() },
+        required: true
       });
     }
 
+    // 🔥 Main query
     const result = await Restaurant.findAll({
       attributes: {
         include: [
           [
             literal(`ST_Distance(location, ST_GeogFromText('POINT(${longitude} ${latitude})'))`),
-            'distance'
+            "distance"
           ]
         ]
       },
       where: whereConditions,
-      include: includeOptions, // <-- important
+      include: includeOptions,
       order: [
-        ['is_premium', 'DESC'],
-        [literal('distance'), 'ASC']
+        ["is_premium", "DESC"],
+        [literal("distance"), "ASC"]
       ],
       limit: 50
     });
 
+    // 📦 Format response
     const formatted = result.map(r => {
       const coords = r.location?.coordinates || [];
       return {
@@ -195,7 +235,8 @@ export const nearbyfilter = async (req, res, next) => {
       count: formatted.length,
       radius: searchRadius,
       center: { lat: latitude, lng: longitude },
-      data: formatted
+      data: formatted,
+      searchType: address ? 'address' : 'coordinates' // Optional: indicate search type
     });
   } catch (err) {
     next(err);
@@ -352,3 +393,5 @@ export const nearbyByAddress = async (req, res, next) => {
     next(err);
   }
 };
+
+
