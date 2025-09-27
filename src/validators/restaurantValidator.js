@@ -159,3 +159,15 @@ export const deleteRestaurantValidator = [
     .notEmpty().withMessage("UUID is required")
     .isUUID().withMessage("Invalid UUID format"),
 ];
+
+
+export const nearbyByAddressValidator = [
+  query("address")
+    .notEmpty().withMessage("Address is required")
+    .isString().withMessage("Address must be a string")
+    .isLength({ min: 3 }).withMessage("Address must be at least 3 characters"),
+
+  query("radius")
+    .optional()
+    .isInt({ min: 1, max: 50000 }).withMessage("Radius must be between 1 and 50000 meters"),
+];
