@@ -15,8 +15,10 @@ import "./models/index.js";
 
 import restaurant from "./routes/restaurant.route.js";
 import foodcategory from "./routes/foodCategory.route.js";
+import restaurantcategory from "./routes/restaurantCategory.route.js";
 import menuitem from "./routes/menuItem.route.js";
 import order from "./routes/order.route.js";
+import orderitem from "./routes/orderItem.route.js";
 import client from "./routes/client.route.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import geocodeRoutes from "./routes/geocode.js";
@@ -40,8 +42,10 @@ app.get("/health", (_, res) => res.send("OK"));
 // Routes
 app.use("/restaurant", restaurant);
 app.use("/foodcategory", foodcategory);
+app.use("/restaurantcategory", restaurantcategory);
 app.use("/menuitem", menuitem);
 app.use("/order", order);
+app.use("/orderitem", orderitem);
 app.use("/client", client);
 app.use("/api", uploadRoutes);
 app.use("/api", geocodeRoutes);

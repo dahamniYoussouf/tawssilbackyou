@@ -162,88 +162,56 @@ export const deleteRestaurantValidator = [
 
 export const nearbyFilterValidator = [
   // Address validation (optional)
-  query("address")
+  body("address")
     .optional()
     .isString().withMessage("Address must be a string")
     .isLength({ min: 3 }).withMessage("Address must be at least 3 characters long"),
 
   // Latitude validation (optional if address provided)
-  query("lat")
+  body("lat")
     .optional()
     .isFloat({ min: -90, max: 90 }).withMessage("Latitude must be between -90 and 90"),
 
   // Longitude validation (optional if address provided)
-  query("lng")
+  body("lng")
     .optional()
     .isFloat({ min: -180, max: 180 }).withMessage("Longitude must be between -180 and 180"),
 
   // Radius validation
-  query("radius")
+  body("radius")
     .optional()
     .isInt({ min: 1, max: 50000 }).withMessage("Radius must be between 1 and 50000 meters"),
 
   // Search query validation
-  query("q")
+  body("q")
     .optional()
     .isString().withMessage("Search query must be a string")
     .isLength({ min: 1, max: 100 }).withMessage("Search query must be between 1 and 100 characters"),
 
   // Category validation
-  query("category")
+  body("category")
     .optional()
     .isString().withMessage("Category must be a string")
     .matches(/^[a-zA-Z0-9\-_]+$/).withMessage("Category must contain only alphanumeric characters, hyphens, and underscores"),
 
+  // Pagination validation
+  body("page")
+    .optional()
+    .isInt({ min: 1 }).withMessage("Page must be a positive integer"),
+
+  body("pageSize")
+    .optional()
+    .isInt({ min: 1, max: 100 }).withMessage("Page size must be between 1 and 100"),
+
   // Custom validation to ensure either address OR coordinates are provided
-  query("address")
+  body()
     .custom((value, { req }) => {
-      const { lat, lng } = req.query;
-      
-      // If address is provided, we're good
-      if (value && value.trim()) {
-        return true;
-      }
-      
-      // If no address, check for coordinates
-      if (!lat || !lng) {
-        throw new Error("Either 'address' or both 'lat' and 'lng' parameters are required");
-      }
-      
-      return true;
-    }),
+      const { address, lat, lng } = req.body;
 
-  // Additional validation for coordinates when used without address
-  query("lat")
-    .custom((value, { req }) => {
-      const { address, lng } = req.query;
-      
-      // If address is provided, coordinates are optional
-      if (address && address.trim()) {
+      if ((address && address.trim()) || (lat !== undefined && lng !== undefined)) {
         return true;
       }
-      
-      // If no address, both lat and lng are required
-      if (!value || !lng) {
-        throw new Error("Both 'lat' and 'lng' are required when 'address' is not provided");
-      }
-      
-      return true;
-    }),
 
-  query("lng")
-    .custom((value, { req }) => {
-      const { address, lat } = req.query;
-      
-      // If address is provided, coordinates are optional
-      if (address && address.trim()) {
-        return true;
-      }
-      
-      // If no address, both lat and lng are required
-      if (!value || !lat) {
-        throw new Error("Both 'lat' and 'lng' are required when 'address' is not provided");
-      }
-      
-      return true;
-    }),
+      throw new Error("Either 'address' or both 'lat' and 'lng' parameters are required");
+    })
 ];

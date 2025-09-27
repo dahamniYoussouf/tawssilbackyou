@@ -1,13 +1,21 @@
 import Restaurant from "../models/Restaurant.js";
 import MenuItem from "../models/MenuItem.js"; 
+import RestaurantCategory from "../models/RestaurantCategory.js"; 
 import { Op, fn, col, literal } from "sequelize";
 import axios from "axios";
 
 
 export const create = async (req, res, next) => {
   try {
-    const { name, description, address, lat, lng, rating, delivery_time_min, delivery_time_max, image_url, is_active, is_premium, status, opening_hours} = req.body;
-
+    const { name, description, address, lat, lng, rating, delivery_time_min, delivery_time_max, image_url, is_active, is_premium, status, opening_hours, category_id} = req.body;
+    
+    if (category_id) {
+      const category = await RestaurantCategory.findByPk(category_id);
+      if (!category) {
+        return res.status(400).json({ error: "Category not found" });
+      }
+    }
+    
     const resto = await Restaurant.create({
       name,
       description,
@@ -20,7 +28,8 @@ export const create = async (req, res, next) => {
       is_active, 
       is_premium,
       status, 
-      opening_hours
+      opening_hours, 
+      category_id
     });
 
     res.status(201).json({
@@ -116,19 +125,24 @@ export const nearby = async (req, res, next) => {
 }
 };
 
-
 export const nearbyFilter = async (req, res, next) => {
   try {
-    const { address, lat, lng, radius = 2000, q, category } = req.query;
+    // 📦 Get filters from request body
+    const {
+      address,
+      lat,
+      lng,
+      radius = 2000,
+      q,
+      category,
+      page = 1,
+      pageSize = 20
+    } = req.body;
+
     let latitude, longitude;
 
     // 🌍 Handle address-based search (geocoding)
     if (address && address.trim()) {
-      if (!address.trim()) {
-        return res.status(400).json({ error: "Adresse requise" });
-      }
-
-      // Geocoding with Nominatim
       const response = await axios.get("https://nominatim.openstreetmap.org/search", {
         params: { q: address, format: "json", limit: 1 },
         headers: { "User-Agent": "food-delivery-app" }
@@ -141,21 +155,20 @@ export const nearbyFilter = async (req, res, next) => {
       const { lat: geocodedLat, lon: geocodedLon } = response.data[0];
       latitude = parseFloat(geocodedLat);
       longitude = parseFloat(geocodedLon);
-    } 
+    }
     // 📍 Handle coordinate-based search
     else if (lat && lng) {
       latitude = parseFloat(lat);
       longitude = parseFloat(lng);
-      
-      // Validate coordinates
+
       if (isNaN(latitude) || isNaN(longitude)) {
         return res.status(400).json({ error: "Coordonnées invalides" });
       }
-    } 
+    }
     // ❌ Neither address nor coordinates provided
     else {
-      return res.status(400).json({ 
-        error: "Adresse ou coordonnées (lat, lng) requises" 
+      return res.status(400).json({
+        error: "Adresse ou coordonnées (lat, lng) requises"
       });
     }
 
@@ -171,24 +184,34 @@ export const nearbyFilter = async (req, res, next) => {
       ]
     };
 
-    // 🔎 Filter by name
+    // 🔎 Filter by restaurant name
     if (q && q.trim()) {
       whereConditions[Op.and].push({
         name: { [Op.iLike]: `%${q.trim()}%` }
       });
     }
 
-    // 🍽️ Filter by category via MenuItem
+    // 🍽️ Filter by restaurant category
     let includeOptions = [];
     if (category && category.trim()) {
       includeOptions.push({
-        model: MenuItem,
-        as: "menu_items",
-        attributes: [],
-        where: { category_id: category.trim() },
+        model: RestaurantCategory,
+        as: "category",
+        attributes: ["id", "nom"],
+        where: { id: category.trim() },
         required: true
       });
+    } else {
+      includeOptions.push({
+        model: RestaurantCategory,
+        as: "category",
+        attributes: ["id", "nom"]
+      });
     }
+
+    // 🔢 Pagination
+    const limit = parseInt(pageSize, 10);
+    const offset = (parseInt(page, 10) - 1) * limit;
 
     // 🔥 Main query
     const result = await Restaurant.findAll({
@@ -206,7 +229,8 @@ export const nearbyFilter = async (req, res, next) => {
         ["is_premium", "DESC"],
         [literal("distance"), "ASC"]
       ],
-      limit: 50
+      limit,
+      offset
     });
 
     // 📦 Format response
@@ -226,22 +250,26 @@ export const nearbyFilter = async (req, res, next) => {
         distance: r.dataValues.distance,
         is_premium: r.is_premium,
         status: r.status,
-        is_open: r.isOpen()
+        is_open: r.isOpen(),
+        category: r.category ? { id: r.category.id, name: r.category.nom } : null
       };
     });
 
     res.json({
       success: true,
       count: formatted.length,
+      page: parseInt(page, 10),
+      pageSize: limit,
       radius: searchRadius,
       center: { lat: latitude, lng: longitude },
       data: formatted,
-      searchType: address ? 'address' : 'coordinates' // Optional: indicate search type
+      searchType: address ? 'address' : 'coordinates'
     });
   } catch (err) {
     next(err);
   }
 };
+
 
 
 export const update = async (req, res, next) => {
@@ -366,7 +394,7 @@ export const nearbyByAddress = async (req, res, next) => {
       const coords = r.location?.coordinates || [];
       return {
         id: r.id,
-        name: r.name,
+        name: r.nom,
         description: r.description,
         address: r.address,
         lat: coords[1] || null,

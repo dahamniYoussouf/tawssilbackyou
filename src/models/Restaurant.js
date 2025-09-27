@@ -90,7 +90,12 @@ delivery_time_min: {
   type: DataTypes.JSON,
   allowNull: true,
   comment: "Opening hours per day, e.g.: { Mon: {open: 9:00 a.m., close: 6:00 p.m.}, Tue: {...} }"
-}
+}, 
+  category_id: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    comment: "FK to restaurant_categories.id",
+  },
 }, {
   tableName: 'restaurants',
   timestamps: true,

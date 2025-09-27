@@ -1,8 +1,10 @@
 import Restaurant from "./Restaurant.js";
 import MenuItem from "./MenuItem.js";
 import FoodCategory from "./FoodCategory.js";
+import RestaurantCategory from "./RestaurantCategory.js";
 import Client from "./Client.js";
 import Order from "./Order.js";
+import OrderItem from "./OrderItem.js";
 
 // ==========================
 // 🍽️ Restaurant & Menu Items
@@ -35,6 +37,21 @@ MenuItem.belongsTo(FoodCategory, {
 });
 
 // ==========================
+// 🏪 RestaurantCategory & Restaurants
+// ==========================
+RestaurantCategory.hasMany(Restaurant, {
+  foreignKey: "category_id",
+  as: "restaurants",
+  onDelete: "SET NULL",
+  onUpdate: "CASCADE"
+});
+
+Restaurant.belongsTo(RestaurantCategory, {
+  foreignKey: "category_id",
+  as: "category"
+});
+
+// ==========================
 // 👤 Client & Orders
 // ==========================
 Client.hasMany(Order, {
@@ -48,7 +65,6 @@ Order.belongsTo(Client, {
   foreignKey: "client_id",
   as: "client"
 });
-
 
 // ==========================
 // 🍽️ Restaurant & Orders
@@ -65,5 +81,34 @@ Order.belongsTo(Restaurant, {
   as: "restaurant"
 });
 
+// ==========================
+// 📦 Order & OrderItems
+// ==========================
+Order.hasMany(OrderItem, {
+  foreignKey: "order_id",
+  as: "order_items",
+  onDelete: "CASCADE",     // si une commande est supprimée => articles supprimés
+  onUpdate: "CASCADE"
+});
 
-export { Restaurant, MenuItem, FoodCategory, Client, Order };
+OrderItem.belongsTo(Order, {
+  foreignKey: "order_id",
+  as: "order"
+});
+
+// ==========================
+// 🍕 MenuItem & OrderItems
+// ==========================
+MenuItem.hasMany(OrderItem, {
+  foreignKey: "menu_item_id",
+  as: "order_items",
+  onDelete: "RESTRICT",    // empêche la suppression d'un menu item s'il y a des commandes
+  onUpdate: "CASCADE"
+});
+
+OrderItem.belongsTo(MenuItem, {
+  foreignKey: "menu_item_id",
+  as: "menu_item"
+});
+
+export { Restaurant, MenuItem, FoodCategory, RestaurantCategory, Client, Order, OrderItem };

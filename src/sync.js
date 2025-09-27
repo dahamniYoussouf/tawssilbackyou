@@ -3,6 +3,12 @@ import sequelize from "./config/database.js";
 import "./models/Order.js";
 import "./models/Restaurant.js";
 import "./models/Client.js";
+import "./models/RestaurantCategory.js";
+import "./models/MenuItem.js";
+import "./models/FoodCategory.js";
+import "./models/OrderItem.js";
+
+
 // import any other models you have (Livreur, Menu, etc.)
 
 (async () => {
