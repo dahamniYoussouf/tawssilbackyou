@@ -11,6 +11,8 @@ const swaggerOutput = JSON.parse(readFileSync('./swagger-output.json', 'utf8'));
 import { securityMiddlewares } from "./middlewares/security.js";
 import { errorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
 
+import "./models/index.js";
+
 import restaurant from "./routes/restaurant.route.js";
 import foodcategory from "./routes/foodCategory.route.js";
 import menuitem from "./routes/menuItem.route.js";

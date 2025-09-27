@@ -1,4 +1,5 @@
 import Restaurant from "../models/Restaurant.js";
+import MenuItem from "../models/MenuItem.js"; 
 import { Op, fn, col, literal } from "sequelize";
 import axios from "axios";
 
@@ -113,6 +114,92 @@ export const nearby = async (req, res, next) => {
   } catch (err) {       
     next(err);
 }
+};
+
+
+export const nearbyfilter = async (req, res, next) => {
+  try {
+    const { lat, lng, radius = 2000, q, category } = req.query;
+
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lng);
+    const searchRadius = parseInt(radius);
+
+    const whereConditions = {
+      [Op.and]: [
+        { is_active: true },
+        literal(
+          `ST_DWithin(location, ST_GeogFromText('POINT(${longitude} ${latitude})'), ${searchRadius})`
+        )
+      ]
+    };
+
+    // 🔎 Filtre par nom
+    if (q && q.trim()) {
+      whereConditions[Op.and].push({
+        name: { [Op.iLike]: `%${q.trim()}%` }  // PostgreSQL
+      });
+    }
+
+    let includeOptions = [];
+    if (category && category.trim()) {
+      includeOptions.push({
+        model: MenuItem,
+        as: "menu_items",                
+        attributes: [],                 
+        where: { category_id: category.trim() },  
+        required: true                   
+      });
+    }
+
+    const result = await Restaurant.findAll({
+      attributes: {
+        include: [
+          [
+            literal(`ST_Distance(location, ST_GeogFromText('POINT(${longitude} ${latitude})'))`),
+            'distance'
+          ]
+        ]
+      },
+      where: whereConditions,
+      include: includeOptions, // <-- important
+      order: [
+        ['is_premium', 'DESC'],
+        [literal('distance'), 'ASC']
+      ],
+      limit: 50
+    });
+
+    const formatted = result.map(r => {
+      const coords = r.location?.coordinates || [];
+      return {
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        address: r.address,
+        lat: coords[1] || null,
+        lng: coords[0] || null,
+        rating: r.rating,
+        delivery_time_min: r.delivery_time_min,
+        delivery_time_max: r.delivery_time_max,
+        image_url: r.image_url,
+        distance: r.dataValues.distance,
+        is_premium: r.is_premium,
+        status: r.status,
+        is_open: r.isOpen()
+      };
+    });
+
+    res.json({
+      success: true,
+      count: formatted.length,
+      radius: searchRadius,
+      center: { lat: latitude, lng: longitude },
+      data: formatted
+    });
+  } catch (err) {
+    next(err);
+  }
 };
 
 
