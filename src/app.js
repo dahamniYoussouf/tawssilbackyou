@@ -16,6 +16,8 @@ import "./models/index.js";
 import restaurant from "./routes/restaurant.route.js";
 import foodcategory from "./routes/foodCategory.route.js";
 import menuitem from "./routes/menuItem.route.js";
+import order from "./routes/order.route.js";
+import client from "./routes/client.route.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import geocodeRoutes from "./routes/geocode.js";
 
@@ -39,6 +41,8 @@ app.get("/health", (_, res) => res.send("OK"));
 app.use("/restaurant", restaurant);
 app.use("/foodcategory", foodcategory);
 app.use("/menuitem", menuitem);
+app.use("/order", order);
+app.use("/client", client);
 app.use("/api", uploadRoutes);
 app.use("/api", geocodeRoutes);
 

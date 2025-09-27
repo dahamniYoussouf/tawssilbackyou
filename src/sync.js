@@ -1,16 +1,23 @@
-const sequelize = require('./config/database');
-const Restaurant = require('./models/Restaurant');
+// src/sync.js
+import sequelize from "./config/database.js";
+import "./models/Order.js";
+import "./models/Restaurant.js";
+import "./models/Client.js";
+// import any other models you have (Livreur, Menu, etc.)
 
 (async () => {
   try {
     await sequelize.authenticate();
-    console.log('✅ Connexion réussie à PostgreSQL');
+    console.log("✅ Database connected");
 
-    await sequelize.sync({ alter: true }); 
-    console.log('✅ Tables synchronisées');
+    // This will create the missing tables
+    await sequelize.sync({ force: true }); 
+    // Or { force: true } if you want to drop & recreate (⚠️ will delete data!)
 
-    process.exit();
-  } catch (err) {
-    console.error('❌ Erreur de connexion :', err);
+    console.log("✅ Database synchronized");
+    process.exit(0);
+  } catch (error) {
+    console.error("❌ Sync failed:", error);
+    process.exit(1);
   }
 })();
