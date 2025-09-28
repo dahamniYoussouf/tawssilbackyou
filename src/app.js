@@ -20,6 +20,7 @@ import menuitem from "./routes/menuItem.route.js";
 import order from "./routes/order.route.js";
 import orderitem from "./routes/orderItem.route.js";
 import client from "./routes/client.route.js";
+import announcement from "./routes/announcement.route.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import geocodeRoutes from "./routes/geocode.js";
 
@@ -47,6 +48,7 @@ app.use("/menuitem", menuitem);
 app.use("/order", order);
 app.use("/orderitem", orderitem);
 app.use("/client", client);
+app.use("/announcement", announcement);
 app.use("/api", uploadRoutes);
 app.use("/api", geocodeRoutes);
 
