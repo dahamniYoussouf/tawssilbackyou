@@ -7,9 +7,10 @@ import "./models/RestaurantCategory.js";
 import "./models/MenuItem.js";
 import "./models/FoodCategory.js";
 import "./models/OrderItem.js";
+import "./models/OrderStatusHistory.js";
 
-
-// import any other models you have (Livreur, Menu, etc.)
+// Import associations
+import "./models/index.js";
 
 (async () => {
   try {

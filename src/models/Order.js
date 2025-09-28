@@ -1,5 +1,7 @@
 import { DataTypes, Op } from "sequelize";
 import { sequelize } from "../config/database.js";
+import OrderStatusHistory from './OrderStatusHistory.js';
+
 
 const Order = sequelize.define('Order', {
   id: {
@@ -381,5 +383,29 @@ Order.prototype.generateOrderNumber = async function() {
   this.order_number = await Order.generateOrderNumber(this.order_type);
   return this.order_number;
 };
+
+Order.addHook('afterUpdate', async (order, options) => {
+  if (order.changed('status')) {
+    const previousStatus = order._previousDataValues.status;
+    
+    await OrderStatusHistory.create({
+      order_id: order.id,
+      old_status: previousStatus,
+      new_status: order.status,
+      changed_by: options.changedBy || 'system',
+      notes: options.changeNotes || null
+    });
+  }
+});
+
+// 🏷️ Nouvelle méthode pour récupérer l'historique
+Order.prototype.getStatusHistory = async function() {
+  return await OrderStatusHistory.findAll({
+    where: { order_id: this.id },
+    order: [['created_at', 'ASC']]
+  });
+};
+
+
 
 export default Order;

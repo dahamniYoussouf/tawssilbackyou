@@ -12,7 +12,7 @@ router.get('/client/:clientId', getClientOrdersValidator, validate, orderControl
 router.get('/:id', getOrderByIdValidator, validate, orderController.getOrderById);
 router.put('/update/:id', updateOrderValidator, validate, orderController.updateOrder);
 router.delete('/delete/:id', deleteOrderValidator, validate, orderController.deleteOrder);
-router.patch('/:id/status', updateOrderStatusValidator, validate, orderController.updateOrderStatus);
+router.patch('/updateorderstatus/:id/status', updateOrderStatusValidator, validate, orderController.updateOrderStatus);
 router.patch('/:id/payment', updatePaymentStatusValidator, validate, orderController.updatePaymentStatus);
 router.patch('/:id/assign-delivery', assignDeliveryPersonValidator, validate, orderController.assignDeliveryPerson);
 router.post('/:id/rating', addRatingValidator, validate, orderController.addRating);

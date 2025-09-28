@@ -5,6 +5,7 @@ import RestaurantCategory from "./RestaurantCategory.js";
 import Client from "./Client.js";
 import Order from "./Order.js";
 import OrderItem from "./OrderItem.js";
+import OrderStatusHistory from "./OrderStatusHistory.js";
 
 // ==========================
 // 🍽️ Restaurant & Menu Items
@@ -111,4 +112,20 @@ OrderItem.belongsTo(MenuItem, {
   as: "menu_item"
 });
 
-export { Restaurant, MenuItem, FoodCategory, RestaurantCategory, Client, Order, OrderItem };
+// ==========================
+// 📊 Order & OrderStatusHistory
+// ==========================
+Order.hasMany(OrderStatusHistory, {
+  foreignKey: "order_id",
+  as: "status_history",
+  onDelete: "CASCADE",     // si une commande est supprimée => historique supprimé
+  onUpdate: "CASCADE"
+});
+
+OrderStatusHistory.belongsTo(Order, {
+  foreignKey: "order_id",
+  as: "order"
+});
+
+
+export { Restaurant, MenuItem, FoodCategory, RestaurantCategory, Client, Order, OrderItem, OrderStatusHistory  };
