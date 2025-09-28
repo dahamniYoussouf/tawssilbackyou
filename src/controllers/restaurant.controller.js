@@ -423,3 +423,75 @@ export const nearbyByAddress = async (req, res, next) => {
 };
 
 
+export const getNearbyNames = async (req, res, next) => {
+  try {
+    const { address, lat, lng, radius = 2000 } = req.body; // <-- body JSON
+
+    let latitude, longitude;
+
+    // Géocoder si adresse fournie
+    if (address && address.trim()) {
+      const response = await axios.get("https://nominatim.openstreetmap.org/search", {
+        params: { q: address, format: "json", limit: 1 },
+        headers: { "User-Agent": "food-delivery-app" }
+      });
+
+      if (response.data.length === 0) {
+        return res.status(404).json({ error: "Adresse introuvable" });
+      }
+
+      const { lat: geocodedLat, lon: geocodedLon } = response.data[0];
+      latitude = parseFloat(geocodedLat);
+      longitude = parseFloat(geocodedLon);
+    } 
+    // Sinon utiliser lat/lng
+    else if (lat && lng) {
+      latitude = parseFloat(lat);
+      longitude = parseFloat(lng);
+
+      if (isNaN(latitude) || isNaN(longitude)) {
+        return res.status(400).json({ error: "Coordonnées invalides" });
+      }
+    } 
+    // Ni adresse ni coordonnées
+    else {
+      return res.status(400).json({ error: "Adresse ou coordonnées (lat, lng) requises" });
+    }
+
+    const searchRadius = parseInt(radius, 10);
+
+    const restaurants = await Restaurant.findAll({
+      attributes: [
+        'name',
+        [literal(`ST_Distance(location, ST_GeogFromText('POINT(${longitude} ${latitude})'))`), 'distance']
+      ],
+      where: {
+        [Op.and]: [
+          { is_active: true },
+          literal(`ST_DWithin(location, ST_GeogFromText('POINT(${longitude} ${latitude})'), ${searchRadius})`)
+        ]
+      },
+      order: [
+        ['is_premium', 'DESC'],
+        [literal('distance'), 'ASC']
+      ],
+      limit: 50
+    });
+
+    // Tableau des noms uniquement
+    const names = restaurants.map(r => r.name);
+
+    res.json({
+      success: true,
+      count: names.length,
+      radius: searchRadius,
+      center: { lat: latitude, lng: longitude },
+      data: names,
+      searchType: address ? 'address' : 'coordinates'
+    });
+
+  } catch (err) {
+    next(err);
+  }
+};
+

@@ -1,10 +1,29 @@
 import OrderItem from "../models/OrderItem.js";
 import MenuItem from "../models/MenuItem.js";
+import Order from "../models/Order.js";
 
 // Create a new Order item
 export const create = async (req, res, next) => {
   try {
     const { order_id, menu_item_id, quantite, prix_unitaire, prix_total, instructions_speciales, customizations, statut } = req.body;
+
+     // Vérifier que la commande existe
+    const order = await Order.findByPk(order_id);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    // Vérifier que le menu item existe
+    const menuItem = await MenuItem.findByPk(menu_item_id);
+    if (!menuItem) {
+      return res.status(404).json({
+        success: false,
+        message: "Menu item not found"
+      });
+    }
 
     const orderItem = await OrderItem.create({
       order_id,

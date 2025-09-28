@@ -1,4 +1,6 @@
 import MenuItem from "../models/MenuItem.js";
+import Restaurant from "../models/Restaurant.js";
+import Category from "../models/FoodCategory.js";
 
 // Create a new menu item
 export const create = async (req, res, next) => {
@@ -15,6 +17,18 @@ export const create = async (req, res, next) => {
       photo_url,
       disponible
     } = req.body;
+
+     // Vérifier si le restaurant existe
+    const restaurant = await Restaurant.findByPk(restaurant_id);
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: "Restaurant not found" });
+    }
+
+    // Vérifier si la catégorie existe
+    const category = await Category.findByPk(category_id);
+    if (!category) {
+      return res.status(404).json({ success: false, message: "Category not found" });
+    }
 
     const item = await MenuItem.create({
       restaurant_id,

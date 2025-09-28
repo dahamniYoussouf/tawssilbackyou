@@ -37,6 +37,15 @@ export const createOrder = async (req, res, next) => {
         error: "Restaurant not found"
       });
     }
+    
+    // Vérifier que le client existe
+    const client = await Client.findByPk(client_id);
+    if (!client) {
+      return res.status(404).json({
+        success: false,
+        error: "Client not found"
+      });
+    }
 
     // Créer la commande
     const orderData = {

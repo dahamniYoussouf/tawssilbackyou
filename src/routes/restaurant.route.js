@@ -10,6 +10,7 @@ router.put("/update/:id", updateRestaurantValidator, validate, restaurantCtrl.up
 router.delete("/delete/:id", deleteRestaurantValidator, validate, restaurantCtrl.remove);
 router.get("/nearby", nearbyRestaurantValidator, validate, restaurantCtrl.nearby);
 router.post("/nearbyfilter",nearbyFilterValidator, validate, restaurantCtrl.nearbyFilter);
+router.post("/getnearbynames",nearbyFilterValidator, validate, restaurantCtrl.getNearbyNames);
 router.get("/getall", restaurantCtrl.getAll);
 
 
