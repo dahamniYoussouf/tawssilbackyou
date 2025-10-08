@@ -8,7 +8,6 @@ const router = Router();
 router.post("/create", createRestaurantValidator, validate, restaurantCtrl.create);
 router.put("/update/:id", updateRestaurantValidator, validate, restaurantCtrl.update);
 router.delete("/delete/:id", deleteRestaurantValidator, validate, restaurantCtrl.remove);
-router.get("/nearby", nearbyRestaurantValidator, validate, restaurantCtrl.nearby);
 router.post("/nearbyfilter",nearbyFilterValidator, validate, restaurantCtrl.nearbyFilter);
 router.post("/getnearbynames",nearbyFilterValidator, validate, restaurantCtrl.getNearbyNames);
 router.get("/getall", restaurantCtrl.getAll);

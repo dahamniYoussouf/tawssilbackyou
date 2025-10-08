@@ -9,6 +9,17 @@ const FoodCategory = sequelize.define("FoodCategory", {
     primaryKey: true,
     comment: "Primary key (UUID)",
   },
+  restaurant_id: {
+    type: DataTypes.UUID,
+    allowNull: false,
+    references: {
+      model: 'restaurants',
+      key: 'id'
+    },
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+    comment: "Foreign key to restaurant"
+  },
   nom: {
     type: DataTypes.STRING,
     allowNull: false,

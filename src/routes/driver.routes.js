@@ -1,0 +1,31 @@
+import express from "express";
+import {
+  create,
+  getAll,
+  getById,
+  update,
+  remove,
+  updateStatus,
+  updateLocation,
+  completeOrder,
+  getAvailable,
+  getStatistics
+} from "../controllers/driver.controller.js";
+
+const router = express.Router();
+
+// Basic CRUD
+router.post("/create", create);
+router.get("/getall", getAll);
+router.get("/getavailable", getAvailable);
+router.get("/:id", getById);
+router.put("/update/:id", update);
+router.delete("/delete/:id", remove);
+
+// Driver-specific operations
+router.patch("/:id/status", updateStatus);
+router.patch("/:id/location", updateLocation);
+router.post("/:id/complete-order", completeOrder);
+router.get("/:id/statistics", getStatistics);
+
+export default router;

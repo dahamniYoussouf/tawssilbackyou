@@ -1,121 +1,126 @@
-import MenuItem from "../models/MenuItem.js";
-import Restaurant from "../models/Restaurant.js";
-import Category from "../models/FoodCategory.js";
+import * as menuItemService from "../services/menuItem.service.js";
 
-// Create a new menu item
+/**
+ * Create a new menu item
+ */
 export const create = async (req, res, next) => {
   try {
-    const {
-      restaurant_id,
-      category_id,
-      nom,
-      description,
-      prix,
-      temps_preparation,
-      ingredients,
-      allergenes,
-      photo_url,
-      disponible
-    } = req.body;
-
-     // Vérifier si le restaurant existe
-    const restaurant = await Restaurant.findByPk(restaurant_id);
-    if (!restaurant) {
-      return res.status(404).json({ success: false, message: "Restaurant not found" });
-    }
-
-    // Vérifier si la catégorie existe
-    const category = await Category.findByPk(category_id);
-    if (!category) {
-      return res.status(404).json({ success: false, message: "Category not found" });
-    }
-
-    const item = await MenuItem.create({
-      restaurant_id,
-      category_id,
-      nom,
-      description,
-      prix,
-      temps_preparation,
-      ingredients,
-      allergenes,
-      photo_url,
-      disponible
+    const item = await menuItemService.createMenuItem(req.body);
+    res.status(201).json({
+      success: true,
+      data: item
     });
-
-    res.status(201).json({ success: true, data: item });
   } catch (err) {
     next(err);
   }
 };
 
-// Get all menu items
+/**
+ * Get all menu items with optional filters (pagination, search, etc.)
+ */
 export const getAll = async (req, res, next) => {
   try {
-    const items = await MenuItem.findAll({
-      order: [["created_at", "DESC"]],
+    const filters = req.query;
+    const result = await menuItemService.getAllMenuItems(filters);
+    res.json({
+      success: true,
+      ...result
     });
-
-    res.json({ success: true, data: items });
   } catch (err) {
     next(err);
   }
 };
 
-// Update a menu item by UUID
+/**
+ * Get menu item by ID
+ */
+export const getById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const item = await menuItemService.getMenuItemById(id);
+    res.json({
+      success: true,
+      data: item
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Get menu items by category (with favorite support)
+ */
+export const getByCategory = async (req, res, next) => {
+  try {
+    const result = await menuItemService.getMenuItemsByCategory(req.body);
+    res.json({
+      success: true,
+      count: result.count,
+      data: result.items
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Update a menu item by ID
+ */
 export const update = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const updates = req.body;
-
-    const item = await MenuItem.findOne({ where: { id } });
-
-    if (!item) {
-      return res.status(404).json({ success: false, message: "Menu item not found" });
-    }
-
-    await item.update(updates);
-
-    res.json({ success: true, data: item });
+    const item = await menuItemService.updateMenuItem(id, req.body);
+    res.json({
+      success: true,
+      data: item
+    });
   } catch (err) {
     next(err);
   }
 };
 
-// Delete a menu item by UUID
+/**
+ * Toggle a menu item's availability
+ */
+export const toggleAvailability = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await menuItemService.toggleAvailability(id);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Bulk update availability for multiple items
+ */
+export const bulkUpdateAvailability = async (req, res, next) => {
+  try {
+    const { menu_item_ids, is_available } = req.body;
+    const result = await menuItemService.bulkUpdateAvailability(menu_item_ids, is_available);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Delete a menu item by ID
+ */
 export const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
-
-    const deleted = await MenuItem.destroy({ where: { id } });
-
-    if (!deleted) {
-      return res.status(404).json({ success: false, message: "Menu item not found" });
-    }
-
-    res.status(200).json({ success: true, message: "Menu item deleted successfully" });
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const getByRestaurantAndCategory = async (req, res, next) => {
-  try {
-    const { restaurantId, categoryId } = req.query;
-
-    const where = {};
-    if (restaurantId) where.restaurant_id = restaurantId;
-    if (categoryId) where.category_id = categoryId;
-
-    const items = await MenuItem.findAll({
-      where,
-      order: [["created_at", "DESC"]],
-    });
-
-    res.json({
+    await menuItemService.deleteMenuItem(id);
+    res.status(200).json({
       success: true,
-      count: items.length,
-      data: items,
+      message: "Menu item deleted successfully"
     });
   } catch (err) {
     next(err);

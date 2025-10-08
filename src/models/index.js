@@ -1,11 +1,13 @@
 import Restaurant from "./Restaurant.js";
 import MenuItem from "./MenuItem.js";
 import FoodCategory from "./FoodCategory.js";
-import RestaurantCategory from "./RestaurantCategory.js";
 import Client from "./Client.js";
 import Order from "./Order.js";
 import OrderItem from "./OrderItem.js";
-import OrderStatusHistory from "./OrderStatusHistory.js";
+import FavoriteMeal from "./FavoriteMeal.js";
+import FavoriteRestaurant from "./FavoriteRestaurant.js";
+import Driver from "./Driver.js";
+
 
 // ==========================
 // 🍽️ Restaurant & Menu Items
@@ -37,20 +39,6 @@ MenuItem.belongsTo(FoodCategory, {
   as: "category"
 });
 
-// ==========================
-// 🏪 RestaurantCategory & Restaurants
-// ==========================
-RestaurantCategory.hasMany(Restaurant, {
-  foreignKey: "category_id",
-  as: "restaurants",
-  onDelete: "SET NULL",
-  onUpdate: "CASCADE"
-});
-
-Restaurant.belongsTo(RestaurantCategory, {
-  foreignKey: "category_id",
-  as: "category"
-});
 
 // ==========================
 // 👤 Client & Orders
@@ -113,19 +101,125 @@ OrderItem.belongsTo(MenuItem, {
 });
 
 // ==========================
-// 📊 Order & OrderStatusHistory
+// ⭐ Client & Favorite Restaurants (Many-to-Many)
 // ==========================
-Order.hasMany(OrderStatusHistory, {
-  foreignKey: "order_id",
-  as: "status_history",
-  onDelete: "CASCADE",     // si une commande est supprimée => historique supprimé
+Client.belongsToMany(Restaurant, {
+  through: FavoriteRestaurant,
+  foreignKey: "client_id",
+  otherKey: "restaurant_id",
+  as: "favorite_restaurants"
+});
+
+Restaurant.belongsToMany(Client, {
+  through: FavoriteRestaurant,
+  foreignKey: "restaurant_id",
+  otherKey: "client_id",
+  as: "favorited_by_clients"
+});
+
+// Direct associations for easier queries
+Client.hasMany(FavoriteRestaurant, {
+  foreignKey: "client_id",
+  as: "restaurant_favorites",
+  onDelete: "CASCADE",
   onUpdate: "CASCADE"
 });
 
-OrderStatusHistory.belongsTo(Order, {
-  foreignKey: "order_id",
-  as: "order"
+FavoriteRestaurant.belongsTo(Client, {
+  foreignKey: "client_id",
+  as: "client"
+});
+
+FavoriteRestaurant.belongsTo(Restaurant, {
+  foreignKey: "restaurant_id",
+  as: "restaurant"
+});
+
+Restaurant.hasMany(FavoriteRestaurant, {
+  foreignKey: "restaurant_id",
+  as: "client_favorites",
+  onDelete: "CASCADE",
+  onUpdate: "CASCADE"
+});
+
+// ==========================
+// ❤️ Restaurant & FoodCategory  (One-to-Many)
+// ==========================
+Restaurant.hasMany(FoodCategory, {
+  foreignKey: 'restaurant_id',
+  as: 'foodCategories',
+  onDelete: 'CASCADE'
+});
+
+FoodCategory.belongsTo(Restaurant, {
+  foreignKey: 'restaurant_id',
+  as: 'restaurant'
+});
+
+// ==========================
+// ❤️ Client & Favorite Meals (Many-to-Many)
+// ==========================
+Client.belongsToMany(MenuItem, {
+  through: FavoriteMeal,
+  foreignKey: "client_id",
+  otherKey: "meal_id",
+  as: "favorite_meals"
+});
+
+MenuItem.belongsToMany(Client, {
+  through: FavoriteMeal,
+  foreignKey: "meal_id",
+  otherKey: "client_id",
+  as: "favorited_by_clients"
+});
+
+// Direct associations for easier queries
+Client.hasMany(FavoriteMeal, {
+  foreignKey: "client_id",
+  as: "meal_favorites",
+  onDelete: "CASCADE",
+  onUpdate: "CASCADE"
+});
+
+FavoriteMeal.belongsTo(Client, {
+  foreignKey: "client_id",
+  as: "client"
+});
+
+FavoriteMeal.belongsTo(MenuItem, {
+  foreignKey: "meal_id",
+  as: "meal"
+});
+
+MenuItem.hasMany(FavoriteMeal, {
+  foreignKey: "meal_id",
+  as: "client_favorites",
+  onDelete: "CASCADE",
+  onUpdate: "CASCADE"
+});
+
+// Order <-> Driver (for livreur_id)
+Order.belongsTo(Driver, {
+  foreignKey: 'livreur_id',
+  as: 'driver'
+});
+
+Driver.hasMany(Order, {
+  foreignKey: 'livreur_id',
+  as: 'orders'
 });
 
 
-export { Restaurant, MenuItem, FoodCategory, RestaurantCategory, Client, Order, OrderItem, OrderStatusHistory  };
+
+export { 
+  Restaurant, 
+  MenuItem, 
+  FoodCategory, 
+  Client, 
+  Order, 
+  OrderItem, 
+  FavoriteRestaurant,
+  FavoriteMeal, 
+  Driver
+};
+

@@ -46,22 +46,6 @@ const Restaurant = sequelize.define('Restaurant', {
     },
     comment: 'Note sur 5 étoiles'
   },
-delivery_time_min: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    validate: {
-      min: 0
-    },
-    comment: 'Temps de livraison minimum en minutes'
-  },
-  delivery_time_max: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    validate: {
-      min: 0
-    },
-    comment: 'Temps de livraison maximum en minutes'
-  },
   image_url: {
     type: DataTypes.STRING,
     allowNull: true,
@@ -83,18 +67,37 @@ delivery_time_min: {
     comment: 'Restaurant premium ou non'
   },
   status: {
-  type: DataTypes.ENUM("pending", "approved", "suspended", "archived"),
-  defaultValue: "pending"
+    type: DataTypes.ENUM("pending", "approved", "suspended", "archived"),
+    defaultValue: "pending"
   },
   opening_hours: {
-  type: DataTypes.JSON,
-  allowNull: true,
-  comment: "Opening hours per day, e.g.: { Mon: {open: 9:00 a.m., close: 6:00 p.m.}, Tue: {...} }"
-}, 
-  category_id: {
-    type: DataTypes.UUID,
+    type: DataTypes.JSON,
     allowNull: true,
-    comment: "FK to restaurant_categories.id",
+    comment: "Opening hours per day, e.g.: { Mon: {open: 9:00 a.m., close: 6:00 p.m.}, Tue: {...} }"
+  }, 
+  categories: {
+    type: DataTypes.ARRAY(DataTypes.ENUM(
+      'pizza',
+      'burger',
+      'tacos',
+      'sandwish'
+    )),
+    allowNull: false,
+    defaultValue: [],
+    validate: {
+      notEmpty: {
+        msg: 'Restaurant must have at least one category'
+      },
+      isValidArray(value) {
+        if (!Array.isArray(value)) {
+          throw new Error('Categories must be an array');
+        }
+        if (value.length === 0) {
+          throw new Error('Restaurant must have at least one category');
+        }
+      }
+    },
+    comment: "Restaurant categories (can have multiple)"
   },
 }, {
   tableName: 'restaurants',
@@ -104,6 +107,7 @@ delivery_time_min: {
   updatedAt: 'updated_at'
 });
 
+// Helper methods
 Restaurant.prototype.setCoordinates = function(longitude, latitude) {
   this.location = {
     type: 'Point',
@@ -121,12 +125,6 @@ Restaurant.prototype.getCoordinates = function() {
   return null;
 };
 
-Restaurant.prototype.getDeliveryTimeRange = function() {
-  if (this.delivery_time_min && this.delivery_time_max) {
-    return `${this.delivery_time_min}-${this.delivery_time_max} min`;
-  }
-  return null;
-};
 
 Restaurant.prototype.isOpen = function () {
   if (!this.opening_hours) return false;
@@ -139,6 +137,25 @@ Restaurant.prototype.isOpen = function () {
   if (!todayHours) return false;
 
   return currentTime >= todayHours.open && currentTime <= todayHours.close;
+};
+
+Restaurant.prototype.hasCategory = function(category) {
+  return this.categories && this.categories.includes(category);
+};
+
+Restaurant.prototype.addCategory = function(category) {
+  if (!this.categories) {
+    this.categories = [];
+  }
+  if (!this.categories.includes(category)) {
+    this.categories.push(category);
+  }
+};
+
+Restaurant.prototype.removeCategory = function(category) {
+  if (this.categories) {
+    this.categories = this.categories.filter(cat => cat !== category);
+  }
 };
 
 export default Restaurant;

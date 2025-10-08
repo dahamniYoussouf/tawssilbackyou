@@ -1,336 +1,302 @@
-import { body, query, param } from "express-validator";
+import { body, param, query } from "express-validator";
 
-// 🆕 CREATE ORDER VALIDATOR
+// ==================== ORDER CRUD VALIDATORS ====================
+
+export const createOrderWithItemsValidator = [
+  body('client_id')
+    .notEmpty().withMessage('Client ID is required')
+    .isUUID().withMessage('Invalid client ID format'),
+  
+  body('restaurant_id')
+    .notEmpty().withMessage('Restaurant ID is required')
+    .isUUID().withMessage('Invalid restaurant ID format'),
+  
+  body('order_type')
+    .optional()
+    .isIn(['delivery', 'pickup']).withMessage('Order type must be delivery or pickup'),
+  
+  body('delivery_address')
+    .if(body('order_type').equals('delivery'))
+    .notEmpty().withMessage('Delivery address is required for delivery orders'),
+  
+  body('lat')
+    .optional()
+    .isFloat({ min: -90, max: 90 }).withMessage('Invalid latitude'),
+  
+  body('lng')
+    .optional()
+    .isFloat({ min: -180, max: 180 }).withMessage('Invalid longitude'),
+  
+  body('delivery_fee')
+    .optional()
+    .isFloat({ min: 0 }).withMessage('Delivery fee must be positive'),
+  
+  // REMOVED: subtotal is auto-calculated from items
+  body('subtotal')
+    .optional()
+    .isFloat({ min: 0 }).withMessage('Subtotal must be positive'),
+  
+  body('payment_method')
+    .notEmpty().withMessage('Payment method is required')
+    .isIn(['baridi_mob', 'cash_on_delivery', 'bank_transfer'])
+    .withMessage('Invalid payment method'),
+  
+  body('delivery_instructions')
+    .optional()
+    .isString().withMessage('Delivery instructions must be a string'),
+  
+  body('items')
+    .isArray({ min: 1 }).withMessage('At least one item is required'),
+  
+  body('items.*.menu_item_id')
+    .notEmpty().withMessage('Menu item ID is required')
+    .isUUID().withMessage('Invalid menu item ID'),
+  
+  body('items.*.quantity')
+    .notEmpty().withMessage('Quantity is required')
+    .isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
+  
+  // REMOVED: unit_price is fetched from MenuItem model
+  body('items.*.unit_price')
+    .optional()
+    .isFloat({ min: 0 }).withMessage('Unit price must be positive'),
+  
+  body('items.*.special_instructions')
+    .optional()
+    .isString().withMessage('Special instructions must be a string'),
+  
+  // Support legacy field name
+  body('items.*.customizations')
+    .optional()
+    .isString().withMessage('Customizations must be a string')
+];
+
 export const createOrderValidator = [
-  body("client_id")
-    .notEmpty().withMessage("client_id is required")
-    .isUUID().withMessage("client_id must be a valid UUID"),
-
-  body("restaurant_id")
-    .notEmpty().withMessage("restaurant_id is required")
-    .isUUID().withMessage("restaurant_id must be a valid UUID"),
-
-  body("order_type")
+  body('client_id')
+    .notEmpty().withMessage('Client ID is required')
+    .isUUID().withMessage('Invalid client ID format'),
+  
+  body('restaurant_id')
+    .notEmpty().withMessage('Restaurant ID is required')
+    .isUUID().withMessage('Invalid restaurant ID format'),
+  
+  body('order_type')
     .optional()
-    .isIn(["delivery", "pickup"]).withMessage("order_type must be 'delivery' or 'pickup'"),
-
-  body("subtotal")
-    .notEmpty().withMessage("subtotal is required")
-    .isFloat({ min: 0 }).withMessage("subtotal must be a positive number"),
-
-  body("delivery_fee")
-    .optional()
-    .isFloat({ min: 0 }).withMessage("delivery_fee must be a positive number"),
-
-  body("service_fee")
-    .optional()
-    .isFloat({ min: 0 }).withMessage("service_fee must be a positive number"),
-
-  body("tax_amount")
-    .optional()
-    .isFloat({ min: 0 }).withMessage("tax_amount must be a positive number"),
-
-  body("discount_amount")
-    .optional()
-    .isFloat({ min: 0 }).withMessage("discount_amount must be a positive number"),
-
-  body("tip_amount")
-    .optional()
-    .isFloat({ min: 0 }).withMessage("tip_amount must be a positive number"),
-
-  body("payment_method")
-    .optional()
-    .isIn(["baridi_mob", "cash_on_delivery", "bank_transfer"])
-    .withMessage("payment_method must be 'baridi_mob', 'cash_on_delivery', or 'bank_transfer'"),
-
-  // Validation conditionnelle pour delivery
-  body("delivery_address")
-    .custom((value, { req }) => {
-      if (req.body.order_type === 'delivery' && !value) {
-        throw new Error("delivery_address is required for delivery orders");
-      }
-      return true;
-    }),
-
-  body("lat")
-    .custom((value, { req }) => {
-      if (req.body.order_type === 'delivery') {
-        if (!value) throw new Error("lat is required for delivery orders");
-        if (isNaN(value) || value < -90 || value > 90) {
-          throw new Error("lat must be between -90 and 90");
-        }
-      }
-      return true;
-    }),
-
-  body("lng")
-    .custom((value, { req }) => {
-      if (req.body.order_type === 'delivery') {
-        if (!value) throw new Error("lng is required for delivery orders");
-        if (isNaN(value) || value < -180 || value > 180) {
-          throw new Error("lng must be between -180 and 180");
-        }
-      }
-      return true;
-    }),
-
-  body("pickup_time")
-    .optional()
-    .isISO8601().withMessage("pickup_time must be a valid ISO8601 date"),
-
-  body("scheduled_for")
-    .optional()
-    .isISO8601().withMessage("scheduled_for must be a valid ISO8601 date"),
-
-  body("is_scheduled")
-    .optional()
-    .isBoolean().withMessage("is_scheduled must be true or false"),
-
-  body("delivery_instructions")
-    .optional()
-    .isString().withMessage("delivery_instructions must be a string")
-    .isLength({ max: 500 }).withMessage("delivery_instructions must be less than 500 characters"),
-
-  body("pickup_instructions")
-    .optional()
-    .isString().withMessage("pickup_instructions must be a string")
-    .isLength({ max: 500 }).withMessage("pickup_instructions must be less than 500 characters"),
-
-  body("special_requests")
-    .optional()
-    .isString().withMessage("special_requests must be a string")
-    .isLength({ max: 1000 }).withMessage("special_requests must be less than 1000 characters"),
-
-  body("coupon_code")
-    .optional()
-    .isString().withMessage("coupon_code must be a string")
-    .matches(/^[A-Z0-9]{3,20}$/).withMessage("coupon_code must be 3-20 alphanumeric characters")
+    .isIn(['delivery', 'pickup']).withMessage('Order type must be delivery or pickup'),
+  
+  body('delivery_address')
+    .if(body('order_type').equals('delivery'))
+    .notEmpty().withMessage('Delivery address is required for delivery orders'),
+  
+  body('subtotal')
+    .notEmpty().withMessage('Subtotal is required')
+    .isFloat({ min: 0 }).withMessage('Subtotal must be positive'),
+  
+  body('payment_method')
+    .notEmpty().withMessage('Payment method is required')
+    .isIn(['baridi_mob', 'cash_on_delivery', 'bank_transfer'])
+    .withMessage('Invalid payment method')
 ];
 
-// ✏️ UPDATE ORDER VALIDATOR
-export const updateOrderValidator = [
-  param("id")
-    .notEmpty().withMessage("Order ID is required")
-    .isUUID().withMessage("Order ID must be a valid UUID"),
-
-  body("subtotal")
-    .optional()
-    .isFloat({ min: 0 }).withMessage("subtotal must be a positive number"),
-
-  body("delivery_fee")
-    .optional()
-    .isFloat({ min: 0 }).withMessage("delivery_fee must be a positive number"),
-
-  body("service_fee")
-    .optional()
-    .isFloat({ min: 0 }).withMessage("service_fee must be a positive number"),
-
-  body("tax_amount")
-    .optional()
-    .isFloat({ min: 0 }).withMessage("tax_amount must be a positive number"),
-
-  body("discount_amount")
-    .optional()
-    .isFloat({ min: 0 }).withMessage("discount_amount must be a positive number"),
-
-  body("tip_amount")
-    .optional()
-    .isFloat({ min: 0 }).withMessage("tip_amount must be a positive number"),
-
-  body("payment_method")
-    .optional()
-    .isIn(["baridi_mob", "cash_on_delivery", "bank_transfer"])
-    .withMessage("payment_method must be 'baridi_mob', 'cash_on_delivery', or 'bank_transfer'"),
-
-  body("delivery_instructions")
-    .optional()
-    .isString().withMessage("delivery_instructions must be a string")
-    .isLength({ max: 500 }).withMessage("delivery_instructions must be less than 500 characters"),
-
-  body("pickup_instructions")
-    .optional()
-    .isString().withMessage("pickup_instructions must be a string")
-    .isLength({ max: 500 }).withMessage("pickup_instructions must be less than 500 characters"),
-
-  body("special_requests")
-    .optional()
-    .isString().withMessage("special_requests must be a string")
-    .isLength({ max: 1000 }).withMessage("special_requests must be less than 1000 characters"),
-
-  body("pickup_time")
-    .optional()
-    .isISO8601().withMessage("pickup_time must be a valid ISO8601 date"),
-
-  body("scheduled_for")
-    .optional()
-    .isISO8601().withMessage("scheduled_for must be a valid ISO8601 date")
-];
-
-// 🔄 UPDATE STATUS VALIDATOR
-export const updateOrderStatusValidator = [
-  param("id")
-    .notEmpty().withMessage("Order ID is required")
-    .isUUID().withMessage("Order ID must be a valid UUID"),
-
-  body("status")
-    .notEmpty().withMessage("status is required")
-    .isIn(["pending", "confirmed", "preparing", "ready", "picked_up", "on_the_way", "delivered", "cancelled", "refunded"])
-    .withMessage("Invalid status value"),
-
-  body("cancellation_reason")
-    .custom((value, { req }) => {
-      if (req.body.status === 'cancelled' && !value) {
-        throw new Error("cancellation_reason is required when status is 'cancelled'");
-      }
-      return true;
-    })
-    .optional()
-    .isString().withMessage("cancellation_reason must be a string")
-    .isLength({ max: 500 }).withMessage("cancellation_reason must be less than 500 characters"),
-
-  body("cancelled_by")
-    .custom((value, { req }) => {
-      if (req.body.status === 'cancelled' && !value) {
-        throw new Error("cancelled_by is required when status is 'cancelled'");
-      }
-      return true;
-    })
-    .optional()
-    .isIn(["customer", "restaurant", "system", "admin"])
-    .withMessage("cancelled_by must be 'customer', 'restaurant', 'system', or 'admin'")
-];
-
-// 💳 UPDATE PAYMENT STATUS VALIDATOR
-export const updatePaymentStatusValidator = [
-  param("id")
-    .notEmpty().withMessage("Order ID is required")
-    .isUUID().withMessage("Order ID must be a valid UUID"),
-
-  body("payment_status")
-    .notEmpty().withMessage("payment_status is required")
-    .isIn(["pending", "processing", "paid", "failed", "refunded", "partially_refunded"])
-    .withMessage("Invalid payment_status value"),
-
-  body("payment_method")
-    .optional()
-    .isIn(["baridi_mob", "cash_on_delivery", "bank_transfer"])
-    .withMessage("payment_method must be 'baridi_mob', 'cash_on_delivery', or 'bank_transfer'")
-];
-
-// 🚚 ASSIGN DELIVERY PERSON VALIDATOR
-export const assignDeliveryPersonValidator = [
-  param("id")
-    .notEmpty().withMessage("Order ID is required")
-    .isUUID().withMessage("Order ID must be a valid UUID"),
-
-  body("livreur_id")
-    .notEmpty().withMessage("livreur_id is required")
-    .isUUID().withMessage("livreur_id must be a valid UUID")
-];
-
-// ⭐ ADD RATING VALIDATOR
-export const addRatingValidator = [
-  param("id")
-    .notEmpty().withMessage("Order ID is required")
-    .isUUID().withMessage("Order ID must be a valid UUID"),
-
-  body("rating")
-    .notEmpty().withMessage("rating is required")
-    .isFloat({ min: 1, max: 5 }).withMessage("rating must be between 1 and 5"),
-
-  body("review_comment")
-    .optional()
-    .isString().withMessage("review_comment must be a string")
-    .isLength({ max: 1000 }).withMessage("review_comment must be less than 1000 characters")
-];
-
-// 📋 GET ALL ORDERS VALIDATOR
 export const getAllOrdersValidator = [
-  query("page")
+  query('page')
     .optional()
-    .isInt({ min: 1 }).withMessage("page must be a positive integer"),
-
-  query("limit")
+    .isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+  
+  query('limit')
     .optional()
-    .isInt({ min: 1, max: 100 }).withMessage("limit must be between 1 and 100"),
-
-  query("status")
+    .isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+  
+  query('status')
     .optional()
-    .isIn(["pending", "confirmed", "preparing", "ready", "picked_up", "on_the_way", "delivered", "cancelled", "refunded"])
-    .withMessage("Invalid status filter"),
-
-  query("payment_status")
+    .isIn(['pending', 'accepted', 'preparing', 'assigned', 'delivering', 'delivered', 'declined'])
+    .withMessage('Invalid status'),
+  
+  query('order_type')
     .optional()
-    .isIn(["pending", "processing", "paid", "failed", "refunded", "partially_refunded"])
-    .withMessage("Invalid payment_status filter"),
-
-  query("order_type")
+    .isIn(['delivery', 'pickup']).withMessage('Invalid order type'),
+  
+  query('client_id')
     .optional()
-    .isIn(["delivery", "pickup"]).withMessage("order_type must be 'delivery' or 'pickup'"),
-
-  query("client_id")
+    .isUUID().withMessage('Invalid client ID'),
+  
+  query('restaurant_id')
     .optional()
-    .isUUID().withMessage("client_id must be a valid UUID"),
-
-  query("restaurant_id")
+    .isUUID().withMessage('Invalid restaurant ID'),
+  
+  query('date_from')
     .optional()
-    .isUUID().withMessage("restaurant_id must be a valid UUID"),
-
-  query("date_from")
+    .isISO8601().withMessage('Invalid date format for date_from'),
+  
+  query('date_to')
     .optional()
-    .isISO8601().withMessage("date_from must be a valid ISO8601 date"),
-
-  query("date_to")
+    .isISO8601().withMessage('Invalid date format for date_to'),
+  
+  query('search')
     .optional()
-    .isISO8601().withMessage("date_to must be a valid ISO8601 date"),
-
-  query("search")
-    .optional()
-    .isString().withMessage("search must be a string")
-    .isLength({ min: 3, max: 50 }).withMessage("search must be between 3 and 50 characters")
+    .isString().withMessage('Search must be a string')
 ];
 
-// 🔍 GET ORDER BY ID VALIDATOR
 export const getOrderByIdValidator = [
-  param("id")
-    .notEmpty().withMessage("Order ID is required")
-    .isUUID().withMessage("Order ID must be a valid UUID")
+  param('id')
+    .notEmpty().withMessage('Order ID is required')
+    .isUUID().withMessage('Invalid order ID format')
 ];
 
-// ❌ DELETE ORDER VALIDATOR
-export const deleteOrderValidator = [
-  param("id")
-    .notEmpty().withMessage("Order ID is required")
-    .isUUID().withMessage("Order ID must be a valid UUID")
-];
-
-// 📊 GET ORDER STATISTICS VALIDATOR
-export const getOrderStatisticsValidator = [
-  query("period")
-    .optional()
-    .isIn(["7d", "30d", "90d"]).withMessage("period must be '7d', '30d', or '90d'"),
-
-  query("restaurant_id")
-    .optional()
-    .isUUID().withMessage("restaurant_id must be a valid UUID")
-];
-
-// 👤 GET client ORDERS VALIDATOR
 export const getClientOrdersValidator = [
-  param("clientId")
-    .notEmpty().withMessage("client ID is required")
-    .isUUID().withMessage("client ID must be a valid UUID"),
-
-  query("page")
+  param('clientId')
+    .notEmpty().withMessage('Client ID is required')
+    .isUUID().withMessage('Invalid client ID format'),
+  
+  query('page')
     .optional()
-    .isInt({ min: 1 }).withMessage("page must be a positive integer"),
-
-  query("limit")
+    .isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+  
+  query('limit')
     .optional()
-    .isInt({ min: 1, max: 50 }).withMessage("limit must be between 1 and 50"),
-
-  query("status")
+    .isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+  
+  query('status')
     .optional()
-    .isIn(["pending", "confirmed", "preparing", "ready", "picked_up", "on_the_way", "delivered", "cancelled", "refunded"])
-    .withMessage("Invalid status filter")
+    .isIn(['pending', 'accepted', 'preparing', 'assigned', 'delivering', 'delivered', 'declined'])
+    .withMessage('Invalid status')
+];
+
+// ==================== STATUS TRANSITION VALIDATORS ====================
+
+export const declineOrderValidator = [
+  param('id')
+    .notEmpty().withMessage('Order ID is required')
+    .isUUID().withMessage('Invalid order ID format'),
+  
+  body('reason')
+    .notEmpty().withMessage('Decline reason is required')
+    .isString().withMessage('Reason must be a string')
+    .isLength({ min: 10, max: 500 }).withMessage('Reason must be between 10 and 500 characters')
+];
+
+export const assignDriverValidator = [
+  param('id')
+    .notEmpty().withMessage('Order ID is required')
+    .isUUID().withMessage('Invalid order ID format'),
+  
+  body('driver_id')
+    .optional()
+    .isUUID().withMessage('Invalid driver ID format')
+];
+
+// ==================== GPS TRACKING VALIDATORS ====================
+
+export const updateDriverGPSValidator = [
+  param('driverId')
+    .notEmpty().withMessage('Driver ID is required')
+    .isUUID().withMessage('Invalid driver ID format'),
+  
+  body('longitude')
+    .notEmpty().withMessage('Longitude is required')
+    .isFloat({ min: -180, max: 180 }).withMessage('Longitude must be between -180 and 180'),
+  
+  body('latitude')
+    .notEmpty().withMessage('Latitude is required')
+    .isFloat({ min: -90, max: 90 }).withMessage('Latitude must be between -90 and 90')
+];
+
+// ==================== RATING VALIDATOR ====================
+
+export const addRatingValidator = [
+  param('id')
+    .notEmpty().withMessage('Order ID is required')
+    .isUUID().withMessage('Invalid order ID format'),
+  
+  body('rating')
+    .notEmpty().withMessage('Rating is required')
+    .isFloat({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
+  
+  body('review_comment')
+    .optional()
+    .isString().withMessage('Review comment must be a string')
+    .isLength({ max: 1000 }).withMessage('Review comment must not exceed 1000 characters')
+];
+
+// ==================== LEGACY VALIDATORS (kept for backward compatibility) ====================
+
+export const updateOrderValidator = [
+  param('id')
+    .notEmpty().withMessage('Order ID is required')
+    .isUUID().withMessage('Invalid order ID format'),
+  
+  body('status')
+    .optional()
+    .isIn(['pending', 'accepted', 'preparing', 'assigned', 'delivering', 'delivered', 'declined'])
+    .withMessage('Invalid status'),
+  
+  body('delivery_address')
+    .optional()
+    .isString().withMessage('Delivery address must be a string'),
+  
+  body('payment_method')
+    .optional()
+    .isIn(['baridi_mob', 'cash_on_delivery', 'bank_transfer'])
+    .withMessage('Invalid payment method')
+];
+
+export const deleteOrderValidator = [
+  param('id')
+    .notEmpty().withMessage('Order ID is required')
+    .isUUID().withMessage('Invalid order ID format')
+];
+
+export const updateOrderStatusValidator = [
+  param('id')
+    .notEmpty().withMessage('Order ID is required')
+    .isUUID().withMessage('Invalid order ID format'),
+  
+  body('status')
+    .notEmpty().withMessage('Status is required')
+    .isIn(['pending', 'accepted', 'preparing', 'assigned', 'delivering', 'delivered', 'declined'])
+    .withMessage('Invalid status'),
+  
+  body('cancellation_reason')
+    .optional()
+    .isString().withMessage('Cancellation reason must be a string')
+];
+
+export const updatePaymentStatusValidator = [
+  param('id')
+    .notEmpty().withMessage('Order ID is required')
+    .isUUID().withMessage('Invalid order ID format'),
+  
+  body('payment_status')
+    .notEmpty().withMessage('Payment status is required')
+    .isIn(['pending', 'paid', 'failed', 'refunded'])
+    .withMessage('Invalid payment status'),
+  
+  body('payment_method')
+    .optional()
+    .isIn(['baridi_mob', 'cash_on_delivery', 'bank_transfer'])
+    .withMessage('Invalid payment method')
+];
+
+export const assignDeliveryPersonValidator = [
+  param('id')
+    .notEmpty().withMessage('Order ID is required')
+    .isUUID().withMessage('Invalid order ID format'),
+  
+  body('livreur_id')
+    .notEmpty().withMessage('Delivery person ID is required')
+    .isUUID().withMessage('Invalid delivery person ID format')
+];
+
+export const getOrderStatisticsValidator = [
+  query('date_from')
+    .optional()
+    .isISO8601().withMessage('Invalid date format for date_from'),
+  
+  query('date_to')
+    .optional()
+    .isISO8601().withMessage('Invalid date format for date_to'),
+  
+  query('restaurant_id')
+    .optional()
+    .isUUID().withMessage('Invalid restaurant ID')
 ];

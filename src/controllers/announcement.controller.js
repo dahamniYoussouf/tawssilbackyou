@@ -1,141 +1,77 @@
-import Announcement from "../models/Announcement.js";
+import {
+  createAnnouncement,
+  getAllAnnouncements,
+  getActiveAnnouncements,
+  updateAnnouncement,
+  deleteAnnouncement
+} from "../services/announcement.service.js";
 
-// ----------------------------
-// Create a new announcement
-// ----------------------------
+// Create
 export const create = async (req, res, next) => {
   try {
-    const {
-      title,
-      content,
-      css_styles,
-      js_scripts,
-      type,
-      is_active,
-      start_date,
-      end_date
-    } = req.body;
-
-    const announcement = await Announcement.create({
-      title,
-      content,
-      css_styles,
-      js_scripts,
-      type,
-      is_active,
-      start_date,
-      end_date
-    });
-
+    const announcement = await createAnnouncement(req.body);
     res.status(201).json({
       success: true,
       message: "Announcement created successfully",
-      data: announcement
+      data: announcement,
     });
   } catch (err) {
     next(err);
   }
 };
 
-// ----------------------------
-// Get all announcements
-// ----------------------------
+// Get all
 export const getAll = async (req, res, next) => {
   try {
-    const announcements = await Announcement.findAll({
-      order: [["created_at", "DESC"]]
-    });
-
-    res.json({
-      success: true,
-      data: announcements
-    });
+    const announcements = await getAllAnnouncements();
+    res.json({ success: true, data: announcements });
   } catch (err) {
     next(err);
   }
 };
 
-// ----------------------------
-// Get active announcements only
-// ----------------------------
+// Get active
 export const getActive = async (req, res, next) => {
   try {
-    const announcements = await Announcement.findAll({
-      where: { is_active: true },
-      order: [["created_at", "DESC"]]
-    });
+    const activeAnnouncements = await getActiveAnnouncements();
 
-    const activeAnnouncements = announcements.filter(a => a.isCurrentlyActive());
-
-    res.json({
+    res.status(200).json({
       success: true,
-      data: activeAnnouncements
+      data: activeAnnouncements,
     });
   } catch (err) {
+    console.error("Error fetching active announcements:", err);
     next(err);
   }
 };
 
-// ----------------------------
-// Update announcement
-// ----------------------------
+// Update
 export const update = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const {
-      title,
-      content,
-      css_styles,
-      js_scripts,
-      type,
-      is_active,
-      start_date,
-      end_date
-    } = req.body;
-
-    const announcement = await Announcement.findOne({ where: { id } });
+    const announcement = await updateAnnouncement(id, req.body);
 
     if (!announcement) {
       return res.status(404).json({ success: false, message: "Announcement not found" });
     }
 
-    await announcement.update({
-      title,
-      content,
-      css_styles,
-      js_scripts,
-      type,
-      is_active,
-      start_date,
-      end_date
-    });
-
-    res.json({
-      success: true,
-      message: "Announcement updated successfully"
-    });
+    res.json({ success: true, message: "Announcement updated successfully" });
   } catch (err) {
     next(err);
   }
 };
 
-// ----------------------------
-// Delete announcement
-// ----------------------------
+// Delete
 export const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
-
-    const deleted = await Announcement.destroy({ where: { id } });
+    const deleted = await deleteAnnouncement(id);
 
     if (!deleted) {
       return res.status(404).json({ success: false, message: "Announcement not found" });
     }
 
-    res.status(200).json({
-      success: true,
-      message: "Announcement deleted successfully"
-    });
+    res.status(200).json({ success: true, message: "Announcement deleted successfully" });
   } catch (err) {
     next(err);
   }

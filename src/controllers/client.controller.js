@@ -1,143 +1,103 @@
-import Client from "../models/Client.js";
+import {
+  createClient,
+  getAllClients,
+  updateClient,
+  deleteClient
+} from "../services/client.service.js";
 
-// ----------------------------
-// Create a new client
-// ----------------------------
+// Create
 export const create = async (req, res, next) => {
   try {
-    const {
-      first_name,
-      last_name,
-      email,
-      phone_number,
-      address,
-      lat,
-      lng,
-      profile_image_url,
-      loyalty_points,
-      is_verified,
-      is_active,
-      status
-    } = req.body;
-
-    const client = await Client.create({
-      first_name,
-      last_name,
-      email,
-      phone_number,
-      address,
-      location: lat && lng
-        ? { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] }
-        : null,
-      profile_image_url,
-      loyalty_points,
-      is_verified,
-      is_active,
-      status
-    });
-
+    const client = await createClient(req.body);
     res.status(201).json({
       success: true,
       message: "Client created successfully",
-      data: client
+      data: client,
     });
   } catch (err) {
-    next(err);
+    //  errors Sequelize
+    if (err.name === "SequelizeUniqueConstraintError") {
+      return res.status(400).json({
+        success: false,
+        message: "This email is already registered",
+        field: err.errors[0].path,
+        value: err.errors[0].value
+      });
+    }
+
+    if (err.name === "SequelizeValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: err.errors.map(e => ({
+          field: e.path,
+          message: e.message
+        }))
+      });
+    }
+
+    next(err); // autre erreur => middleware global
   }
 };
 
-// ----------------------------
-// Get all clients
-// ----------------------------
+// Get all
 export const getAll = async (req, res, next) => {
   try {
-    const clients = await Client.findAll({
-      order: [["created_at", "DESC"]]
-    });
-
-    const formatted = clients.map(c => ({
-      ...c.toJSON(),
-      full_name: c.getFullName()
-    }));
-
-    res.json({
-      success: true,
-      data: formatted
-    });
+    const clients = await getAllClients();
+    res.json({ success: true, data: clients });
   } catch (err) {
     next(err);
   }
 };
 
-// ----------------------------
-// Update client
-// ----------------------------
+// Update
 export const update = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const {
-      first_name,
-      last_name,
-      email,
-      phone_number,
-      address,
-      lat,
-      lng,
-      profile_image_url,
-      loyalty_points,
-      is_verified,
-      is_active,
-      status
-    } = req.body;
-
-    const client = await Client.findOne({ where: { id } });
+    const client = await updateClient(id, req.body);
 
     if (!client) {
       return res.status(404).json({ success: false, message: "Client not found" });
     }
 
-    await client.update({
-      first_name,
-      last_name,
-      email,
-      phone_number,
-      address,
-      location: lat && lng
-        ? { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] }
-        : client.location,
-      profile_image_url,
-      loyalty_points,
-      is_verified,
-      is_active,
-      status
-    });
-
-    res.json({
-      success: true,
-      message: "Client updated successfully"
-    });
+    res.json({ success: true, message: "Client updated successfully" });
   } catch (err) {
-    next(err);
+    //  errors Sequelize
+    if (err.name === "SequelizeUniqueConstraintError") {
+      return res.status(400).json({
+        success: false,
+        message: "This email is already registered",
+        field: err.errors[0].path,
+        value: err.errors[0].value
+      });
+    }
+
+    if (err.name === "SequelizeValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: err.errors.map(e => ({
+          field: e.path,
+          message: e.message
+        }))
+      });
+    }
+
+    next(err); // autre erreur => middleware global
   }
 };
 
-// ----------------------------
-// Delete client
-// ----------------------------
+// Delete
 export const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
-
-    const deleted = await Client.destroy({ where: { id } });
+    const deleted = await deleteClient(id);
 
     if (!deleted) {
       return res.status(404).json({ success: false, message: "Client not found" });
     }
 
-    res.status(200).json({
-      success: true,
-      message: "Client deleted successfully"
-    });
+    res.status(200).json({ success: true, message: "Client deleted successfully" });
   } catch (err) {
     next(err);
   }

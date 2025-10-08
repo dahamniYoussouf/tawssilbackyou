@@ -3,11 +3,13 @@ import sequelize from "./config/database.js";
 import "./models/Order.js";
 import "./models/Restaurant.js";
 import "./models/Client.js";
-import "./models/RestaurantCategory.js";
 import "./models/MenuItem.js";
 import "./models/FoodCategory.js";
 import "./models/OrderItem.js";
-import "./models/OrderStatusHistory.js";
+import "./models/FavoriteMeal.js";
+import "./models/FavoriteRestaurant.js";
+import "./models/Announcement.js";
+import "./models/Driver.js";
 
 // Import associations
 import "./models/index.js";
