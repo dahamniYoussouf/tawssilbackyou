@@ -5,14 +5,24 @@ import {
   updateCategory,
   deleteCategory,
 } from "../services/foodCategory.service.js";
+import Restaurant from '../models/Restaurant.js';
 
 //  Create
 export const create = async (req, res, next) => {
   try {
     const { restaurant_id, nom, description, icone_url, ordre_affichage } = req.body;
     
+    // Check if restaurant exists
+    const restaurant = await Restaurant.findByPk(restaurant_id);
+    if (!restaurant) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Restaurant not found' 
+      });
+    }
+    
     const category = await createCategory({ 
-      restaurant_id,  // ← ADD THIS!
+      restaurant_id,
       nom, 
       description, 
       icone_url, 
