@@ -9,6 +9,17 @@ const Restaurant = sequelize.define('Restaurant', {
     primaryKey: true,
     comment: "Primary key (UUID)",
   },
+  user_id: {
+  type: DataTypes.UUID,
+  allowNull: false,
+  unique: true,
+  references: {
+    model: 'users',
+    key: 'id'
+  },
+  onDelete: 'CASCADE',
+  comment: "Reference to user account"
+},
   name: {
     type: DataTypes.STRING,
     allowNull: false

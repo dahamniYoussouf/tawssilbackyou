@@ -10,6 +10,7 @@ import "./models/FavoriteMeal.js";
 import "./models/FavoriteRestaurant.js";
 import "./models/Announcement.js";
 import "./models/Driver.js";
+import "./models/User.js";
 
 // Import associations
 import "./models/index.js";

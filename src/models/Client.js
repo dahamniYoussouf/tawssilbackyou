@@ -9,6 +9,17 @@ const Client = sequelize.define("Client", {
     primaryKey: true,
     comment: "Unique client identifier (UUID)"
   },
+  user_id: {
+  type: DataTypes.UUID,
+  allowNull: false,
+  unique: true,
+  references: {
+    model: 'users',
+    key: 'id'
+  },
+  onDelete: 'CASCADE',
+  comment: "Reference to user account"
+},
   first_name: {
     type: DataTypes.STRING(100),
     allowNull: false,

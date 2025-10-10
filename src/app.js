@@ -12,6 +12,7 @@ import { errorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
 
 import "./models/index.js";
 
+// Import routes
 import restaurant from "./routes/restaurant.route.js";
 import foodcategory from "./routes/foodCategory.route.js";
 import menuitem from "./routes/menuItem.route.js";
@@ -24,17 +25,17 @@ import favoriteMeal from "./routes/favoriteMeal.route.js";
 import driver from "./routes/driver.routes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import geocodeRoutes from "./routes/geocode.js";
+import auth from "./routes/auth.route.js"; // ⚡ ADD THIS LINE
 
 const app = express();
 
 // ⚡ CREATE HTTP SERVER (Required for Socket.IO)
 const server = http.createServer(app);
 
-
 // Swagger documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerOutput));
 
-// CORS configuration (update for Socket.IO support)
+// CORS configuration
 app.use(cors({
   origin: process.env.CLIENT_URL || "http://localhost:3000",
   credentials: true,
@@ -48,16 +49,16 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 // Security middlewares (helmet + rate limit)
 app.use(securityMiddlewares);
 
-// Health check route (updated to include socket status)
+// Health check route
 app.get("/health", (_, res) => {
-  res.json({ 
+  res.json({
     status: "OK",
-    socket: io ? "connected" : "disconnected",
     timestamp: new Date().toISOString()
   });
 });
 
 // Routes
+app.use("/auth", auth); // ⚡ ADD THIS LINE
 app.use("/restaurant", restaurant);
 app.use("/foodcategory", foodcategory);
 app.use("/menuitem", menuitem);

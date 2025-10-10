@@ -7,6 +7,7 @@ import OrderItem from "./OrderItem.js";
 import FavoriteMeal from "./FavoriteMeal.js";
 import FavoriteRestaurant from "./FavoriteRestaurant.js";
 import Driver from "./Driver.js";
+import User from "./User.js";
 
 
 // ==========================
@@ -211,6 +212,38 @@ Driver.hasMany(Order, {
 
 
 
+//User 
+
+User.hasOne(Client, {
+  foreignKey: 'user_id',
+  as: 'clientProfile',
+  onDelete: 'CASCADE'
+});
+Client.belongsTo(User, {
+  foreignKey: 'user_id',
+  as: 'user'
+});
+
+User.hasOne(Driver, {
+  foreignKey: 'user_id',
+  as: 'driverProfile',
+  onDelete: 'CASCADE'
+});
+Driver.belongsTo(User, {
+  foreignKey: 'user_id',
+  as: 'user'
+});
+
+User.hasOne(Restaurant, {
+  foreignKey: 'user_id',
+  as: 'restaurantProfile',
+  onDelete: 'CASCADE'
+});
+Restaurant.belongsTo(User, {
+  foreignKey: 'user_id',
+  as: 'user'
+});
+
 export { 
   Restaurant, 
   MenuItem, 
@@ -220,6 +253,7 @@ export {
   OrderItem, 
   FavoriteRestaurant,
   FavoriteMeal, 
-  Driver
+  Driver,
+  User
 };
 

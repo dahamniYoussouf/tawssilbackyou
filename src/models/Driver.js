@@ -10,11 +10,16 @@ const Driver = sequelize.define('Driver', {
     comment: "Primary key (UUID)"
   },
   user_id: {
-    type: DataTypes.UUID,
-    allowNull: false,
-    unique: true,
-    comment: "Reference to user account"
+  type: DataTypes.UUID,
+  allowNull: false,
+  unique: true,
+  references: {
+    model: 'users',
+    key: 'id'
   },
+  onDelete: 'CASCADE',
+  comment: "Reference to user account"
+},
   driver_code: {
     type: DataTypes.STRING,
     allowNull: false,
