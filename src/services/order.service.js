@@ -46,6 +46,7 @@ export async function startPreparing(orderId) {
 /**
  * PREPARING -> ASSIGNED (for delivery) or DELIVERED (for pickup)
  * Driver accepts delivery OR customer picks up
+ * Auto-assigns the NEAREST available driver (within radius)
  */
 export async function assignDriverOrComplete(orderId, driverId = null) {
   const order = await Order.findByPk(orderId);
@@ -63,24 +64,66 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
   
   // DELIVERY orders need a driver
   if (!driverId) {
-    // Auto-assign best available driver
-    const driver = await Driver.findOne({
+    // AUTO-ASSIGN: Find nearest available driver
+    const deliveryCoords = order.delivery_location?.coordinates;
+    
+    if (!deliveryCoords) {
+      throw { status: 400, message: "Order has no delivery coordinates" };
+    }
+    
+    const [longitude, latitude] = deliveryCoords;
+    const searchRadius = 10000; // 10km radius in meters
+    
+    // Query drivers within radius, ordered by distance
+    const drivers = await Driver.findAll({
       where: {
         status: 'available',
         is_active: true,
         is_verified: true,
-        active_order_id: null
+        active_order_id: null,
+        current_location: {
+          [Op.ne]: null
+        }
       },
-      order: [['rating', 'DESC']]
+      attributes: {
+        include: [
+          [
+            sequelize.fn(
+              'ST_Distance',
+              sequelize.col('current_location'),
+              sequelize.fn('ST_SetSRID', 
+                sequelize.fn('ST_MakePoint', longitude, latitude),
+                4326
+              )
+            ),
+            'distance'
+          ]
+        ]
+      },
+      having: sequelize.literal(`ST_Distance(current_location, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)) <= ${searchRadius}`),
+      order: [
+        [sequelize.literal('distance'), 'ASC'], // Nearest first
+        ['rating', 'DESC'] // Then by rating
+      ],
+      limit: 1
     });
     
-    if (!driver) {
-      throw { status: 404, message: "No available drivers found" };
+    if (drivers.length === 0) {
+      throw { 
+        status: 404, 
+        message: `No available drivers found within ${searchRadius/1000}km radius` 
+      };
     }
+    
+    const driver = drivers[0];
     driverId = driver.id;
+    
+    console.log(`🚗 Auto-assigned driver ${driver.driver_code} (${driver.getDataValue('distance')}m away, rating: ${driver.rating})`);
+    
   } else {
+    // MANUAL ASSIGNMENT: Validate driver
     const driver = await Driver.findByPk(driverId);
-    if (!driver || driver.status !== 'available' || !driver.is_active) {
+    if (!driver || !driver.isAvailable()) {
       throw { status: 400, message: "Driver is not available" };
     }
   }
