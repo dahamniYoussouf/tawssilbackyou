@@ -140,3 +140,26 @@ export const remove = async (req, res, next) => {
     next(err);
   }
 };
+
+
+/**
+ * Get a  restaurant all data
+ */
+export const getRestaurantMenu = async (req, res) => {
+  try {
+    const { restaurantId } = req.params;
+    const { client_id } = req.query; // Optional client_id for favorites
+
+    const menu = await restaurantService.getCategoriesWithMenuItems(restaurantId, client_id);
+
+    res.status(200).json({
+      success: true,
+      data: menu
+    });
+  } catch (error) {
+    res.status(error.message === 'Restaurant not found' ? 404 : 500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};

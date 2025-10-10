@@ -1,5 +1,7 @@
 import Restaurant from "../models/Restaurant.js";
 import FavoriteRestaurant from "../models/FavoriteRestaurant.js";
+import FoodCategory from "../models/FoodCategory.js";
+import MenuItem from "../models/MenuItem.js";
 import { Op, literal } from "sequelize";
 import axios from "axios";
 import calculateRouteTime from "../services/routingService.js"
@@ -338,4 +340,86 @@ export const deleteRestaurant = async (id) => {
   }
 
   return deleted;
+};
+
+export const getCategoriesWithMenuItems = async (restaurantId, clientId = null) => {
+  // Verify restaurant exists
+  const restaurant = await Restaurant.findByPk(restaurantId);
+  if (!restaurant) {
+    throw new Error('Restaurant not found');
+  }
+
+  // Fetch all categories for this restaurant with their menu items
+  const categories = await FoodCategory.findAll({
+    where: { restaurant_id: restaurantId },
+    include: [{
+      model: MenuItem,
+      as: 'items', // Make sure this association exists in your models
+      where: { is_available: true }, // Only include available items
+      required: false, // Include categories even if they have no items
+      attributes: [
+        'id',
+        'nom',
+        'description',
+        'prix',
+        'photo_url',
+        'temps_preparation',
+        'is_available'
+      ]
+    }],
+    order: [
+      ['ordre_affichage', 'ASC'],
+      ['created_at', 'DESC'],
+      [{ model: MenuItem, as: 'items' }, 'nom', 'ASC']
+    ]
+  });
+
+  // If client_id is provided, fetch their favorite meals
+  let favoritesMap = new Map();
+  if (clientId) {
+    const allMenuItemIds = categories.flatMap(cat => 
+      cat.menuItems ? cat.menuItems.map(item => item.id) : []
+    );
+
+    if (allMenuItemIds.length > 0) {
+      const favorites = await FavoriteMeal.findAll({
+        where: {
+          client_id: clientId,
+          meal_id: { [Op.in]: allMenuItemIds }
+        },
+        attributes: ["meal_id", "id"]
+      });
+
+      favorites.forEach(fav => favoritesMap.set(fav.meal_id, fav.id));
+    }
+  }
+
+  // Format response
+  const formattedCategories = categories.map(category => ({
+    id: category.id,
+    nom: category.nom,
+    description: category.description,
+    icone_url: category.icone_url,
+    ordre_affichage: category.ordre_affichage,
+    items: category.items ? category.items.map(item => ({
+      id: item.id,
+      nom: item.nom,
+      description: item.description,
+      prix: parseFloat(item.prix),
+      photo_url: item.photo_url,
+      temps_preparation: item.temps_preparation,
+      is_available: item.is_available,
+      is_favorite: favoritesMap.has(item.id),
+      favorite_id: favoritesMap.get(item.id) || null
+    })) : [],
+    items_count: category.items ? category.items.length : 0
+  }));
+
+  return {
+    restaurant_id: restaurantId,
+    restaurant_name: restaurant.name,
+    categories: formattedCategories,
+    total_categories: formattedCategories.length,
+    total_items: formattedCategories.reduce((sum, cat) => sum + cat.items_count, 0)
+  };
 };

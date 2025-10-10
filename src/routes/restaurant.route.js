@@ -11,6 +11,7 @@ router.delete("/delete/:id", deleteRestaurantValidator, validate, restaurantCtrl
 router.post("/nearbyfilter",nearbyFilterValidator, validate, restaurantCtrl.nearbyFilter);
 router.post("/getnearbynames",nearbyFilterValidator, validate, restaurantCtrl.getNearbyNames);
 router.get("/getall", restaurantCtrl.getAll);
+router.get('/details/:restaurantId', restaurantCtrl.getRestaurantMenu);
 
 
 

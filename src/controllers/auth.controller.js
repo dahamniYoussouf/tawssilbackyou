@@ -178,25 +178,60 @@ export const register = async (req, res) => {
         break;
       
       case 'restaurant': {
-        const { lat, lng } = profileData;
-        const latitude = parseFloat(lat) || 0;
-        const longitude = parseFloat(lng) || 0;
+  const { lat, lng } = profileData;
+  const latitude = parseFloat(lat);
+  const longitude = parseFloat(lng);
 
-        profile = await Restaurant.create({
-          user_id: user.id,
-          name: profileData.name || 'New Restaurant',
-          description: profileData.description || null,
-          address: profileData.address || null,
-          categories: profileData.categories || ['pizza'],
-          location: {
-            type: 'Point',
-            coordinates: [longitude, latitude]
-          },
-          latitude,
-          longitude
-        });
-        break;
-      }
+  // Validate coordinates
+  if (isNaN(latitude) || isNaN(longitude)) {
+    throw new Error('Valid latitude and longitude are required');
+  }
+
+  // Validate and process categories
+  const categories = profileData.categories || ['pizza'];
+  if (!Array.isArray(categories) || categories.length === 0) {
+    throw new Error('At least one category is required');
+  }
+
+  // Parse boolean values (in case they come as strings)
+  const isActive = profileData.is_active === undefined ? true : 
+                   (typeof profileData.is_active === 'string' ? 
+                    profileData.is_active === 'true' : 
+                    profileData.is_active);
+  
+  const isPremium = profileData.is_premium === undefined ? false : 
+                    (typeof profileData.is_premium === 'string' ? 
+                     profileData.is_premium === 'true' : 
+                     profileData.is_premium);
+
+  // Validate rating if provided
+  let rating = 0.0;
+  if (profileData.rating !== undefined && profileData.rating !== null) {
+    rating = parseFloat(profileData.rating);
+    if (isNaN(rating) || rating < 0 || rating > 5) {
+      throw new Error('Rating must be between 0 and 5');
+    }
+  }
+
+  profile = await Restaurant.create({
+    user_id: user.id,
+    name: profileData.name || 'New Restaurant',
+    description: profileData.description || null,
+    address: profileData.address || null,
+    location: {
+      type: 'Point',
+      coordinates: [longitude, latitude]
+    },
+    rating: rating,
+    image_url: profileData.image_url || null,
+    is_active: isActive,
+    is_premium: isPremium,
+    status: 'pending', // Always pending for new registrations
+    opening_hours: profileData.opening_hours || null,
+    categories: categories
+  });
+  break;
+}
     }
 
     // Generate token
