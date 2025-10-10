@@ -1,19 +1,24 @@
 import express from 'express';
-import { register, login, getProfile } from '../controllers/auth.controller.js';
-import { authenticate, authorize } from '../middlewares/auth.js';
+import { 
+  register, 
+  login, 
+  getProfile,
+  requestOTP,
+  verifyOTP
+} from '../controllers/auth.controller.js';
+import { protect } from '../middlewares/auth.js';
 
 const router = express.Router();
 
-// Public routes
+// Routes OTP pour clients
+router.post('/otp/request', requestOTP);
+router.post('/otp/verify', verifyOTP);
+
+// Routes traditionnelles pour driver et restaurant
 router.post('/register', register);
 router.post('/login', login);
 
-// Protected routes
-router.get('/profile', authenticate, getProfile);
-
-// Role-specific routes (examples)
-router.get('/client/profile', authenticate, authorize('client'), getProfile);
-router.get('/driver/profile', authenticate, authorize('driver'), getProfile);
-router.get('/restaurant/profile', authenticate, authorize('restaurant'), getProfile);
+// Route protégée
+router.get('/profile', protect, getProfile);
 
 export default router;

@@ -4,6 +4,9 @@ import Client from '../models/Client.js';
 import Driver from '../models/Driver.js';
 import Restaurant from '../models/Restaurant.js';
 
+// Store OTPs temporarily (en production, utilisez Redis)
+const otpStore = new Map();
+
 // Generate JWT token
 const generateToken = (userId, role) => {
   return jwt.sign(
@@ -13,15 +16,138 @@ const generateToken = (userId, role) => {
   );
 };
 
-// Register
+// Generate 6-digit OTP
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// Send OTP (simulé - remplacer par vrai service SMS/Email)
+const sendOTP = async (phoneOrEmail, otp) => {
+  console.log(`📱 OTP envoyé à ${phoneOrEmail}: ${otp}`);
+  // TODO: Intégrer un service SMS (Twilio, etc.) ou Email
+  return true;
+};
+
+// ÉTAPE 1: Demander OTP
+export const requestOTP = async (req, res) => {
+  try {
+    const { phone_number } = req.body;
+
+    if (!phone_number) {
+      return res.status(400).json({ message: 'Numéro de téléphone requis' });
+    }
+
+    // Vérifier si le client existe
+    let client = await Client.findOne({ where: { phone_number } });
+    
+    // Si pas de client, créer un nouveau
+    if (!client) {
+      const tempEmail = `${phone_number}@temp.local`;
+      const user = await User.create({ 
+        email: tempEmail, 
+        password: Math.random().toString(36), // Mot de passe temporaire
+        role: 'client' 
+      });
+
+      client = await Client.create({
+        user_id: user.id,
+        email: tempEmail,
+        phone_number,
+        first_name: '',
+        last_name: ''
+      });
+    }
+
+    // Générer et stocker OTP
+    const otp = generateOTP();
+    otpStore.set(phone_number, {
+      code: otp,
+      clientId: client.id,
+      userId: client.user_id,
+      expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
+    });
+
+    // Envoyer OTP
+    await sendOTP(phone_number, otp);
+
+    res.json({ 
+      message: 'OTP envoyé avec succès',
+      phone_number,
+      // En développement uniquement - RETIRER EN PRODUCTION
+      dev_otp: process.env.NODE_ENV === 'development' ? otp : undefined
+    });
+  } catch (error) {
+    console.error('Erreur requestOTP:', error);
+    res.status(500).json({ message: 'Échec envoi OTP', error: error.message });
+  }
+};
+
+// ÉTAPE 2: Vérifier OTP et connecter
+export const verifyOTP = async (req, res) => {
+  try {
+    const { phone_number, otp } = req.body;
+
+    if (!phone_number || !otp) {
+      return res.status(400).json({ message: 'Téléphone et OTP requis' });
+    }
+
+    // Récupérer OTP stocké
+    const storedData = otpStore.get(phone_number);
+
+    if (!storedData) {
+      return res.status(400).json({ message: 'OTP non trouvé ou expiré' });
+    }
+
+    // Vérifier expiration
+    if (Date.now() > storedData.expiresAt) {
+      otpStore.delete(phone_number);
+      return res.status(400).json({ message: 'OTP expiré' });
+    }
+
+    // Vérifier le code
+    if (storedData.code !== otp) {
+      return res.status(400).json({ message: 'OTP invalide' });
+    }
+
+    // OTP valide - supprimer du store
+    otpStore.delete(phone_number);
+
+    // Récupérer user et profil
+    const user = await User.findByPk(storedData.userId);
+    const client = await Client.findByPk(storedData.clientId);
+
+    // Mettre à jour last login
+    user.last_login = new Date();
+    await user.save();
+
+    // Générer token
+    const token = generateToken(user.id, user.role);
+
+    res.json({
+      message: 'Connexion réussie',
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role
+      },
+      profile: client
+    });
+  } catch (error) {
+    console.error('Erreur verifyOTP:', error);
+    res.status(500).json({ message: 'Échec vérification OTP', error: error.message });
+  }
+};
+
+// Register (pour driver et restaurant)
 export const register = async (req, res) => {
   try {
     const { email, password, role, ...profileData } = req.body;
 
     // Validate role
-    if (!['client', 'driver', 'restaurant'].includes(role)) {
+    if (!['driver', 'restaurant'].includes(role)) {
       return res.status(400).json({ 
-        message: 'Invalid role. Must be client, driver, or restaurant' 
+        message: 'Invalid role. Must be driver or restaurant' 
       });
     }
 
@@ -37,17 +163,6 @@ export const register = async (req, res) => {
     // Create profile based on role
     let profile;
     switch (role) {
-      case 'client':
-        profile = await Client.create({
-          user_id: user.id,
-          email: email,
-          first_name: profileData.first_name || '',
-          last_name: profileData.last_name || '',
-          phone_number: profileData.phone_number || null,
-          address: profileData.address || null
-        });
-        break;
-      
       case 'driver':
         profile = await Driver.create({
           user_id: user.id,
@@ -62,28 +177,26 @@ export const register = async (req, res) => {
         });
         break;
       
-     case 'restaurant': {
-  const { lat, lng } = profileData;
+      case 'restaurant': {
+        const { lat, lng } = profileData;
+        const latitude = parseFloat(lat) || 0;
+        const longitude = parseFloat(lng) || 0;
 
-  // Convert to numbers (in case they come as strings)
-  const latitude = parseFloat(lat) || 0;
-  const longitude = parseFloat(lng) || 0;
-
-  profile = await Restaurant.create({
-    user_id: user.id,
-    name: profileData.name || 'New Restaurant',
-    description: profileData.description || null,
-    address: profileData.address || null,
-    categories: profileData.categories || ['pizza'],
-    location: {
-      type: 'Point',
-      coordinates: [longitude, latitude]
-    },
-    latitude,
-    longitude
-  });
-  break;
-}
+        profile = await Restaurant.create({
+          user_id: user.id,
+          name: profileData.name || 'New Restaurant',
+          description: profileData.description || null,
+          address: profileData.address || null,
+          categories: profileData.categories || ['pizza'],
+          location: {
+            type: 'Point',
+            coordinates: [longitude, latitude]
+          },
+          latitude,
+          longitude
+        });
+        break;
+      }
     }
 
     // Generate token
@@ -105,28 +218,24 @@ export const register = async (req, res) => {
   }
 };
 
-// Login
+// Login (pour driver et restaurant)
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate input
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    // Find user
     const user = await User.findOne({ where: { email } });
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // Check if active
     if (!user.is_active) {
       return res.status(403).json({ message: 'Account is deactivated' });
     }
 
-    // Verify password
     const isValid = await user.comparePassword(password);
     if (!isValid) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -135,9 +244,6 @@ export const login = async (req, res) => {
     // Get profile
     let profile;
     switch (user.role) {
-      case 'client':
-        profile = await Client.findOne({ where: { user_id: user.id } });
-        break;
       case 'driver':
         profile = await Driver.findOne({ where: { user_id: user.id } });
         break;
@@ -146,11 +252,9 @@ export const login = async (req, res) => {
         break;
     }
 
-    // Update last login
     user.last_login = new Date();
     await user.save();
 
-    // Generate token
     const token = generateToken(user.id, user.role);
 
     res.json({
@@ -180,7 +284,6 @@ export const getProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Get role-specific profile
     let profile;
     switch (user.role) {
       case 'client':
