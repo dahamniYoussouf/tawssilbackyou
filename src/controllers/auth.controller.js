@@ -74,7 +74,7 @@ export const requestOTP = async (req, res) => {
       message: 'OTP envoyé avec succès',
       phone_number,
       // En développement uniquement - RETIRER EN PRODUCTION
-      dev_otp: process.env.NODE_ENV === 'development' ? otp : undefined
+      dev_otp:  otp 
     });
   } catch (error) {
     console.error('Erreur requestOTP:', error);
