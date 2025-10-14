@@ -387,3 +387,51 @@ export const getRestaurantOrders = async (req, res, next) => {
     next(error);
   }
 };
+
+
+
+// ==================== CONTROLLER ====================
+// Add this to order.controller.js
+
+/**
+ * Get nearby orders for authenticated driver
+ * GET /api/orders/nearby
+ */
+export const getNearbyOrders = async (req, res, next) => {
+  try {
+    // Get driver ID from authenticated user
+    const driverId = req.user?.driver_id || req.user?.id;
+    
+    if (!driverId) {
+      return res.status(401).json({
+        success: false,
+        message: "Driver authentication required"
+      });
+    }
+
+    const result = await orderService.getNearbyOrders(driverId, req.query);
+    
+    res.json({
+      success: true,
+      message: `Found ${result.orders.length} nearby orders`,
+      data: result.orders,
+      pagination: result.pagination,
+      driver_location: result.driver_location,
+      search_radius_km: result.search_radius_km
+    });
+  } catch (err) {
+    if (err.status === 404) {
+      return res.status(404).json({
+        success: false,
+        message: err.message
+      });
+    }
+    if (err.status === 400) {
+      return res.status(400).json({
+        success: false,
+        message: err.message
+      });
+    }
+    next(err);
+  }
+};

@@ -40,6 +40,9 @@ export const protect = async (req, res, next) => {
     req.user = await User.findByPk(decoded.id, {
       attributes: { exclude: ['password'] }
     });
+    if (decoded.driver_id) req.user.driver_id = decoded.driver_id;
+if (decoded.restaurant_id) req.user.restaurant_id = decoded.restaurant_id;
+
 
     if (!req.user) {
       return res.status(401).json({ message: 'Utilisateur non trouvé' });

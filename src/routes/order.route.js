@@ -8,9 +8,11 @@ import {
   createOrderWithItemsValidator,
   declineOrderValidator,
   assignDriverValidator,
-  updateDriverGPSValidator
+  updateDriverGPSValidator, 
+  getNearbyOrdersValidator 
 } from "../validators/orderValidator.js";
 import { validate } from "../middlewares/validate.js";
+import { protect, isDriver } from "../middlewares/auth.js"; 
 import * as orderController from "../controllers/order.controller.js";
 
 const router = Router();
@@ -41,6 +43,19 @@ router.get(
   orderController.getAllOrders
 );
 
+// ==================== DRIVER NEARBY ORDERS ====================
+// ADD THIS BEFORE '/:id' route to avoid route conflicts
+
+// Get nearby orders for authenticated driver
+router.get(
+  '/nearby',
+  protect,      // First verify token
+  isDriver,     // Then check if user is a driver
+  orderController.getNearbyOrders
+);
+
+// ==================== CONTINUE WITH EXISTING ROUTES ====================
+
 // Get order by ID (with tracking info if delivering)
 router.get(
   '/:id',
@@ -62,6 +77,7 @@ router.get(
   '/restaurant/:restaurant_id/orders',
   orderController.getRestaurantOrders
 );
+
 // ==================== STATUS TRANSITIONS ====================
 
 // Restaurant accepts order (PENDING -> ACCEPTED)
@@ -72,7 +88,6 @@ router.post(
   orderController.acceptOrder
 );
 
-
 // Restaurant starts preparing (ACCEPTED -> PREPARING) → NOTIFIES DRIVERS
 router.post(
   '/:id/preparing',
@@ -80,7 +95,6 @@ router.post(
   validate,
   orderController.startPreparingOrder
 );
-
 
 // Restaurant declines order (PENDING/ACCEPTED -> DECLINED)
 router.post(

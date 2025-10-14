@@ -388,29 +388,62 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // ===== Load the profile =====
     let profile;
+    let driver_id = null;
+    let restaurant_id = null;
+
     switch (user.role) {
       case 'driver':
         profile = await Driver.findOne({ where: { user_id: user.id } });
+        driver_id = profile?.id || null;
         break;
+
       case 'restaurant':
         profile = await Restaurant.findOne({ where: { user_id: user.id } });
+        restaurant_id = profile?.id || null;
         break;
     }
 
     user.last_login = new Date();
     await user.save();
 
+    // ===== Generate tokens with driver_id / restaurant_id =====
     const deviceIdentifier = device_id || `device-${Date.now()}`;
-    const accessToken = generateAccessToken(user.id, user.role);
-    const refreshToken = generateRefreshToken(user.id, user.role, deviceIdentifier);
 
+    const accessToken = jwt.sign(
+      {
+        id: user.id,
+        role: user.role,
+        driver_id,        // ajouté
+        restaurant_id,    // ajouté
+        type: 'access'
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '15m' }
+    );
+
+    const refreshToken = jwt.sign(
+      {
+        id: user.id,
+        role: user.role,
+        driver_id,
+        restaurant_id,
+        type: 'refresh',
+        deviceId: deviceIdentifier
+      },
+      process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
+      { expiresIn: '30d' }
+    );
+
+    // ===== Store refresh token =====
     deviceTokens.set(refreshToken, {
       userId: user.id,
       deviceId: deviceIdentifier,
       createdAt: Date.now()
     });
 
+    // ===== Response =====
     res.json({
       message: 'Login successful',
       access_token: accessToken,
@@ -423,12 +456,13 @@ export const login = async (req, res) => {
       },
       profile
     });
-    
+
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Login failed', error: error.message });
   }
 };
+
 
 export const getProfile = async (req, res) => {
   try {

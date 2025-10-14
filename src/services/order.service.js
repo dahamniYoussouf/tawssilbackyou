@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, literal } from "sequelize";
 import Order from "../models/Order.js";
 import Restaurant from "../models/Restaurant.js";
 import Client from "../models/Client.js";
@@ -222,64 +222,6 @@ export async function declineOrder(orderId, reason) {
 }
 
 // ==================== CRUD OPERATIONS ====================
-
-/**
- * CREATE ORDER (Client validates)
- */
-export async function createOrderService(data) {
-  const {
-    client_id,
-    restaurant_id,
-    order_type = 'delivery',
-    delivery_address,
-    lat,
-    lng,
-    delivery_fee = 0,
-    subtotal,
-    payment_method,
-    delivery_instructions,
-    estimated_delivery_time
-  } = data;
-
-  const restaurant = await Restaurant.findByPk(restaurant_id);
-  if (!restaurant) throw { status: 404, message: "Restaurant not found" };
-
-  const client = await Client.findByPk(client_id);
-  if (!client) throw { status: 404, message: "Client not found" };
-
-  if (order_type === 'delivery' && !delivery_address) {
-    throw { status: 400, message: "Delivery address required" };
-  }
-
-  const order = await Order.create({
-    client_id,
-    restaurant_id,
-    order_type,
-    delivery_address: order_type === 'delivery' ? delivery_address : null,
-    delivery_fee: order_type === 'delivery' ? delivery_fee : 0,
-    subtotal,
-    payment_method,
-    delivery_instructions,
-    estimated_delivery_time,
-    status: 'pending' // Always starts as pending
-  });
-
-  if (order_type === 'delivery' && lat && lng) {
-    order.setDeliveryCoordinates(parseFloat(lng), parseFloat(lat));
-  }
-
-  order.calculateTotal();
-  await order.save();
-
-  notify('restaurant', data.restaurant_id, {
-    type: 'new_order',
-    orderId: order.id,
-    orderNumber: order.order_number,
-    total: order.total
-  });
-  
-  return order;
-}
 
 /**
  * GET ALL ORDERS
@@ -506,3 +448,160 @@ export async function getClientOrdersService(clientId, filters = {}) {
     }
   };
 }
+
+// ==================== SERVICE ====================
+// Add this to order.service.js
+
+/**
+ * Get nearby orders for drivers
+ * Uses driver's current location to find available orders
+ */
+export const getNearbyOrders = async (driverId, filters = {}) => {
+  const {
+    radius = 5000, // 5km default
+    status = ['preparing'], // Ready for pickup
+    page = 1,
+    pageSize = 20,
+    min_fee, // Minimum delivery fee
+    max_distance // Maximum distance in meters
+  } = filters;
+
+  // Get driver and their current location
+  const driver = await Driver.findByPk(driverId);
+  if (!driver) {
+    throw { status: 404, message: "Driver not found" };
+  }
+
+  if (!driver.current_location) {
+    throw { status: 400, message: "Driver location not available. Please enable GPS." };
+  }
+
+  const coords = driver.getCurrentCoordinates();
+  if (!coords) {
+    throw { status: 400, message: "Invalid driver location" };
+  }
+
+  const { longitude, latitude } = coords;
+  const searchRadius = parseInt(radius, 10);
+
+  // Build WHERE conditions
+  const whereConditions = {
+    [Op.and]: [
+      { order_type: 'delivery' }, // Only delivery orders
+      { livreur_id: null }, // Unassigned only
+      literal(
+        `ST_DWithin(delivery_location, ST_GeogFromText('POINT(${longitude} ${latitude})'), ${searchRadius})`
+      )
+    ]
+  };
+
+  // Status filter
+  if (status) {
+    const statusArray = Array.isArray(status) ? status : [status];
+    whereConditions[Op.and].push({
+      status: { [Op.in]: statusArray }
+    });
+  }
+
+  // Minimum fee filter
+  if (min_fee) {
+    whereConditions[Op.and].push({
+      delivery_fee: { [Op.gte]: parseFloat(min_fee) }
+    });
+  }
+
+  const limit = parseInt(pageSize, 10);
+  const offset = (parseInt(page, 10) - 1) * limit;
+
+  // Query orders with distance
+  const { count, rows } = await Order.findAndCountAll({
+    attributes: {
+      include: [
+        [
+          literal(`ST_Distance(delivery_location, ST_GeogFromText('POINT(${longitude} ${latitude})'))`),
+          "distance"
+        ]
+      ]
+    },
+    where: whereConditions,
+    include: [
+      {
+        model: Restaurant,
+        as: 'restaurant',
+        attributes: ['id', 'name', 'address', 'location', 'image_url']
+      },
+      {
+        model: Client,
+        as: 'client',
+        attributes: ['id', 'first_name', 'last_name', 'phone_number']
+      }
+    ],
+    order: [
+      [literal("distance"), "ASC"],
+      ['created_at', 'DESC']
+    ],
+    limit,
+    offset
+  });
+
+  // Format results
+  const formatted = rows
+    .map((order) => {
+      const restaurantCoords = order.restaurant.location?.coordinates || [];
+      const deliveryCoords = order.delivery_location?.coordinates || [];
+      const distance = parseFloat(order.dataValues.distance);
+
+      // Apply max distance filter if set
+      if (max_distance && distance > max_distance) {
+        return null;
+      }
+
+      return {
+        id: order.id,
+        order_number: order.order_number,
+        status: order.status,
+        total_amount: parseFloat(order.total_amount),
+        delivery_fee: parseFloat(order.delivery_fee),
+        delivery_address: order.delivery_address,
+        delivery_location: {
+          lat: deliveryCoords[1] || null,
+          lng: deliveryCoords[0] || null
+        },
+        distance_meters: Math.round(distance),
+        distance_km: (distance / 1000).toFixed(2),
+        restaurant: {
+          id: order.restaurant.id,
+          name: order.restaurant.name,
+          address: order.restaurant.address,
+          location: {
+            lat: restaurantCoords[1] || null,
+            lng: restaurantCoords[0] || null
+          },
+          image_url: order.restaurant.image_url
+        },
+        client: {
+          name: `${order.client.first_name} ${order.client.last_name}`,
+          phone: order.client.phone_number
+        },
+        estimated_delivery_time: order.estimated_delivery_time,
+        created_at: order.created_at
+      };
+    })
+    .filter(order => order !== null); // Remove filtered orders
+
+  return {
+    orders: formatted,
+    pagination: {
+      current_page: parseInt(page, 10),
+      total_pages: Math.ceil(count / limit),
+      total_items: count,
+      items_in_page: formatted.length
+    },
+    driver_location: {
+      lat: latitude,
+      lng: longitude
+    },
+    search_radius_km: (searchRadius / 1000).toFixed(2)
+  };
+};
+

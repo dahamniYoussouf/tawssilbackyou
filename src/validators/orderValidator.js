@@ -300,3 +300,32 @@ export const getOrderStatisticsValidator = [
     .optional()
     .isUUID().withMessage('Invalid restaurant ID')
 ];
+
+
+// getNearbyOrdersValidator
+export const getNearbyOrdersValidator = [
+  query('radius')
+    .optional()
+    .isInt({ min: 100, max: 50000 })
+    .withMessage('Radius must be between 100 and 50000 meters'),
+  
+  query('min_fee')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Minimum fee must be positive'),
+  
+  query('max_distance')
+    .optional()
+    .isInt({ min: 100 })
+    .withMessage('Max distance must be at least 100 meters'),
+  
+  query('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Page must be at least 1'),
+  
+  query('pageSize')
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage('Page size must be between 1 and 100')
+];
