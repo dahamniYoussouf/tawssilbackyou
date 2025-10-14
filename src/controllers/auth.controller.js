@@ -97,9 +97,8 @@ export const requestOTP = async (req, res) => {
     res.json({ 
       message: 'OTP envoyé avec succès',
       phone_number,
-      is_new_user: isNewUser,  // Tell frontend if this is first time
-      // Dev only
-      ...(process.env.NODE_ENV === 'development' && { dev_otp: otp })
+      is_new_user: isNewUser,
+      dev_otp: otp 
     });
     
   } catch (error) {
