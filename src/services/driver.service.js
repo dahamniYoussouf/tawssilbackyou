@@ -97,19 +97,6 @@ export const updateDriverStatus = async (id, status) => {
   return driver;
 };
 
-// Update driver location
-export const updateDriverLocation = async (id, longitude, latitude) => {
-  const driver = await Driver.findByPk(id);
-  if (!driver) return null;
-  
-  driver.setCurrentLocation(longitude, latitude);
-  driver.last_active_at = new Date();
-  await driver.save();
-  
-  return driver;
-};
-
-
 
 // Get available drivers
 export const getAvailableDrivers = async () => {

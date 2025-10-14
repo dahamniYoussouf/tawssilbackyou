@@ -5,7 +5,6 @@ import {
   updateDriver,
   deleteDriver,
   updateDriverStatus,
-  updateDriverLocation,
   getAvailableDrivers,
   getDriverStatistics
 } from "../services/driver.service.js";
@@ -180,42 +179,6 @@ export const updateStatus = async (req, res, next) => {
     next(err);
   }
 };
-
-// Update driver location
-export const updateLocation = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { longitude, latitude } = req.body;
-
-    if (!longitude || !latitude) {
-      return res.status(400).json({
-        success: false,
-        message: "Longitude and latitude are required"
-      });
-    }
-
-    const driver = await updateDriverLocation(id, longitude, latitude);
-
-    if (!driver) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Driver not found" 
-      });
-    }
-
-    res.json({ 
-      success: true, 
-      message: "Driver location updated successfully",
-      data: {
-        id: driver.id,
-        current_location: driver.getCurrentCoordinates()
-      }
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
 
 
 // Get available drivers

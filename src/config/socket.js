@@ -1,4 +1,6 @@
 import { Server } from "socket.io";
+import sequelize from "../config/database.js";
+
 import jwt from "jsonwebtoken";
 import Restaurant from "../models/Restaurant.js";
 import Driver from "../models/Driver.js";

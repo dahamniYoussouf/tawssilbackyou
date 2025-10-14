@@ -5,8 +5,9 @@ import Client from "../models/Client.js";
 import OrderItem from "../models/OrderItem.js";
 import MenuItem from "../models/MenuItem.js";
 import Driver from "../models/Driver.js";
-import { updateDriverLocation as updateDriverLocationService } from "./driver.service.js";
 import { emit, notifyNearbyDrivers } from "../config/socket.js";
+import calculateRouteTime from '../services/routingService.js'; 
+
 
 // Helper to notify
 function notify(type, id, data) {
@@ -150,15 +151,43 @@ export async function startDelivering(orderId) {
 export async function updateDriverGPS(driverId, longitude, latitude) {
   const driver = await Driver.findByPk(driverId);
   if (!driver) throw { status: 404, message: "Driver not found" };
-  if (!driver.active_order_id) {
-    throw { status: 400, message: "No active delivery" };
+
+
+  // Update driver location directly
+  driver.setCurrentLocation(longitude, latitude);
+  driver.last_active_at = new Date();
+  await driver.save();
+
+  // Notify client with current location and route info
+  const order = await Order.findByPk(driver.active_order_id, {
+    include: [{ model: Client, as: 'client' }]
+  });
+
+  if (order) {
+    const currentLocation = driver.getCurrentCoordinates();
+    const destinationCoords = order.delivery_location?.coordinates;
+    
+    let routeInfo = null;
+    
+    // Calculate real route distance and ETA
+    if (destinationCoords && destinationCoords.length === 2) {
+      const [destLng, destLat] = destinationCoords;
+      routeInfo = await calculateRouteTime(longitude, latitude, destLng, destLat);
+    }
+
+    notify('client', order.client_id, {
+      type: 'order_location',
+      orderId: order.id,
+      location: currentLocation,
+      distance_km: routeInfo?.distanceKm || null,
+      eta_min: routeInfo?.timeMin || null,
+      eta_max: routeInfo?.timeMax || null,
+      message: routeInfo 
+        ? `Your order is ${routeInfo.distanceKm} km away (${routeInfo.timeMin}-${routeInfo.timeMax} min)`
+        : 'Your order is on the way'
+    });
   }
-  
-  await updateDriverLocationService(driverId, longitude, latitude);
-  
-  // Broadcast to order room
-  emit(`order:${driver.active_order_id}`, 'location', { lat: latitude, lng: longitude });
-  
+    
   return { driver_id: driverId, order_id: driver.active_order_id };
 }
 
