@@ -140,7 +140,12 @@ const Driver = sequelize.define('Driver', {
     },
     {
       fields: ['driver_code']
-    }
+    },
+      {
+    fields: ['current_location'],
+    using: 'gist', 
+    name: 'drivers_location_gix'
+  }
   ]
 });
 

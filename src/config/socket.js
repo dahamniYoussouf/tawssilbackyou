@@ -192,51 +192,55 @@ export function emit(room, event, data) {
   io.to(room).emit(event, data);
 }
 
-/* -------- Distance helpers -------- */
-function getDistance(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLng / 2) ** 2;
-  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-}
+/* -------- Notify near driver -------- */
 
-export function notifyNearbyDrivers(orderLat, orderLng, data, radius = 10) {
-  const nearby = [];
-  
-  console.log(`🔍 Searching for drivers near (${orderLat}, ${orderLng}) within ${radius}km`);
-  console.log(`📊 Total online drivers: ${driverLocations.size}`);
-  
-  for (const [driverId, location] of driverLocations.entries()) {
-    // Skip if driver is not available
-    if (!location.isAvailable) {
-      console.log(`⏭️ Skipped driver ${driverId} (busy)`);
-      continue;
+export async function notifyNearbyDrivers(orderLat, orderLng, data, radius = 10) {
+  // radius en kilomètres → conversion en mètres
+  const radiusMeters = radius * 1000;
+
+  console.log(`🔍 Searching nearby drivers within ${radius} km via PostGIS query`);
+
+  // Trouver les drivers disponibles dans la zone via ST_DWithin
+  const nearbyDrivers = await Driver.findAll({
+    where: sequelize.literal(`
+      status = 'available'
+      AND active_order_id IS NULL
+      AND ST_DWithin(
+        current_location,
+        ST_GeogFromText('POINT(${orderLng} ${orderLat})'),
+        ${radiusMeters}
+      )
+    `),
+    attributes: {
+      include: [
+        [
+          sequelize.literal(`
+            ST_Distance(
+              current_location,
+              ST_GeogFromText('POINT(${orderLng} ${orderLat})')
+            )
+          `),
+          'distance_meters'
+        ]
+      ]
     }
-    
-    const distance = getDistance(orderLat, orderLng, location.lat, location.lng);
-    
-    if (distance <= radius) {
-      nearby.push({ driverId, distance });
-      
-      // Emit to driver's PROFILE room (not user room!)
-      const driverRoom = `driver:${location.profileId}`;
-      io.to(driverRoom).emit("new_delivery", {
-        ...data,
-        distance: distance.toFixed(1),
-      });
-      console.log(`📢 Notified driver profile ${location.profileId} in room '${driverRoom}' (${distance.toFixed(1)} km away)`);
-    } else {
-      console.log(`⏭️ Skipped driver ${driverId} (${distance.toFixed(1)} km away, outside radius)`);
-    }
+  });
+
+  // 🔔 Notification en temps réel via Socket.IO
+  for (const driver of nearbyDrivers) {
+    const distance = (driver.getDataValue('distance_meters') / 1000).toFixed(2);
+    const driverRoom = `driver:${driver.id}`;
+
+    io.to(driverRoom).emit('new_delivery', {
+      ...data,
+      distance
+    });
+
+    console.log(`📢 Notified driver ${driver.id} (${distance} km away)`);
   }
-  
-  console.log(`📍 Notified ${nearby.length} available drivers within ${radius} km`);
-  return nearby;
+
+  console.log(`✅ ${nearbyDrivers.length} drivers notified within ${radius} km`);
+  return nearbyDrivers;
 }
 
 // Helper to get all connected clients in a room (for debugging)

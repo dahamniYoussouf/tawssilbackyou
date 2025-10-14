@@ -115,7 +115,28 @@ const Restaurant = sequelize.define('Restaurant', {
   timestamps: true,
   underscored: true, 
   createdAt: 'created_at',
-  updatedAt: 'updated_at'
+  updatedAt: 'updated_at', 
+  indexes: [
+    {
+      fields: ['status']
+    },
+    {
+      fields: ['is_active']
+    },
+    {
+      fields: ['is_premium']
+    },
+    {
+      fields: ['location'],
+      using: 'gist',
+      name: 'restaurants_location_gix'
+    }, 
+    {
+    fields: ['categories'],
+    using: 'gin',
+    name: 'restaurants_categories_gin'
+  }
+  ]
 });
 
 // Helper methods
