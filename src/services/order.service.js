@@ -6,198 +6,174 @@ import OrderItem from "../models/OrderItem.js";
 import MenuItem from "../models/MenuItem.js";
 import Driver from "../models/Driver.js";
 import { updateDriverLocation as updateDriverLocationService } from "./driver.service.js";
+import { emit, notifyNearbyDrivers } from "../config/socket.js";
+
+// Helper to notify
+function notify(type, id, data) {
+  emit(`${type}:${id}`, "notification", data);
+}
 
 // ==================== STATUS TRANSITIONS ====================
 
-/**
- * PENDING -> ACCEPTED
- * Restaurant accepts the order
- */
 export async function acceptOrder(orderId, userId) {
-  const order = await Order.findByPk(orderId);
-  if (!order) throw { status: 404, message: "Order not found" };
+  const order = await Order.findByPk(orderId, {
+    include: [{ model: Client, as: 'client' }, { model: Restaurant, as: 'restaurant' }]
+  });
   
+  if (!order) throw { status: 404, message: "Order not found" };
   if (!order.canTransitionTo('accepted')) {
     throw { status: 400, message: `Cannot accept order in ${order.status} status` };
   }
   
   await order.update({ status: 'accepted' });
   
-  // Auto-transition to preparing after 1 minute
-  setTimeout(async () => {
-    await startPreparing(orderId);
-  }, 60000); // 1 minute
+  // Notify client
+  notify('client', order.client_id, {
+    type: 'order_accepted',
+    orderId: order.id,
+    message: `${order.restaurant.name} accepted your order`
+  });
   
+  setTimeout(() => startPreparing(orderId), 60000);
   return order;
 }
 
-/**
- * ACCEPTED -> PREPARING (auto after 1 min)
- */
 export async function startPreparing(orderId) {
-  const order = await Order.findByPk(orderId);
-  if (!order) return;
+  const order = await Order.findByPk(orderId, {
+    include: [{ model: Client, as: 'client' }, { model: Restaurant, as: 'restaurant' }]
+  });
   
-  if (order.status === 'accepted') {
-    await order.update({ status: 'preparing' });
+  if (!order || order.status !== 'accepted') return;
+  
+  await order.update({ status: 'preparing' });
+  
+  // Notify client
+  notify('client', order.client_id, {
+    type: 'order_preparing',
+    orderId: order.id,
+    message: 'Your order is being prepared'
+  });
+  
+  // Notify NEARBY drivers only (delivery only)
+  if (order.order_type === 'delivery') {
+    const coords = order.delivery_location?.coordinates;
+    
+    if (coords && coords.length === 2) {
+      const [lng, lat] = coords;
+      
+      notifyNearbyDrivers(lat, lng, {
+        orderId: order.id,
+        orderNumber: order.order_number,
+        restaurant: order.restaurant.name,
+        restaurantAddress: order.restaurant.address,
+        deliveryAddress: order.delivery_address,
+        fee: order.delivery_fee,
+        estimatedTime: order.estimated_delivery_time
+      }, 10); // 10km radius
+    }
   }
 }
 
-/**
- * PREPARING -> ASSIGNED (for delivery) or DELIVERED (for pickup)
- * Driver accepts delivery OR customer picks up
- * Auto-assigns the NEAREST available driver (within radius)
- */
 export async function assignDriverOrComplete(orderId, driverId = null) {
-  const order = await Order.findByPk(orderId);
-  if (!order) throw { status: 404, message: "Order not found" };
+  const order = await Order.findByPk(orderId, {
+    include: [{ model: Client, as: 'client' }, { model: Restaurant, as: 'restaurant' }]
+  });
   
+  if (!order) throw { status: 404, message: "Order not found" };
   if (order.status !== 'preparing') {
     throw { status: 400, message: "Order must be in preparing status" };
   }
   
-  // PICKUP orders go directly to delivered
+  // PICKUP
   if (order.order_type === 'pickup') {
     await order.update({ status: 'delivered' });
+    notify('client', order.client_id, {
+      type: 'order_ready',
+      orderId: order.id,
+      message: 'Order ready for pickup!'
+    });
     return order;
   }
   
-  // DELIVERY orders need a driver
-  if (!driverId) {
-    // AUTO-ASSIGN: Find nearest available driver
-    const deliveryCoords = order.delivery_location?.coordinates;
-    
-    if (!deliveryCoords) {
-      throw { status: 400, message: "Order has no delivery coordinates" };
-    }
-    
-    const [longitude, latitude] = deliveryCoords;
-    const searchRadius = 10000; // 10km radius in meters
-    
-    // Query drivers within radius, ordered by distance
-    const drivers = await Driver.findAll({
-      where: {
-        status: 'available',
-        is_active: true,
-        is_verified: true,
-        active_order_id: null,
-        current_location: {
-          [Op.ne]: null
-        }
-      },
-      attributes: {
-        include: [
-          [
-            sequelize.fn(
-              'ST_Distance',
-              sequelize.col('current_location'),
-              sequelize.fn('ST_SetSRID', 
-                sequelize.fn('ST_MakePoint', longitude, latitude),
-                4326
-              )
-            ),
-            'distance'
-          ]
-        ]
-      },
-      having: sequelize.literal(`ST_Distance(current_location, ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)) <= ${searchRadius}`),
-      order: [
-        [sequelize.literal('distance'), 'ASC'], // Nearest first
-        ['rating', 'DESC'] // Then by rating
-      ],
-      limit: 1
-    });
-    
-    if (drivers.length === 0) {
-      throw { 
-        status: 404, 
-        message: `No available drivers found within ${searchRadius/1000}km radius` 
-      };
-    }
-    
-    const driver = drivers[0];
-    driverId = driver.id;
-    
-    console.log(`🚗 Auto-assigned driver ${driver.driver_code} (${driver.getDataValue('distance')}m away, rating: ${driver.rating})`);
-    
-  } else {
-    // MANUAL ASSIGNMENT: Validate driver
-    const driver = await Driver.findByPk(driverId);
-    if (!driver || !driver.isAvailable()) {
-      throw { status: 400, message: "Driver is not available" };
-    }
+  // Check if already assigned
+  if (order.livreur_id) {
+    throw { status: 400, message: "Order already assigned" };
   }
   
-  // Assign driver and update status
-  await order.update({
-    status: 'assigned',
-    livreur_id: driverId
+  const driver = await Driver.findByPk(driverId);
+  if (!driver || !driver.isAvailable()) {
+    throw { status: 400, message: "Driver not available" };
+  }
+  
+  await order.update({ status: 'assigned', livreur_id: driverId });
+  await Driver.update({ status: 'busy', active_order_id: orderId }, { where: { id: driverId } });
+  
+  // Notify client
+  notify('client', order.client_id, {
+    type: 'driver_assigned',
+    orderId: order.id,
+    driver: driver.getFullName(),
+    phone: driver.phone
   });
   
-  // Update driver status
-  await Driver.update(
-    { status: 'busy', active_order_id: orderId },
-    { where: { id: driverId } }
-  );
+  // Notify driver
+  notify('driver', driverId, {
+    type: 'order_confirmed',
+    orderId: order.id,
+    message: 'Order assigned to you'
+  });
   
   return order;
 }
 
-/**
- * ASSIGNED -> DELIVERING
- * Driver clicks "Start Delivery" and begins sending GPS updates
- */
 export async function startDelivering(orderId) {
-  const order = await Order.findByPk(orderId);
-  if (!order) throw { status: 404, message: "Order not found" };
+  const order = await Order.findByPk(orderId, {
+    include: [{ model: Client, as: 'client' }, { model: Driver, as: 'driver' }]
+  });
   
+  if (!order) throw { status: 404, message: "Order not found" };
   if (!order.canTransitionTo('delivering')) {
     throw { status: 400, message: `Cannot start delivery from ${order.status} status` };
   }
   
   await order.update({ status: 'delivering' });
+  
+  notify('client', order.client_id, {
+    type: 'delivery_started',
+    orderId: order.id,
+    message: 'Your order is on the way!'
+  });
+  
   return order;
 }
 
-/**
- * Update driver GPS location (every 25s)
- * Updates driver.current_location - no need to store on order!
- */
 export async function updateDriverGPS(driverId, longitude, latitude) {
   const driver = await Driver.findByPk(driverId);
   if (!driver) throw { status: 404, message: "Driver not found" };
-  
-  // Check if driver has an active delivery
-  if (!driver.active_order_id || driver.status !== 'busy') {
-    throw { status: 400, message: "Driver has no active delivery" };
+  if (!driver.active_order_id) {
+    throw { status: 400, message: "No active delivery" };
   }
   
-  // Update driver's current location (single source of truth)
   await updateDriverLocationService(driverId, longitude, latitude);
   
-  return {
-    driver_id: driverId,
-    order_id: driver.active_order_id,
-    location: { longitude, latitude },
-    updated_at: new Date()
-  };
+  // Broadcast to order room
+  emit(`order:${driver.active_order_id}`, 'location', { lat: latitude, lng: longitude });
+  
+  return { driver_id: driverId, order_id: driver.active_order_id };
 }
 
-/**
- * DELIVERING -> DELIVERED
- * Driver confirms delivery
- */
 export async function completeDelivery(orderId) {
-  const order = await Order.findByPk(orderId);
-  if (!order) throw { status: 404, message: "Order not found" };
+  const order = await Order.findByPk(orderId, {
+    include: [{ model: Client, as: 'client' }, { model: Driver, as: 'driver' }]
+  });
   
+  if (!order) throw { status: 404, message: "Order not found" };
   if (!order.canTransitionTo('delivered')) {
     throw { status: 400, message: `Cannot complete from ${order.status} status` };
   }
   
   await order.update({ status: 'delivered' });
   
-  // Free up the driver
   if (order.livreur_id) {
     const driver = await Driver.findByPk(order.livreur_id);
     if (driver) {
@@ -208,24 +184,38 @@ export async function completeDelivery(orderId) {
     }
   }
   
+  notify('client', order.client_id, {
+    type: 'order_delivered',
+    orderId: order.id,
+    message: 'Order delivered!'
+  });
+  
+  if (order.driver) {
+    notify('driver', order.driver.id, {
+      type: 'delivery_complete',
+      message: 'Delivery completed'
+    });
+  }
+  
   return order;
 }
 
-/**
- * PENDING/ACCEPTED -> DECLINED
- * Restaurant declines the order
- */
 export async function declineOrder(orderId, reason) {
-  const order = await Order.findByPk(orderId);
-  if (!order) throw { status: 404, message: "Order not found" };
+  const order = await Order.findByPk(orderId, {
+    include: [{ model: Client, as: 'client' }]
+  });
   
+  if (!order) throw { status: 404, message: "Order not found" };
   if (!order.canTransitionTo('declined')) {
     throw { status: 400, message: `Cannot decline order in ${order.status} status` };
   }
   
-  await order.update({
-    status: 'declined',
-    decline_reason: reason
+  await order.update({ status: 'declined', decline_reason: reason });
+  
+  notify('client', order.client_id, {
+    type: 'order_declined',
+    orderId: order.id,
+    reason: reason
   });
   
   return order;
@@ -281,6 +271,13 @@ export async function createOrderService(data) {
   order.calculateTotal();
   await order.save();
 
+  notify('restaurant', data.restaurant_id, {
+    type: 'new_order',
+    orderId: order.id,
+    orderNumber: order.order_number,
+    total: order.total
+  });
+  
   return order;
 }
 

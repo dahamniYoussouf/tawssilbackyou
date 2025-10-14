@@ -57,6 +57,11 @@ router.get(
   orderController.getClientOrders
 );
 
+// Get restaurant orders
+router.get(
+  '/restaurant/:restaurant_id/orders',
+  orderController.getRestaurantOrders
+);
 // ==================== STATUS TRANSITIONS ====================
 
 // Restaurant accepts order (PENDING -> ACCEPTED)
@@ -66,6 +71,16 @@ router.post(
   validate,
   orderController.acceptOrder
 );
+
+
+// Restaurant starts preparing (ACCEPTED -> PREPARING) → NOTIFIES DRIVERS
+router.post(
+  '/:id/preparing',
+  getOrderByIdValidator,
+  validate,
+  orderController.startPreparingOrder
+);
+
 
 // Restaurant declines order (PENDING/ACCEPTED -> DECLINED)
 router.post(

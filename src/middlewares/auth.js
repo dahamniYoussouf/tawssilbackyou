@@ -1,12 +1,12 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
-// Middleware pour protéger les routes
+// Protect routes - verify access token
 export const protect = async (req, res, next) => {
   try {
     let token;
 
-    // Récupérer le token du header Authorization
+    // Get token from Authorization header
     if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
     }
@@ -15,10 +15,28 @@ export const protect = async (req, res, next) => {
       return res.status(401).json({ message: 'Non autorisé - Token manquant' });
     }
 
-    // Vérifier le token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    // Verify access token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    } catch (error) {
+      // Token expired or invalid
+      if (error.name === 'TokenExpiredError') {
+        return res.status(401).json({ 
+          message: 'Token expiré',
+          code: 'TOKEN_EXPIRED',  // Frontend can catch this and refresh
+          expired: true 
+        });
+      }
+      return res.status(401).json({ message: 'Token invalide' });
+    }
 
-    // Récupérer l'utilisateur (sans le mot de passe)
+    // Must be an access token
+    if (decoded.type !== 'access') {
+      return res.status(401).json({ message: 'Type de token invalide' });
+    }
+
+    // Load user
     req.user = await User.findByPk(decoded.id, {
       attributes: { exclude: ['password'] }
     });
@@ -32,13 +50,14 @@ export const protect = async (req, res, next) => {
     }
 
     next();
+    
   } catch (error) {
     console.error('Auth middleware error:', error);
-    return res.status(401).json({ message: 'Non autorisé - Token invalide' });
+    return res.status(401).json({ message: 'Non autorisé' });
   }
 };
 
-// Middleware pour vérifier le rôle
+// Verify role
 export const authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
@@ -50,7 +69,7 @@ export const authorize = (...roles) => {
   };
 };
 
-// Middleware pour vérifier si c'est un client
+// Role-specific middlewares
 export const isClient = (req, res, next) => {
   if (req.user.role !== 'client') {
     return res.status(403).json({ message: 'Accès réservé aux clients' });
@@ -58,7 +77,6 @@ export const isClient = (req, res, next) => {
   next();
 };
 
-// Middleware pour vérifier si c'est un driver
 export const isDriver = (req, res, next) => {
   if (req.user.role !== 'driver') {
     return res.status(403).json({ message: 'Accès réservé aux livreurs' });
@@ -66,7 +84,6 @@ export const isDriver = (req, res, next) => {
   next();
 };
 
-// Middleware pour vérifier si c'est un restaurant
 export const isRestaurant = (req, res, next) => {
   if (req.user.role !== 'restaurant') {
     return res.status(403).json({ message: 'Accès réservé aux restaurants' });

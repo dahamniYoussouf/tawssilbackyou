@@ -1,5 +1,5 @@
 import * as orderService from "../services/order.service.js";
-import { createOrderWithItems } from "../services/orderWithItem.js";
+import { createOrderWithItems, getOrdersByRestaurant } from "../services/orderWithItem.js";
 
 // ==================== ORDER CRUD ====================
 
@@ -349,5 +349,41 @@ export const addRating = async (req, res, next) => {
       });
     }
     next(err);
+  }
+};
+
+
+// Start preparing order → Notifies nearby drivers
+export const startPreparingOrder = async (req, res, next) => {
+  try {
+    const order = await orderService.startPreparing(req.params.id);
+    res.json({
+      message: 'Order is now being prepared',
+      order
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+// Get orders by restaurant ID
+export const getRestaurantOrders = async (req, res, next) => {
+  try {
+    const { restaurant_id } = req.params;
+    const filters = {
+      status: req.query.status,
+      order_type: req.query.order_type
+    };
+    
+    const orders = await getOrdersByRestaurant(restaurant_id, filters);
+    
+    res.json({
+      message: 'Orders retrieved successfully',
+      data: orders,
+      count: orders.length
+    });
+  } catch (error) {
+    next(error);
   }
 };

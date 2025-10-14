@@ -6,7 +6,6 @@ import {
   deleteDriver,
   updateDriverStatus,
   updateDriverLocation,
-  completeOrderForDriver,
   getAvailableDrivers,
   getDriverStatistics
 } from "../services/driver.service.js";
@@ -217,30 +216,7 @@ export const updateLocation = async (req, res, next) => {
   }
 };
 
-// Complete order for driver
-export const completeOrder = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { rating } = req.body;
 
-    const driver = await completeOrderForDriver(id, rating);
-
-    if (!driver) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Driver not found" 
-      });
-    }
-
-    res.json({ 
-      success: true, 
-      message: "Order completed successfully",
-      data: driver
-    });
-  } catch (err) {
-    next(err);
-  }
-};
 
 // Get available drivers
 export const getAvailable = async (req, res, next) => {

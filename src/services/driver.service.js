@@ -109,23 +109,7 @@ export const updateDriverLocation = async (id, longitude, latitude) => {
   return driver;
 };
 
-// Complete order for driver
-export const completeOrderForDriver = async (driver_id, rating = null) => {
-  const driver = await Driver.findByPk(driver_id);
-  if (!driver) return null;
-  
-  driver.active_order_id = null;
-  driver.status = 'available';
-  
-  if (rating) {
-    driver.updateRating(rating);
-  } else {
-    driver.total_deliveries += 1;
-  }
-  
-  await driver.save();
-  return driver;
-};
+
 
 // Get available drivers
 export const getAvailableDrivers = async () => {

@@ -20,29 +20,6 @@
     "/create": {
       "post": {
         "description": "",
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "nom": {
-                  "example": "any"
-                },
-                "description": {
-                  "example": "any"
-                },
-                "icone_url": {
-                  "example": "any"
-                },
-                "ordre_affichage": {
-                  "example": "any"
-                }
-              }
-            }
-          }
-        ],
         "responses": {
           "201": {
             "description": "Created"
@@ -62,6 +39,162 @@
             "in": "path",
             "required": true,
             "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
+    "/delete/{id}": {
+      "delete": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
+    "/nearbyfilter": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "categories": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
+    "/getnearbynames": {
+      "post": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
+    "/getall": {
+      "get": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
+    "/details/{restaurantId}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "restaurantId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/filter": {
+      "post": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
+    "/{id}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      },
+      "put": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
           },
           {
             "name": "body",
@@ -69,6 +202,9 @@
             "schema": {
               "type": "object",
               "properties": {
+                "restaurant_id": {
+                  "example": "any"
+                },
                 "nom": {
                   "example": "any"
                 },
@@ -96,9 +232,7 @@
             "description": "Not Found"
           }
         }
-      }
-    },
-    "/delete/{id}": {
+      },
       "delete": {
         "description": "",
         "parameters": [
@@ -122,23 +256,14 @@
         }
       }
     },
-    "/nearby": {
-      "get": {
+    "/toggle-availability/{id}": {
+      "patch": {
         "description": "",
         "parameters": [
           {
-            "name": "lat",
-            "in": "query",
-            "type": "string"
-          },
-          {
-            "name": "lng",
-            "in": "query",
-            "type": "string"
-          },
-          {
-            "name": "radius",
-            "in": "query",
+            "name": "id",
+            "in": "path",
+            "required": true,
             "type": "string"
           }
         ],
@@ -152,71 +277,68 @@
         }
       }
     },
-    "/nearbyFilter": {
-      "get": {
+    "/bulk-availability": {
+      "patch": {
         "description": "",
         "parameters": [
           {
-            "name": "lat",
-            "in": "query",
-            "type": "string"
-          },
-          {
-            "name": "lng",
-            "in": "query",
-            "type": "string"
-          },
-          {
-            "name": "radius",
-            "in": "query",
-            "type": "string"
-          },
-          {
-            "name": "q",
-            "in": "query",
-            "type": "string"
-          },
-          {
-            "name": "category",
-            "in": "query",
-            "type": "string"
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "menu_item_ids": {
+                  "example": "any"
+                },
+                "is_available": {
+                  "example": "any"
+                }
+              }
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
           }
         }
       }
     },
-    "/getall": {
-      "get": {
-        "description": "",
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/nearbybyaddress": {
-      "get": {
+    "/": {
+      "post": {
         "description": "",
         "parameters": [
           {
-            "name": "address",
-            "in": "query",
-            "type": "string"
-          },
-          {
-            "name": "radius",
-            "in": "query",
-            "type": "string"
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "restaurant_id": {
+                  "example": "any"
+                },
+                "nom": {
+                  "example": "any"
+                },
+                "description": {
+                  "example": "any"
+                },
+                "icone_url": {
+                  "example": "any"
+                },
+                "ordre_affichage": {
+                  "example": "any"
+                }
+              }
+            }
           }
         ],
         "responses": {
-          "200": {
-            "description": "OK"
+          "201": {
+            "description": "Created"
           },
           "400": {
             "description": "Bad Request"
@@ -225,26 +347,33 @@
             "description": "Not Found"
           }
         }
+      },
+      "get": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
       }
     },
-    "/filter": {
+    "/restaurant/{restaurantId}": {
       "get": {
         "description": "",
         "parameters": [
           {
             "name": "restaurantId",
-            "in": "query",
-            "type": "string"
-          },
-          {
-            "name": "categoryId",
-            "in": "query",
+            "in": "path",
+            "required": true,
             "type": "string"
           }
         ],
         "responses": {
           "200": {
             "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
           }
         }
       }
@@ -255,6 +384,9 @@
         "responses": {
           "200": {
             "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
           },
           "500": {
             "description": "Internal Server Error"

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Client - Realtime Delivery</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;background:#f4f6fa;margin:0;padding:20px;min-height:100vh}
+.container{max-width:600px;margin:0 auto}
+h1{text-align:center;color:#0f62fe;margin-bottom:30px}
+.section{background:#fff;padding:20px;border-radius:10px;box-shadow:0 4px 10px rgba(0,0,0,.1);margin-bottom:20px}
+h2{margin-top:0;color:#0f62fe;font-size:18px;border-bottom:2px solid #e5e7eb;padding-bottom:10px}
+input,button,select,textarea{width:100%;padding:10px;margin:6px 0;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;font-size:14px}
+button{background:#0f62fe;color:#fff;font-weight:bold;cursor:pointer;border:none}
+button:hover{background:#084cd2}
+button:disabled{background:#ccc;cursor:not-allowed}
+.card{border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:8px 0;background:#fafbff}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+.timeline{font-size:13px;border-left:3px solid #0f62fe;padding-left:12px;max-height:300px;overflow:auto;background:#f9fafb;padding:10px;border-radius:6px}
+.timeline div{margin:8px 0;padding:4px 0}
+.status{display:inline-block;background:#eef2ff;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:bold;color:#0f62fe}
+.empty{color:#999;font-style:italic;text-align:center;padding:20px}
+.cart-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #e5e7eb}
+.cart-item:last-child{border-bottom:none}
+.menu-item{display:flex;justify-content:space-between;align-items:center}
+.menu-item button{width:auto;padding:6px 16px}
+.category{margin-top:15px;border-top:2px solid #e5e7eb;padding-top:10px}
+.category h3{color:#0f62fe;margin:5px 0;font-size:16px}
+.category-desc{font-size:13px;color:#666;margin-bottom:8px}
+.item-photo{width:80px;height:80px;object-fit:cover;border-radius:8px;margin-right:10px}
+.menu-entry{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.notification{background:#d1fae5;border-left:4px solid #10b981;padding:10px;margin:8px 0;border-radius:4px;animation:slideIn 0.3s}
+@keyframes slideIn{from{opacity:0;transform:translateX(-20px)}to{opacity:1;transform:translateX(0)}}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>👤 Client Portal</h1>
+
+<div class="section">
+<h2>🔐 Login</h2>
+<input id="c_phone" placeholder="Phone (e.g. 0600000000)">
+<div class="row">
+<input id="c_otp" placeholder="OTP Code">
+<button onclick="clientLogin()">Login / Verify</button>
+</div>
+<div id="login_status" class="status" style="display:none;margin-top:10px"></div>
+</div>
+
+<div class="section">
+<h2>🍴 Browse Restaurants</h2>
+<button onclick="loadRestaurants()">Load Restaurants</button>
+<select id="c_restaurants" onchange="loadMenu()">
+<option value="">-- Select Restaurant --</option>
+</select>
+<div id="c_menu"></div>
+</div>
+
+<div class="section">
+<h2>🛒 Your Cart</h2>
+<div id="c_cart" class="card">
+<div class="empty">Your cart is empty</div>
+</div>
+<div id="cart_total" style="text-align:right;font-weight:bold;margin-top:10px;display:none"></div>
+<textarea id="delivery_instructions" placeholder="Delivery instructions (optional)"></textarea>
+<button onclick="placeOrder()" id="order_btn" disabled>Place Order</button>
+</div>
+
+<div class="section">
+<h2>📊 Order Status Timeline</h2>
+<div id="c_timeline" class="timeline">
+<div class="empty">No orders yet</div>
+</div>
+</div>
+</div>
+
+<script>
+let socket=null;
+let auth={role:null,token:null,user:null};
+let state={cart:[],restaurants:[],menu:[],currentOrder:null};
+
+function timeline(s, isNotification = false){
+ const e=document.getElementById('c_timeline');
+ if(e.querySelector('.empty'))e.innerHTML='';
+ const d=document.createElement('div');
+ if(isNotification) d.className = 'notification';
+ d.textContent=`[${new Date().toLocaleTimeString()}] ${s}`;
+ e.prepend(d);
+}
+
+function headers(){
+ return{'Content-Type':'application/json',Authorization:`Bearer ${auth.token||''}`};
+}
+
+function initSocket(){
+ if(socket) {
+   console.log('Socket already initialized');
+   return;
+ }
+ 
+ console.log('🔌 Connecting to socket with token:', auth.token ? 'YES' : 'NO');
+ 
+ socket=io(location.origin,{
+   auth:{token:auth.token}
+ });
+ 
+ socket.on('connect',()=>{
+   console.log('✅ Socket connected! ID:', socket.id);
+   timeline('✅ Connected to realtime updates');
+   
+   // Verify we're in the right room
+   if(auth.profile) {
+     console.log('👤 Client Profile ID:', auth.profile.id);
+     console.log('📡 Should be listening on room: client:' + auth.profile.id);
+   }
+ });
+ 
+ socket.on('disconnect', () => {
+   console.log('❌ Socket disconnected');
+   timeline('❌ Disconnected from server');
+ });
+ 
+ // THIS IS THE KEY: Listen for notifications
+ socket.on('notification', data => {
+   console.log('🔔 NOTIFICATION RECEIVED:', data);
+   
+   const message = data.message || JSON.stringify(data);
+   timeline(`🔔 ${message}`, true);
+   
+   // Show browser notification if permission granted
+   if(Notification.permission === 'granted') {
+     new Notification('Order Update', {
+       body: message,
+       icon: '🍔'
+     });
+   }
+ });
+ 
+ socket.on('connect_error', (err) => {
+   console.error('❌ Socket connection error:', err);
+   timeline('❌ Connection error: ' + err.message);
+ });
+}
+
+async function clientLogin(){
+ const phone=document.getElementById('c_phone').value;
+ const otp=document.getElementById('c_otp').value;
+ const step=otp?'/auth/otp/verify':'/auth/otp/request';
+ const body=otp?{phone_number:phone,otp}:{phone_number:phone};
+ try{
+   const r=await fetch(step,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+   const j=await r.json();
+   
+   if(!r.ok) {
+     alert('Error: ' + (j.message || 'Unknown error'));
+     return;
+   }
+   
+   if(otp){
+     auth={role:'client',token:j.access_token,user:j.user,profile:j.profile};
+     
+     console.log('✅ Login successful!');
+     console.log('User:', j.user);
+     console.log('Profile:', j.profile);
+     
+     // Initialize socket AFTER getting profile info
+     initSocket();
+     
+     document.getElementById('login_status').style.display='inline-block';
+     document.getElementById('login_status').textContent='✅ Logged in as '+(j.profile?.phone_number || j.user.email);
+     timeline('✅ Client logged in successfully');
+     
+     // Request notification permission
+     if(Notification.permission === 'default') {
+       Notification.requestPermission();
+     }
+   }else{
+     alert('OTP sent to your phone!\nDev OTP: ' + (j.dev_otp || 'check server log'));
+   }
+ }catch(e){ 
+   console.error('Login error:', e);
+   alert('Error: '+e.message); 
+ }
+}
+
+async function loadRestaurants(){
+ try{
+   const r=await fetch('/restaurant/getall');
+   const j=await r.json();
+   const restaurants = Array.isArray(j) ? j : (j.data || []);
+   state.restaurants=restaurants;
+   const s=document.getElementById('c_restaurants');
+   s.innerHTML='<option value="">-- Select Restaurant --</option>';
+   if(restaurants.length===0)return timeline('⚠️ No restaurants found');
+   restaurants.forEach((x,i)=>s.innerHTML+=`<option value="${i}">${x.name||('Restaurant #'+x.id)}</option>`);
+   timeline(`📍 Loaded ${restaurants.length} restaurants`);
+ }catch(e){ alert('Error loading restaurants: '+e.message); }
+}
+
+async function loadMenu(){
+ const idx=document.getElementById('c_restaurants').value;
+ if(!idx)return;
+ try{
+   const rest=state.restaurants[idx];
+   const client_id = auth.profile ? auth.profile.id : '';
+   const r=await fetch(`/restaurant/details/${rest.id}?client_id=${client_id}`);
+   const j=await r.json();
+   const data = j.data || {};
+   const categories = data.categories || [];
+   state.menu = categories;
+   const box=document.getElementById('c_menu');
+   box.innerHTML='';
+
+   if(categories.length===0){
+     box.innerHTML='<div class="empty">No menu available</div>';
+     timeline(`⚠️ No menu for ${data.restaurant_name}`);
+     return;
+   }
+
+   categories.forEach(cat=>{
+     const catDiv=document.createElement('div');
+     catDiv.className='category';
+     catDiv.innerHTML=`<h3>${cat.nom}</h3><div class="category-desc">${cat.description||''}</div>`;
+     
+     (cat.items||[]).forEach(m=>{
+       const safeName=(m.nom||'Item').replace(/'/g,"\\'");
+       const itemDiv=document.createElement('div');
+       itemDiv.className='card menu-item';
+       itemDiv.innerHTML=`
+         <div class="menu-entry">
+           <img src="${m.photo_url||''}" class="item-photo" alt="">
+           <div style="flex:1">
+             <strong>${m.nom||'Item'}</strong><br>
+             <span style="color:#666">${m.description||''}</span><br>
+             <span style="color:#000;font-weight:bold">${m.prix||0} DA</span>
+           </div>
+           <button onclick="addCart('${m.id}', '${safeName}', ${m.prix})">+ Add</button>
+         </div>`;
+       catDiv.append(itemDiv);
+     });
+
+     box.append(catDiv);
+   });
+
+   timeline(`📋 Loaded ${data.total_items} items from ${data.restaurant_name}`);
+ }catch(e){ alert('Error loading menu: '+e.message); }
+}
+
+function addCart(id,n,p){
+ const e=state.cart.find(x=>x.id===id);
+ if(e)e.qty++;
+ else state.cart.push({id:id,n:n,p:p,qty:1,special:''});
+ renderCart();
+ timeline(`➕ Added ${n} to cart`);
+}
+
+function renderCart(){
+ const box=document.getElementById('c_cart');
+ if(state.cart.length===0){
+   box.innerHTML='<div class="empty">Your cart is empty</div>';
+   document.getElementById('order_btn').disabled=true;
+   document.getElementById('cart_total').style.display='none';
+   return;
+ }
+ box.innerHTML='';
+ let total=0;
+ state.cart.forEach(i=>{
+   const div=document.createElement('div');
+   div.className='cart-item';
+   const subtotal=i.p*i.qty;
+   total+=subtotal;
+   div.innerHTML=`
+     <span><strong>${i.n}</strong> x${i.qty}</span>
+     <span>${subtotal} DA</span>`;
+   box.append(div);
+ });
+ document.getElementById('cart_total').style.display='block';
+ document.getElementById('cart_total').textContent=`Total: ${total} DA`;
+ document.getElementById('order_btn').disabled=false;
+}
+
+async function placeOrder(){
+ if(!auth.token)return alert('Please login first');
+ const idx=document.getElementById('c_restaurants').value;
+ if(!idx)return alert('Please select a restaurant');
+ const rest=state.restaurants[idx];
+ const instructions=document.getElementById('delivery_instructions').value;
+
+ const payload={
+   client_id:auth.profile?.id || '',
+   restaurant_id:rest.id,
+   order_type:'delivery',
+   delivery_address:'123 Main Street, alger',
+   lat:'36.7594001',
+   lng:'2.84287187',
+   delivery_fee:200,
+   payment_method:'cash_on_delivery',
+   delivery_instructions:instructions || 'Ring the bell twice',
+   items:state.cart.map(i=>({
+     menu_item_id:i.id,
+     quantity:i.qty,
+     special_instructions:i.special || ''
+   }))
+ };
+
+ console.log('📤 Placing order:', payload);
+
+ try{
+   const r=await fetch('/order',{
+     method:'POST',
+     headers:headers(),
+     body:JSON.stringify(payload)
+   });
+   const j=await r.json();
+   
+   console.log('📥 Order response:', j);
+   
+   if(r.ok){
+     const orderId = j.data?.id || j.id || 'unknown';
+     const orderNumber = j.data?.order_number || j.order_number || orderId;
+     
+     timeline(`✅ Order #${orderNumber} placed successfully!`, true);
+     state.currentOrder=orderId;
+     state.cart=[];
+     renderCart();
+     
+     alert(`Order placed successfully!\nOrder #${orderNumber}\n\nYou'll receive real-time updates.`);
+   }else{
+     alert('Error: '+(j.message || 'Unknown error'));
+   }
+ }catch(e){ 
+   console.error('Order error:', e);
+   alert('Error placing order: '+e.message); 
+ }
+}
+</script>
+</body>
+</html>

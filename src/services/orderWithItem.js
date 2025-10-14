@@ -5,7 +5,13 @@ import MenuItem from "../models/MenuItem.js";
 import Restaurant from "../models/Restaurant.js";
 import Client from "../models/Client.js";
 import calculateRouteTime from "../services/routingService.js";
+import { emit, notifyNearbyDrivers } from "../config/socket.js";
 
+
+// Helper to notify
+function notify(type, id, data) {
+  emit(`${type}:${id}`, "notification", data);
+}
 /**
  * CREATE ORDER WITH ITEMS IN A SINGLE TRANSACTION
  * Auto-calculates estimated_delivery_time based on restaurant and delivery location
@@ -173,6 +179,12 @@ export async function createOrderWithItems(data) {
 
     await transaction.commit();
 
+      notify('restaurant', data.restaurant_id, {
+    type: 'new_order',
+    orderId: order.id,
+    orderNumber: order.order_number,
+    total: order.total
+  });
     // Return complete order with delivery duration
     return {
       ...completeOrder.toJSON(),
@@ -181,6 +193,55 @@ export async function createOrderWithItems(data) {
 
   } catch (error) {
     await transaction.rollback();
+    throw error;
+  }
+}
+
+
+
+/**
+ * GET ORDERS BY RESTAURANT ID
+ * Retrieves all orders for a specific restaurant
+ */
+export async function getOrdersByRestaurant(restaurantId, filters = {}) {
+  try {
+    const where = { restaurant_id: restaurantId };
+    
+    // Add optional filters
+    if (filters.status) {
+      where.statut = filters.status;
+    }
+    
+    if (filters.order_type) {
+      where.order_type = filters.order_type;
+    }
+
+    const orders = await Order.findAll({
+      where,
+      include: [
+        { 
+          model: Client, 
+          as: 'client',
+          attributes: ['id', 'first_name', 'last_name', 'phone_number', 'email']
+        },
+        { 
+          model: OrderItem, 
+          as: 'order_items',
+          include: [
+            { 
+              model: MenuItem, 
+              as: 'menu_item',
+              attributes: ['id', 'nom', 'description', 'prix', 'photo_url']
+            }
+          ]
+        }
+      ],
+      order: [['created_at', 'DESC']]
+    });
+
+    return orders;
+
+  } catch (error) {
     throw error;
   }
 }

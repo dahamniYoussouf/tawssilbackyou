@@ -7,7 +7,6 @@ import {
   remove,
   updateStatus,
   updateLocation,
-  completeOrder,
   getAvailable,
   getStatistics
 } from "../controllers/driver.controller.js";
@@ -25,7 +24,6 @@ router.delete("/delete/:id", remove);
 // Driver-specific operations
 router.patch("/:id/status", updateStatus);
 router.patch("/:id/location", updateLocation);
-router.post("/:id/complete-order", completeOrder);
 router.get("/:id/statistics", getStatistics);
 
 export default router;
