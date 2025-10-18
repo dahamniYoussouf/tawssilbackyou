@@ -7,11 +7,80 @@ import MenuItem from "../models/MenuItem.js";
 import Driver from "../models/Driver.js";
 import { emit, notifyNearbyDrivers } from "../config/socket.js";
 import calculateRouteTime from '../services/routingService.js'; 
+import { sendWhatsAppMessage, templates } from './whatsappService.js';
 
 
-// Helper to notify
-function notify(type, id, data) {
+
+// Helper to notify (avec WhatsApp)
+async function notify(type, id, data) {
+  // Socket notification
   emit(`${type}:${id}`, "notification", data);
+  
+  // // WhatsApp notification pour clients
+  // if (type === 'client') {
+  //   try {
+  //     const client = await Client.findByPk(id);
+  //     if (client?.phone_number) {
+  //       let message = '';
+        
+  //       switch (data.type) {
+  //         case 'order_accepted':
+  //           message = templates.orderAccepted(
+  //             data.restaurant || 'Restaurant', 
+  //             data.orderNumber || data.orderId
+  //           );
+  //           break;
+            
+  //         case 'order_preparing':
+  //           message = templates.orderPreparing(data.orderNumber || data.orderId);
+  //           break;
+            
+  //         case 'driver_assigned':
+  //           message = templates.driverAssigned(
+  //             data.driver || 'Livreur', 
+  //             data.phone || '', 
+  //             data.orderNumber || data.orderId
+  //           );
+  //           break;
+            
+  //         case 'delivery_started':
+  //           message = templates.orderDelivering(
+  //             data.orderNumber || data.orderId, 
+  //             data.eta_min || 30
+  //           );
+  //           break;
+            
+  //         case 'order_delivered':
+  //           message = templates.orderDelivered(data.orderNumber || data.orderId);
+  //           break;
+            
+  //         case 'order_declined':
+  //           message = templates.orderDeclined(
+  //             data.orderNumber || data.orderId, 
+  //             data.reason || 'Non spécifiée'
+  //           );
+  //           break;
+
+  //         case 'order_location':
+  //           if (data.distance_km && data.eta_min) {
+  //             message = templates.orderLocation(
+  //               data.orderNumber || data.orderId,
+  //               data.distance_km,
+  //               data.eta_min
+  //             );
+  //           }
+  //           break;
+  //       }
+        
+  //       if (message) {
+  //         await sendWhatsAppMessage(client.phone_number, message);
+  //       }
+  //     }
+  //   } catch (error) {
+  //     console.error('WhatsApp notification error:', error);
+  //     // Continue même si WhatsApp échoue
+  //   }
+  // }
 }
 
 // ==================== STATUS TRANSITIONS ====================
@@ -29,9 +98,11 @@ export async function acceptOrder(orderId, userId) {
   await order.update({ status: 'accepted' });
   
   // Notify client
-  notify('client', order.client_id, {
+   notify('client', order.client_id, {
     type: 'order_accepted',
     orderId: order.id,
+    orderNumber: order.order_number,
+    restaurant: order.restaurant.name,
     message: `${order.restaurant.name} accepted your order`
   });
   
@@ -44,9 +115,14 @@ export async function startPreparing(orderId) {
     include: [{ model: Client, as: 'client' }, { model: Restaurant, as: 'restaurant' }]
   });
   
-  if (!order || order.status !== 'accepted') return;
+  if (!order || order.status !== 'accepted') {
+    console.log(`⚠️ Order ${orderId} not found or not in accepted status`);
+    return;
+  }
   
   await order.update({ status: 'preparing' });
+  
+  console.log(`👨‍🍳 Order ${orderId} status changed to PREPARING`);
   
   // Notify client
   notify('client', order.client_id, {
@@ -55,23 +131,42 @@ export async function startPreparing(orderId) {
     message: 'Your order is being prepared'
   });
   
+  console.log(`✅ Client ${order.client_id} notified`);
+  
   // Notify NEARBY drivers only (delivery only)
   if (order.order_type === 'delivery') {
     const coords = order.delivery_location?.coordinates;
     
+    console.log('📍 Order coordinates:', coords);
+    
     if (coords && coords.length === 2) {
       const [lng, lat] = coords;
       
-      notifyNearbyDrivers(lat, lng, {
-        orderId: order.id,
-        orderNumber: order.order_number,
-        restaurant: order.restaurant.name,
-        restaurantAddress: order.restaurant.address,
-        deliveryAddress: order.delivery_address,
-        fee: order.delivery_fee,
-        estimatedTime: order.estimated_delivery_time
-      }, 10); // 10km radius
+      console.log(`🚨 Notifying nearby drivers for order ${order.id}`);
+      console.log(`   Restaurant: ${order.restaurant.name}`);
+      console.log(`   Delivery location: (${lat}, ${lng})`);
+      
+      try {
+        const notifiedDrivers = await notifyNearbyDrivers(lat, lng, {
+          orderId: order.id,
+          orderNumber: order.order_number,
+          restaurant: order.restaurant.name,
+          restaurantAddress: order.restaurant.address,
+          deliveryAddress: order.delivery_address,
+          fee: parseFloat(order.delivery_fee || 0),
+          estimatedTime: order.estimated_delivery_time,
+          totalAmount: parseFloat(order.total_amount || 0)
+        }, 10); // 10km radius
+        
+        console.log(`✅ ${notifiedDrivers.length} drivers notified successfully`);
+      } catch (error) {
+        console.error('❌ Error notifying drivers:', error);
+      }
+    } else {
+      console.warn('⚠️ No valid delivery coordinates for order', orderId);
     }
+  } else {
+    console.log(`📦 Order ${orderId} is PICKUP - no driver notification needed`);
   }
 }
 
@@ -113,6 +208,7 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
   notify('client', order.client_id, {
     type: 'driver_assigned',
     orderId: order.id,
+    orderNumber: order.order_number,
     driver: driver.getFullName(),
     phone: driver.phone
   });

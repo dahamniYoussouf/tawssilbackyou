@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
+
 // Protect routes - verify access token
 export const protect = async (req, res, next) => {
   try {
@@ -24,7 +25,7 @@ export const protect = async (req, res, next) => {
       if (error.name === 'TokenExpiredError') {
         return res.status(401).json({ 
           message: 'Token expiré',
-          code: 'TOKEN_EXPIRED',  // Frontend can catch this and refresh
+          code: 'TOKEN_EXPIRED',
           expired: true 
         });
       }
@@ -40,9 +41,6 @@ export const protect = async (req, res, next) => {
     req.user = await User.findByPk(decoded.id, {
       attributes: { exclude: ['password'] }
     });
-    if (decoded.driver_id) req.user.driver_id = decoded.driver_id;
-if (decoded.restaurant_id) req.user.restaurant_id = decoded.restaurant_id;
-
 
     if (!req.user) {
       return res.status(401).json({ message: 'Utilisateur non trouvé' });
@@ -50,6 +48,19 @@ if (decoded.restaurant_id) req.user.restaurant_id = decoded.restaurant_id;
 
     if (!req.user.is_active) {
       return res.status(403).json({ message: 'Compte désactivé' });
+    }
+
+    // Add profile IDs from token (no DB query needed!)
+    if (decoded.client_id) {
+      req.user.client_id = decoded.client_id;
+    }
+    
+    if (decoded.driver_id) {
+      req.user.driver_id = decoded.driver_id;
+    }
+    
+    if (decoded.restaurant_id) {
+      req.user.restaurant_id = decoded.restaurant_id;
     }
 
     next();

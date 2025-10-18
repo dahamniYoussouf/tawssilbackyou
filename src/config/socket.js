@@ -197,10 +197,32 @@ export function emit(room, event, data) {
 /* -------- Notify near driver -------- */
 
 export async function notifyNearbyDrivers(orderLat, orderLng, data, radius = 10) {
+  if (!io) {
+    console.warn('⚠️ Socket.IO not initialized');
+    return [];
+  }
+
   // radius en kilomètres → conversion en mètres
   const radiusMeters = radius * 1000;
 
   console.log(`🔍 Searching nearby drivers within ${radius} km via PostGIS query`);
+
+  // 📡 BROADCAST TO ALL DRIVERS FIRST (before querying nearby)
+  const broadcastData = {
+    type: 'new_order_broadcast',
+    message: 'New delivery order available',
+    orderLat,
+    orderLng,
+    orderId: data.orderId,
+    orderNumber: data.orderNumber,
+    timestamp: new Date().toISOString()
+  };
+  
+  // Emit to BOTH 'driver' and 'drivers' rooms to be safe
+  io.to('driver').emit('order_broadcast', broadcastData);
+  io.to('drivers').emit('order_broadcast', broadcastData);
+  console.log(`📡 Broadcast sent to all drivers in 'driver' and 'drivers' rooms`);
+  console.log(`📡 Broadcast data:`, broadcastData);
 
   // Trouver les drivers disponibles dans la zone via ST_DWithin
   const nearbyDrivers = await Driver.findAll({
@@ -228,20 +250,29 @@ export async function notifyNearbyDrivers(orderLat, orderLng, data, radius = 10)
     }
   });
 
-  // 🔔 Notification en temps réel via Socket.IO
+  console.log(`✅ Found ${nearbyDrivers.length} available drivers within ${radius} km`);
+
+  // 🔔 Notification détaillée aux drivers proches
   for (const driver of nearbyDrivers) {
     const distance = (driver.getDataValue('distance_meters') / 1000).toFixed(2);
     const driverRoom = `driver:${driver.id}`;
+    const driverUserRoom = `driver:${driver.user_id}`;
 
-    io.to(driverRoom).emit('new_delivery', {
+    const notificationData = {
       ...data,
-      distance
-    });
+      distance,
+      timestamp: new Date().toISOString()
+    };
 
-    console.log(`📢 Notified driver ${driver.id} (${distance} km away)`);
+    // Emit to driver profile room and user room
+    io.to(driverRoom).emit('new_delivery', notificationData);
+        
+    console.log(`📢 Notified driver ${driver.id} (user: ${driver.user_id}) at ${distance} km`);
+    console.log(`   Rooms: ${driverRoom}, ${driverUserRoom}`);
+    console.log(`   Data:`, notificationData);
   }
 
-  console.log(`✅ ${nearbyDrivers.length} drivers notified within ${radius} km`);
+  console.log(`✅ Total: ${nearbyDrivers.length} nearby drivers notified + broadcast to all drivers`);
   return nearbyDrivers;
 }
 

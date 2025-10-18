@@ -1,28 +1,6 @@
 import Driver from "../models/Driver.js";
 import { Op } from "sequelize";
 
-// Create driver
-export const createDriver = async (driverData) => {
-  // Generate driver code
-  const lastDriver = await Driver.findOne({
-    order: [['created_at', 'DESC']]
-  });
-  
-  let driverNumber = 1;
-  if (lastDriver && lastDriver.driver_code) {
-    const lastNumber = parseInt(lastDriver.driver_code.split('-')[1]);
-    driverNumber = lastNumber + 1;
-  }
-  
-  const driver_code = `DRV-${driverNumber.toString().padStart(4, '0')}`;
-  
-  const driver = await Driver.create({
-    ...driverData,
-    driver_code
-  });
-  
-  return driver;
-};
 
 // Get all drivers
 export const getAllDrivers = async (filters = {}) => {
@@ -97,19 +75,6 @@ export const updateDriverStatus = async (id, status) => {
   return driver;
 };
 
-
-// Get available drivers
-export const getAvailableDrivers = async () => {
-  return Driver.findAll({
-    where: {
-      status: 'available',
-      is_active: true,
-      is_verified: true,
-      active_order_id: null
-    },
-    order: [['rating', 'DESC']]
-  });
-};
 
 // Get driver statistics
 export const getDriverStatistics = async (driver_id) => {

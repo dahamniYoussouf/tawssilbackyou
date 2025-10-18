@@ -8,11 +8,13 @@ import {
 } from "../validators/foodCategoryValidator.js";
 import { validate } from "../middlewares/validate.js";
 import * as foodCategoryCtrl from "../controllers/foodCategory.controller.js";
+import { protect, isRestaurant } from "../middlewares/auth.js"; // ✅ import
+
 
 const router = Router();
 
 // Create a new food category
-router.post("/", createFoodCategoryValidator, validate, foodCategoryCtrl.create);
+router.post("/", protect, isRestaurant, createFoodCategoryValidator, validate, foodCategoryCtrl.create);
 
 // Get all food categories
 router.get("/", foodCategoryCtrl.getAll);

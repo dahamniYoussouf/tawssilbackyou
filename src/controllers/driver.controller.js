@@ -1,47 +1,13 @@
 import {
-  createDriver,
   getAllDrivers,
   getDriverById,
   updateDriver,
   deleteDriver,
   updateDriverStatus,
-  getAvailableDrivers,
   getDriverStatistics
 } from "../services/driver.service.js";
 
-// Create driver
-export const create = async (req, res, next) => {
-  try {
-    const driver = await createDriver(req.body);
-    res.status(201).json({
-      success: true,
-      message: "Driver created successfully",
-      data: driver
-    });
-  } catch (err) {
-    if (err.name === "SequelizeUniqueConstraintError") {
-      return res.status(400).json({
-        success: false,
-        message: "This phone number or email is already registered",
-        field: err.errors[0].path,
-        value: err.errors[0].value
-      });
-    }
 
-    if (err.name === "SequelizeValidationError") {
-      return res.status(400).json({
-        success: false,
-        message: "Validation error",
-        errors: err.errors.map(e => ({
-          field: e.path,
-          message: e.message
-        }))
-      });
-    }
-
-    next(err);
-  }
-};
 
 // Get all drivers with filters
 export const getAll = async (req, res, next) => {
@@ -148,11 +114,105 @@ export const remove = async (req, res, next) => {
   }
 };
 
-// Update driver status
+// ✅ NEW: Get authenticated driver's profile
+export const getProfile = async (req, res, next) => {
+  try {
+    // Get driver_id directly from JWT token
+    const driverId = req.user.driver_id;
+    
+    if (!driverId) {
+      return res.status(400).json({
+        success: false,
+        message: "Driver profile not found in token"
+      });
+    }
+
+    const driver = await getDriverById(driverId);
+
+    if (!driver) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Driver profile not found" 
+      });
+    }
+
+    // Remove sensitive data if needed
+    const driverData = driver.toJSON();
+    
+    res.json({ 
+      success: true, 
+      data: driverData
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ✅ NEW: Update authenticated driver's own profile
+export const updateProfile = async (req, res, next) => {
+  try {
+    // Get driver_id directly from JWT token
+    const driverId = req.user.driver_id;
+    
+    if (!driverId) {
+      return res.status(400).json({
+        success: false,
+        message: "Driver profile not found in token"
+      });
+    }
+
+    const driver = await updateDriver(driverId, req.body);
+
+    if (!driver) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Driver not found" 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: "Profile updated successfully",
+      data: driver
+    });
+  } catch (err) {
+    if (err.name === "SequelizeUniqueConstraintError") {
+      return res.status(400).json({
+        success: false,
+        message: "This phone number or email is already registered",
+        field: err.errors[0].path,
+        value: err.errors[0].value
+      });
+    }
+
+    if (err.name === "SequelizeValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: err.errors.map(e => ({
+          field: e.path,
+          message: e.message
+        }))
+      });
+    }
+
+    next(err);
+  }
+};
+
+// ✅ UPDATED: Update status without ID parameter
 export const updateStatus = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    // Get driver_id directly from JWT token
+    const driverId = req.user.driver_id;
     const { status } = req.body;
+
+    if (!driverId) {
+      return res.status(400).json({
+        success: false,
+        message: "Driver profile not found in token"
+      });
+    }
 
     if (!status) {
       return res.status(400).json({
@@ -161,7 +221,7 @@ export const updateStatus = async (req, res, next) => {
       });
     }
 
-    const driver = await updateDriverStatus(id, status);
+    const driver = await updateDriverStatus(driverId, status);
 
     if (!driver) {
       return res.status(404).json({ 
@@ -180,26 +240,20 @@ export const updateStatus = async (req, res, next) => {
   }
 };
 
-
-// Get available drivers
-export const getAvailable = async (req, res, next) => {
-  try {
-    const drivers = await getAvailableDrivers();
-    res.json({ 
-      success: true, 
-      data: drivers,
-      count: drivers.length
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// Get driver statistics
+// ✅ UPDATED: Get statistics without ID parameter
 export const getStatistics = async (req, res, next) => {
   try {
-    const { id } = req.params;
-    const stats = await getDriverStatistics(id);
+    // Get driver_id directly from JWT token
+    const driverId = req.user.driver_id;
+    
+    if (!driverId) {
+      return res.status(400).json({
+        success: false,
+        message: "Driver profile not found in token"
+      });
+    }
+
+    const stats = await getDriverStatistics(driverId);
 
     if (!stats) {
       return res.status(404).json({ 
@@ -212,4 +266,4 @@ export const getStatistics = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
-}
+};

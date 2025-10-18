@@ -1,15 +1,10 @@
 import { body, param, query } from "express-validator";
 
 // ----------------------------
-// Validator for adding a favorite restaurant
+// Validator for adding a favorite meal
 // ----------------------------
 export const addFavoriteMealValidator = [
-  body("client_id")
-    .notEmpty()
-    .withMessage("client_id is required")
-    .isUUID()
-    .withMessage("client_id must be a valid UUID"),
-
+  // ❌ remove client_id check — comes from req.user now
   body("meal_id")
     .notEmpty()
     .withMessage("meal_id is required")
@@ -46,12 +41,7 @@ export const removeFavoriteMealValidator = [
 // Validator for getting favorite meals list
 // ----------------------------
 export const getFavoriteMealsValidator = [
-  query("client_id")
-    .notEmpty()
-    .withMessage("client_id is required")
-    .isUUID()
-    .withMessage("client_id must be a valid UUID"),
-
+  // ❌ remove client_id check — taken from req.user
   query("page")
     .optional()
     .isInt({ min: 1 })

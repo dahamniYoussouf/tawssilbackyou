@@ -19,7 +19,7 @@ const generateAccessToken = (userId, role) => {
   return jwt.sign(
     { id: userId, role, type: 'access' },
     process.env.JWT_SECRET || 'your-secret-key',
-    { expiresIn: '15m' }  // Short-lived for security
+    { expiresIn: '30d' }  // Short-lived for security
   );
 };
 
@@ -116,55 +116,66 @@ export const verifyOTP = async (req, res) => {
       return res.status(400).json({ message: 'Téléphone et OTP requis' });
     }
 
-    // Get stored OTP
     const storedData = otpStore.get(phone_number);
 
     if (!storedData) {
       return res.status(400).json({ message: 'OTP non trouvé ou expiré' });
     }
 
-    // Check expiration
     if (Date.now() > storedData.expiresAt) {
       otpStore.delete(phone_number);
       return res.status(400).json({ message: 'OTP expiré' });
     }
 
-    // Verify code
     if (storedData.code !== otp) {
       return res.status(400).json({ message: 'OTP invalide' });
     }
 
-    // OTP valid - clean up
     otpStore.delete(phone_number);
 
-    // Load user and profile
     const user = await User.findByPk(storedData.userId);
     const client = await Client.findByPk(storedData.clientId);
 
-    // Update last login
     user.last_login = new Date();
     await user.save();
 
-    // Generate device ID if not provided
     const deviceIdentifier = device_id || `device-${Date.now()}-${Math.random()}`;
 
-    // Generate BOTH tokens
-    const accessToken = generateAccessToken(user.id, user.role);
-    const refreshToken = generateRefreshToken(user.id, user.role, deviceIdentifier);
+    // ===== Generate tokens WITH client_id =====
+    const accessToken = jwt.sign(
+      {
+        id: user.id,
+        role: user.role,
+        client_id: client.id,  // ← Added
+        type: 'access'
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '30d' }
+    );
 
-    // Store refresh token (in production, use Redis with TTL)
+    const refreshToken = jwt.sign(
+      {
+        id: user.id,
+        role: user.role,
+        client_id: client.id,  // ← Added
+        type: 'refresh',
+        deviceId: deviceIdentifier
+      },
+      process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
+      { expiresIn: '30d' }
+    );
+
     deviceTokens.set(refreshToken, {
       userId: user.id,
       deviceId: deviceIdentifier,
       createdAt: Date.now()
     });
 
-    // 🎉 Success - User is logged in for 30 days!
     res.json({
       message: 'Connexion réussie',
-      access_token: accessToken,      // Short-lived (15 min)
-      refresh_token: refreshToken,    // Long-lived (30 days)
-      expires_in: 900,                // 15 minutes in seconds
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      expires_in: 900,
       user: {
         id: user.id,
         email: user.email,

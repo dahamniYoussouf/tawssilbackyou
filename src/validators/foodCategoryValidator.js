@@ -1,11 +1,6 @@
 import { body, param } from "express-validator";
 
 export const createFoodCategoryValidator = [
-  body("restaurant_id")
-    .notEmpty()
-    .withMessage("Restaurant ID is required")
-    .isUUID()
-    .withMessage("Restaurant ID must be a valid UUID"),
   body("nom")
     .notEmpty()
     .withMessage("Category name is required")
@@ -29,10 +24,6 @@ export const updateFoodCategoryValidator = [
   param("id")
     .isUUID()
     .withMessage("Invalid category UUID"),
-  body("restaurant_id")
-    .optional()
-    .isUUID()
-    .withMessage("Restaurant ID must be a valid UUID"),
   body("nom")
     .optional()
     .notEmpty()

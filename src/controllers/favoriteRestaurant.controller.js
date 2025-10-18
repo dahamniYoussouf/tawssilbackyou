@@ -8,12 +8,14 @@ import {
 // ⭐ Add a restaurant to favorites
 export const addFavoriteRestaurant = async (req, res, next) => {
   try {
-    const { client_id, restaurant_id } = req.body;
+    const client_id = req.user.client_id; // ✅ from protect middleware
+    const { restaurant_id } = req.body;
+
     if (!client_id || !restaurant_id) {
       return res.status(400).json({ success: false, error: "client_id and restaurant_id are required" });
     }
 
-    const result = await addFavoriteRestaurantService(req.body);
+    const result = await addFavoriteRestaurantService({ client_id, restaurant_id, ...req.body });
 
     if (result.error) {
       return res.status(result.status).json({
@@ -49,14 +51,10 @@ export const removeFavoriteRestaurant = async (req, res, next) => {
   }
 };
 
-// 📋 Get all favorites for a client
+// 📋 Get all favorite restaurants for a client
 export const getFavoriteRestaurants = async (req, res, next) => {
   try {
-    const { client_id } = req.query;
-    if (!client_id) {
-      return res.status(400).json({ success: false, error: "client_id is required" });
-    }
-
+    const client_id = req.user.client_id; // ✅ from protect middleware
     const favorites = await getFavoriteRestaurantsService(client_id);
 
     res.json({

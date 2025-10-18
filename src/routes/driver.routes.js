@@ -1,27 +1,41 @@
+// src/routes/driver.routes.js
 import express from "express";
+import { protect, isDriver, authorize } from "../middlewares/auth.js";
+import { validate } from "../middlewares/validate.js";
 import {
-  create,
   getAll,
   getById,
   update,
   remove,
   updateStatus,
-  getAvailable,
-  getStatistics
+  getStatistics, 
+  getProfile, 
+  updateProfile
 } from "../controllers/driver.controller.js";
+import {
+  getAllDriversValidator,
+  getDriverByIdValidator,
+  updateDriverValidator,
+  deleteDriverValidator,
+  updateStatusValidator
+} from "../validators/driverValidator.js";
 
 const router = express.Router();
 
-// Basic CRUD
-router.post("/create", create);
-router.get("/getall", getAll);
-router.get("/getavailable", getAvailable);
-router.get("/:id", getById);
-router.put("/update/:id", update);
-router.delete("/delete/:id", remove);
+// ===== PUBLIC/ADMIN ROUTES =====
+router.get("/getall", protect, getAllDriversValidator, validate, getAll);
 
-// Driver-specific operations
-router.patch("/:id/status", updateStatus);
-router.get("/:id/statistics", getStatistics);
+// ===== PROTECTED ROUTES - DRIVER'S OWN PROFILE =====
+router.get("/profile/me", protect, isDriver, getProfile);
+router.put("/profile", protect, isDriver, updateDriverValidator, validate, updateProfile);
+router.patch("/status", protect, isDriver, updateStatusValidator, validate, updateStatus);
+router.get("/statistics/me", protect, isDriver, getStatistics);
+
+// ===== ROUTES WITH :id PARAMETER (Must come after specific routes) =====
+router.get("/:id", protect, getDriverByIdValidator, validate, getById);
+
+// ===== ADMIN ROUTES =====
+router.put("/update/:id", protect, authorize('admin'), updateDriverValidator, validate, update);
+router.delete("/delete/:id", protect, authorize('admin', 'driver'), deleteDriverValidator, validate, remove);
 
 export default router;

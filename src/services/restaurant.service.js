@@ -5,45 +5,9 @@ import MenuItem from "../models/MenuItem.js";
 import { Op, literal } from "sequelize";
 import axios from "axios";
 import calculateRouteTime from "../services/routingService.js"
+import FavoriteMeal from "../models/FavoriteMeal.js";
 
-/**
- * Create a new restaurant
- */
-export const createRestaurant = async (data) => {
-  const {
-    name,
-    description,
-    address,
-    lat,
-    lng,
-    rating,
-    image_url,
-    is_active,
-    is_premium,
-    status,
-    opening_hours,
-    categories // Changed from category_id
-  } = data;
 
-  // Validate categories array
-  if (!categories || !Array.isArray(categories) || categories.length === 0) {
-    throw new Error("At least one category is required");
-  }
-
-  return await Restaurant.create({
-    name,
-    description,
-    address,
-    location: { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] },
-    rating,
-    image_url,
-    is_active,
-    is_premium,
-    status,
-    opening_hours,
-    categories // Changed from category_id
-  });
-};
 
 /**
  * Fetch all restaurants with open/close status
@@ -349,14 +313,14 @@ export const getCategoriesWithMenuItems = async (restaurantId, clientId = null) 
     throw new Error('Restaurant not found');
   }
 
-  // Fetch all categories for this restaurant with their menu items
+  // Fetch all categories with their menu items
   const categories = await FoodCategory.findAll({
     where: { restaurant_id: restaurantId },
     include: [{
       model: MenuItem,
-      as: 'items', // Make sure this association exists in your models
-      where: { is_available: true }, // Only include available items
-      required: false, // Include categories even if they have no items
+      as: 'items', // association alias
+      where: { is_available: true },
+      required: false,
       attributes: [
         'id',
         'nom',
@@ -374,11 +338,11 @@ export const getCategoriesWithMenuItems = async (restaurantId, clientId = null) 
     ]
   });
 
-  // If client_id is provided, fetch their favorite meals
+  // If client_id is provided, get their favorites
   let favoritesMap = new Map();
   if (clientId) {
-    const allMenuItemIds = categories.flatMap(cat => 
-      cat.menuItems ? cat.menuItems.map(item => item.id) : []
+    const allMenuItemIds = categories.flatMap(cat =>
+      cat.items ? cat.items.map(item => item.id) : []
     );
 
     if (allMenuItemIds.length > 0) {
@@ -401,17 +365,19 @@ export const getCategoriesWithMenuItems = async (restaurantId, clientId = null) 
     description: category.description,
     icone_url: category.icone_url,
     ordre_affichage: category.ordre_affichage,
-    items: category.items ? category.items.map(item => ({
-      id: item.id,
-      nom: item.nom,
-      description: item.description,
-      prix: parseFloat(item.prix),
-      photo_url: item.photo_url,
-      temps_preparation: item.temps_preparation,
-      is_available: item.is_available,
-      is_favorite: favoritesMap.has(item.id),
-      favorite_id: favoritesMap.get(item.id) || null
-    })) : [],
+    items: category.items
+      ? category.items.map(item => ({
+          id: item.id,
+          nom: item.nom,
+          description: item.description,
+          prix: parseFloat(item.prix),
+          photo_url: item.photo_url,
+          temps_preparation: item.temps_preparation,
+          is_available: item.is_available,
+          is_favorite: favoritesMap.has(item.id),
+          favorite_id: favoritesMap.get(item.id) || null
+        }))
+      : [],
     items_count: category.items ? category.items.length : 0
   }));
 

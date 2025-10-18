@@ -65,6 +65,22 @@ app.use("/driver", driver);
 app.use("/api", uploadRoutes);
 app.use("/api", geocodeRoutes);
 
+
+app.use("/api/v1/auth", auth);
+app.use("/api/v1/restaurants", restaurant);
+app.use("/api/v1/food-categories", foodcategory);
+app.use("/api/v1/menu-items", menuitem);
+app.use("/api/v1/orders", order);
+app.use("/api/v1/order-items", orderitem);
+app.use("/api/v1/clients", client);
+app.use("/api/v1/announcements", announcement);
+app.use("/api/v1/favorite-restaurants", favoriteRestaurant);
+app.use("/api/v1/favorite-meals", favoriteMeal);
+app.use("/api/v1/drivers", driver);
+app.use("/api/v1/uploads", uploadRoutes);
+app.use("/api/v1/geocode", geocodeRoutes);
+
+
 app.use(errorHandler);
 app.use("*", notFoundHandler);
 

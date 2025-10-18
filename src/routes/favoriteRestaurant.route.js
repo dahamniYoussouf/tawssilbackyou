@@ -5,20 +5,20 @@ import {
   getFavoriteRestaurants,
   updateFavoriteRestaurant
 } from "../controllers/favoriteRestaurant.controller.js";
-import { addFavoriteRestaurantValidator, removeFavoriteValidator, getFavoritesValidator, updateFavoriteRestaurantValidator } from "../validators/favoriteRestaurantValidator.js";
+import {
+  addFavoriteRestaurantValidator,
+  removeFavoriteRestaurantValidator,
+  getFavoriteRestaurantsValidator,
+  updateFavoriteRestaurantValidator
+} from "../validators/favoriteRestaurantValidator.js";
 import { validate } from "../middlewares/validate.js";
-
+import { protect, isClient } from "../middlewares/auth.js";
 
 const router = express.Router();
-// ⭐ Add a restaurant to favorites
-router.post("/create", addFavoriteRestaurantValidator, validate, addFavoriteRestaurant);
 
-// ❌ Remove a restaurant from favorites
-router.delete("/delete/:favorite_uuid", removeFavoriteValidator, validate, removeFavoriteRestaurant);
+router.post("/create", protect, isClient, addFavoriteRestaurantValidator, validate, addFavoriteRestaurant);
+router.delete("/delete/:favorite_uuid", protect, isClient, removeFavoriteRestaurantValidator, validate, removeFavoriteRestaurant);
+router.get("/getclientfavorites", protect, isClient, getFavoriteRestaurantsValidator, validate, getFavoriteRestaurants);
+router.patch("/updatefavorite/:favorite_uuid", protect, isClient, updateFavoriteRestaurantValidator, validate, updateFavoriteRestaurant);
 
-// 📋 Get all favorites for a client
-router.get("/getclientfavorites", getFavoritesValidator, validate, getFavoriteRestaurants);
-
-// 🔄 Update a favorite (notes/tags)
-router.patch("/update/:favorite_uuid", updateFavoriteRestaurantValidator, validate, updateFavoriteRestaurant);
 export default router;

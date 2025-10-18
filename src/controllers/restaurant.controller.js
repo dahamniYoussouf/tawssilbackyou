@@ -1,32 +1,9 @@
+// src/controllers/restaurant.controller.js
 import * as restaurantService from "../services/restaurant.service.js";
 
-/**
- * Create a restaurant
- */
-export const create = async (req, res, next) => {
-  try {
-    // Validate categories
-    const { categories } = req.body;
-    
-    if (!categories || !Array.isArray(categories) || categories.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: "At least one category is required and must be an array"
-      });
-    }
-
-    const resto = await restaurantService.createRestaurant(req.body);
-    res.status(201).json({
-      success: true,
-      data: resto
-    });
-  } catch (err) {
-    next(err);
-  }
-};
 
 /**
- * Get all restaurants
+ * Get all restaurants (basic info only - public)
  */
 export const getAll = async (req, res, next) => {
   try {
@@ -42,16 +19,23 @@ export const getAll = async (req, res, next) => {
 
 /**
  * Filter nearby restaurants with advanced options
- * Supports filtering by multiple categories
+ * ✅ REQUIRES AUTHENTICATION - client_id from JWT
  */
 export const nearbyFilter = async (req, res, next) => {
   try {
-    // Parse categories if it's a string (e.g., from query params)
+    // Parse categories if it's a string
     if (req.body.categories && typeof req.body.categories === 'string') {
       req.body.categories = req.body.categories.split(',').map(c => c.trim());
     }
 
-    const result = await restaurantService.filterNearbyRestaurants(req.body);
+    // ✅ Get client_id from JWT token (guaranteed to exist because of isClient middleware)
+    const filters = {
+      ...req.body,
+      client_id: req.user.client_id
+    };
+
+    const result = await restaurantService.filterNearbyRestaurants(filters);
+    
     res.json({
       success: true,
       count: result.count,
@@ -70,6 +54,7 @@ export const nearbyFilter = async (req, res, next) => {
 
 /**
  * Get nearby restaurant names only
+ * ✅ REQUIRES AUTHENTICATION
  */
 export const getNearbyNames = async (req, res, next) => {
   try {
@@ -89,7 +74,44 @@ export const getNearbyNames = async (req, res, next) => {
 };
 
 /**
- * Update a restaurant
+ * Update restaurant profile (own profile only)
+ */
+export const updateProfile = async (req, res, next) => {
+  try {
+    // Get restaurant_id directly from JWT token
+    const restaurantId = req.user.restaurant_id;
+    
+    if (!restaurantId) {
+      return res.status(400).json({
+        success: false,
+        error: "Restaurant profile not found in token"
+      });
+    }
+
+    // Validate categories if provided
+    if (req.body.categories !== undefined) {
+      if (!Array.isArray(req.body.categories) || req.body.categories.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: "Categories must be a non-empty array"
+        });
+      }
+    }
+
+    const updatedRestaurant = await restaurantService.updateRestaurant(restaurantId, req.body);
+
+    res.json({
+      success: true,
+      message: "Profile updated successfully",
+      data: updatedRestaurant
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Update restaurant (admin only)
  */
 export const update = async (req, res, next) => {
   try {
@@ -141,14 +163,16 @@ export const remove = async (req, res, next) => {
   }
 };
 
-
 /**
- * Get a  restaurant all data
+ * Get restaurant menu with categories and items
+ * ✅ REQUIRES AUTHENTICATION - shows favorites
  */
 export const getRestaurantMenu = async (req, res) => {
   try {
     const { restaurantId } = req.params;
-    const { client_id } = req.query; // Optional client_id for favorites
+    
+    // ✅ Get client_id from JWT token (guaranteed to exist)
+    const client_id = req.user.client_id;
 
     const menu = await restaurantService.getCategoriesWithMenuItems(restaurantId, client_id);
 

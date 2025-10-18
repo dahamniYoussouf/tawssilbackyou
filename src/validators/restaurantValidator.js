@@ -229,10 +229,7 @@ export const nearbyRestaurantValidator = [
  * Validator for nearby filter (advanced search)
  */
 export const nearbyFilterValidator = [
-  body("client_id")
-    .optional()
-    .isUUID()
-    .withMessage("Invalid client ID format"),
+
 
   body("address")
     .optional()

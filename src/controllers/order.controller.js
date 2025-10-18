@@ -2,11 +2,29 @@ import * as orderService from "../services/order.service.js";
 import { createOrderWithItems, getOrdersByRestaurant } from "../services/orderWithItem.js";
 
 // ==================== ORDER CRUD ====================
+// src/controllers/order.controller.js
 
-// Create order with items
+// ✅ Create order with items - client_id from JWT
 export const createOrder = async (req, res, next) => {
   try {
-    const order = await createOrderWithItems(req.body);
+    // ✅ Get client_id from JWT token
+    const client_id = req.user.client_id;
+    
+    if (!client_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Client profile not found in token"
+      });
+    }
+
+    // Merge client_id with request body
+    const orderData = {
+      ...req.body,
+      client_id // Override any client_id in body with authenticated user's ID
+    };
+
+    const order = await createOrderWithItems(orderData);
+    
     res.status(201).json({
       success: true,
       message: "Order created successfully",

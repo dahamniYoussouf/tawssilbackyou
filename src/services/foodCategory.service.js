@@ -46,14 +46,6 @@ export const updateCategory = async (id, payload) => {
   const category = await getCategoryById(id);
   if (!category) return null;
   
-  // Optional: Verify new restaurant exists if changing restaurant
-  if (payload.restaurant_id && payload.restaurant_id !== category.restaurant_id) {
-    const restaurant = await Restaurant.findByPk(payload.restaurant_id);
-    if (!restaurant) {
-      throw new Error('Restaurant not found');
-    }
-  }
-  
   await category.update(payload);
   return category;
 };

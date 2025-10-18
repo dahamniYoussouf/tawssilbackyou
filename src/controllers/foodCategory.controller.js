@@ -10,23 +10,19 @@ import Restaurant from '../models/Restaurant.js';
 //  Create
 export const create = async (req, res, next) => {
   try {
-    const { restaurant_id, nom, description, icone_url, ordre_affichage } = req.body;
-    
-    // Check if restaurant exists
-    const restaurant = await Restaurant.findByPk(restaurant_id);
-    if (!restaurant) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Restaurant not found' 
-      });
+    const restaurant_id = req.user.restaurant_id; // ✅ from JWT
+    const { nom, description, icone_url, ordre_affichage } = req.body;
+
+    if (!restaurant_id) {
+      return res.status(403).json({ success: false, message: "Restaurant ID not found in token" });
     }
-    
-    const category = await createCategory({ 
+
+    const category = await createCategory({
       restaurant_id,
-      nom, 
-      description, 
-      icone_url, 
-      ordre_affichage 
+      nom,
+      description,
+      icone_url,
+      ordre_affichage,
     });
 
     res.status(201).json({ success: true, data: category });
@@ -34,6 +30,7 @@ export const create = async (req, res, next) => {
     next(err);
   }
 };
+
 
 //  Get All
 export const getAll = async (req, res, next) => {
@@ -61,10 +58,9 @@ export const getByRestaurant = async (req, res, next) => {
 export const update = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { restaurant_id, nom, description, icone_url, ordre_affichage } = req.body;
+    const {  nom, description, icone_url, ordre_affichage } = req.body;
 
     const updated = await updateCategory(id, { 
-      restaurant_id,  // ← ADD THIS!
       nom, 
       description, 
       icone_url, 

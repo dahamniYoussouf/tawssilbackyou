@@ -1,4 +1,4 @@
-import {
+import { 
   addFavoriteMealService,
   removeFavoriteMealService,
   getFavoriteMealsService,
@@ -8,12 +8,14 @@ import {
 // Add a meal to favorites
 export const addFavoriteMeal = async (req, res, next) => {
   try {
-    const { client_id, meal_id } = req.body;
+    const client_id = req.user.client_id;  // ✅ from protect middleware
+    const { meal_id } = req.body;
+
     if (!client_id || !meal_id) {
       return res.status(400).json({ success: false, error: "client_id and meal_id are required" });
     }
 
-    const result = await addFavoriteMealService(req.body);
+    const result = await addFavoriteMealService({ client_id, meal_id, ...req.body });
 
     if (result.error) {
       return res.status(result.status).json({ success: false, error: result.error, favorite_uuid: result.favorite_uuid });
@@ -29,7 +31,6 @@ export const addFavoriteMeal = async (req, res, next) => {
   }
 };
 
-//  Remove a meal from favorites
 export const removeFavoriteMeal = async (req, res, next) => {
   try {
     const { favorite_uuid } = req.params;
@@ -45,13 +46,10 @@ export const removeFavoriteMeal = async (req, res, next) => {
   }
 };
 
-//  Get all favorite meals
+// Get all favorite meals
 export const getFavoriteMeals = async (req, res, next) => {
   try {
-    const { client_id } = req.query;
-    if (!client_id) {
-      return res.status(400).json({ success: false, error: "client_id is required" });
-    }
+    const client_id = req.user.client_id;  // ✅ from protect middleware
 
     const favorites = await getFavoriteMealsService(client_id);
 
@@ -71,7 +69,7 @@ export const getFavoriteMeals = async (req, res, next) => {
   }
 };
 
-//  Update favorite meal
+// Update favorite meal
 export const updateFavoriteMeal = async (req, res, next) => {
   try {
     const { favorite_uuid } = req.params;

@@ -29,6 +29,8 @@ button.online{background:#10b981;animation:pulse 2s infinite}
 .empty{color:#999;font-style:italic;text-align:center;padding:20px}
 .delivery-badge{position:absolute;top:10px;right:10px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:bold}
 .location-info{background:#f9fafb;padding:10px;border-radius:6px;margin:10px 0;font-size:13px}
+.broadcast-notice{animation:slideIn 0.3s ease-out}
+@keyframes slideIn{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}
 </style>
 </head>
 <body>
@@ -37,8 +39,8 @@ button.online{background:#10b981;animation:pulse 2s infinite}
 
 <div class="section">
 <h2>🔐 Login</h2>
-<input id="d_email" placeholder="Email" type="email">
-<input id="d_password" type="password" placeholder="Password">
+<input id="d_email" placeholder="Email" type="email" value="driver5@example.com">
+<input id="d_password" type="password" placeholder="Password" value="password123">
 <button onclick="driverLogin()">Login as Driver</button>
 <div id="login_status" class="status-badge" style="display:none;margin-top:10px"></div>
 </div>
@@ -58,7 +60,7 @@ button.online{background:#10b981;animation:pulse 2s infinite}
 <h2>📍 Location & Status</h2>
 <div class="row">
 <input id="d_lat" placeholder="Latitude" value="36.75">
-<input id="d_lng" placeholder="Longitude" value="3.04">
+<input id="d_lng" placeholder="Longitude" value="2.8">
 </div>
 <button id="online_btn" onclick="toggleOnline()" disabled>🟢 Go Online</button>
 <div id="driver_status" style="margin-top:10px"></div>
@@ -83,13 +85,20 @@ let auth = {role: null, token: null, user: null, profile: null};
 let isOnline = false;
 let locationInterval = null;
 
+async function apiFetch(url, options = {}) {
+  const token = auth.token || '';
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {})
+  };
+  const response = await fetch(url, { ...options, headers });
+  return response;
+}
+
 function log(...msg) {
   const e = document.getElementById('d_log');
   e.textContent = `[${new Date().toLocaleTimeString()}] ${msg.join(' ')}\n` + e.textContent;
-}
-
-function headers() {
-  return {'Content-Type': 'application/json', Authorization: `Bearer ${auth.token || ''}`};
 }
 
 function initSocket() {
@@ -106,48 +115,112 @@ function initSocket() {
   
   socket.on('connect', () => {
     log('✅ Socket connected! ID:', socket.id);
+    log('👤 Driver Profile ID:', auth.profile?.id);
+    log('📡 Listening for deliveries...');
     document.getElementById('online_btn').disabled = false;
+    
+    // Manually join driver rooms
+    if (auth.profile?.id) {
+      socket.emit('join', `driver:${auth.profile.id}`);
+      socket.emit('join', 'driver');
+      socket.emit('join', 'drivers');
+      log(`📍 Joined rooms: driver:${auth.profile.id}, driver, drivers`);
+    }
   });
   
   socket.on('connect_error', (error) => {
     log('❌ Connection error:', error.message);
   });
   
-  socket.on('notification', data => {
-    log('📬 Notification:', JSON.stringify(data));
+  // 📡 Listen for BROADCAST to all drivers
+  socket.on('order_broadcast', data => {
+    log('📡 BROADCAST RECEIVED! New order available somewhere');
+    log('Broadcast data:', JSON.stringify(data));
+    
+    // Show a subtle notification that there's an order available
+    const box = document.getElementById('d_deliveries');
+    const existingBroadcast = box.querySelector('.broadcast-notice');
+    if (!existingBroadcast) {
+      const notice = document.createElement('div');
+      notice.className = 'card broadcast-notice';
+      notice.style.background = '#fef3c7';
+      notice.style.borderColor = '#f59e0b';
+      notice.innerHTML = `
+        <strong>📡 New Order Available!</strong>
+        <p style="margin:5px 0;font-size:13px">An order was just placed. You may receive details if you're nearby.</p>
+      `;
+      box.prepend(notice);
+      
+      // Remove after 10 seconds
+      setTimeout(() => notice.remove(), 10000);
+    }
   });
   
+  // 🚨 Listen for SPECIFIC delivery (nearby drivers)
   socket.on('new_delivery', data => {
-    log('🚨 NEW DELIVERY!');
-    log('Order:', data.orderNumber, '| Distance:', data.distance, 'km');
+    log('🚨 NEW_DELIVERY EVENT RECEIVED!');
+    log('Data:', JSON.stringify(data));
+    handleNewDelivery(data);
+  });
+  
+  // 📬 General notification listener
+  socket.on('notification', data => {
+    log('📬 General Notification:', JSON.stringify(data));
     
-    const box = document.getElementById('d_deliveries');
-    if (box.querySelector('.empty')) box.innerHTML = '';
-    
-    const div = document.createElement('div');
-    div.className = 'card highlight';
-    div.innerHTML = `
-      <div class="delivery-badge">NEW!</div>
-      <strong style="font-size:18px;color:#0f62fe">Order #${data.orderNumber || data.orderId}</strong>
-      <div class="location-info">
-        <strong>📍 Distance:</strong> ${data.distance || '?'} km<br>
-        <strong>📍 Address:</strong> ${data.deliveryAddress || 'Not specified'}<br>
-        <strong>🍴 Restaurant:</strong> ${data.restaurant || 'Restaurant'}
-      </div>
-      <button class="success" onclick="acceptDelivery('${data.orderId}')">✅ Accept Delivery</button>
-    `;
-    box.prepend(div);
-    
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('New Delivery!', {
-        body: `Order #${data.orderNumber} - ${data.distance} km away`
-      });
+    if (data.type === 'new_delivery' || data.orderId) {
+      handleNewDelivery(data);
     }
   });
   
   socket.on('disconnect', () => {
     log('❌ Disconnected');
   });
+  
+  // Debug: log ALL events received
+  socket.onAny((event, ...args) => {
+    log(`🔔 Event: ${event}`, JSON.stringify(args));
+  });
+}
+
+function handleNewDelivery(data) {
+  log('🚨 Processing new delivery...');
+  log('Order:', data.orderNumber, '| Distance:', data.distance, 'km');
+  
+  const box = document.getElementById('d_deliveries');
+  if (box.querySelector('.empty')) box.innerHTML = '';
+  
+  const div = document.createElement('div');
+  div.className = 'card highlight';
+  div.innerHTML = `
+    <div class="delivery-badge">NEW!</div>
+    <strong style="font-size:18px;color:#0f62fe">Order #${data.orderNumber || data.orderId}</strong>
+    <div class="location-info">
+      <strong>📍 Distance:</strong> ${data.distance || '?'} km<br>
+      <strong>💰 Delivery Fee:</strong> ${data.fee || 0} DA<br>
+      <strong>📍 Address:</strong> ${data.deliveryAddress || 'Not specified'}<br>
+      <strong>🍴 Restaurant:</strong> ${data.restaurant || 'Restaurant'}
+    </div>
+    <button class="success" onclick="acceptDelivery('${data.orderId}')">✅ Accept Delivery</button>
+  `;
+  box.prepend(div);
+  
+  // Browser notification
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('New Delivery Available! 🚨', {
+      body: `Order #${data.orderNumber} - ${data.distance} km away - ${data.fee} DA`,
+      icon: '🛵',
+      requireInteraction: true
+    });
+  }
+  
+  // Sound notification
+  try {
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSqGzvLRfzMGH2S77eeXQAoRVq/n7bJiGgU+lNrywn0pBSh+zPDajEULFlqx6P+oUxMJS6Hh8LdgGgU7k9r0xnktBSV7zPDajUMLFlqx6PCkWBMKTaPi8LJeGgU6ktjzx3ktBSR6y+/fjEULFlqw5/CmWhMKTqPl8bhgGQU8k9j0x3ktBSR6y+/fjEQLFVqx6O+pWxMKT6Pm8rxfGgU9lNr0xnksBS17y+/fjEQKFVmw6PCmWhMKT6Pl8bdgGQU9lNn0xnktBSV7y+/gjEQLFVmw6PKlWhIKTqPl8bdgGQU9lNn0xnktBSV7yu/gjEQLFVmw6O+oWxMKTqPi8LZgGgU7k9n0xngtBSV8y+/gjEURFViv6PCmWhMKTaPh8LZhGgU7k9j0xnktBSZ8yu/fjEURFViv5/CmWhMKTqLi8LdeGgU7k9j0xnktBSZ7yu/fjEQRFVmv5+6nWRMKT6Lk8bdeGgU+k9j0xnktBSZ7yu/fjEQRFViv5+6mWhMKT6Lk8bdeGgU+k9j0xnktBSZ7yu/fjEQRFVmv5+6lWhMKTqHj8rdcGQU9k9j0xnktBSZ8y+/gjEQRFViv5+6lWhMKTqDk8bdeGgU9k9n0xngtBSZ7yu/fjEQRFVmw5+6nWhMKT6Hj8rdcGQU9k9j0xngtBSZ7yu/gjEQQFVmv5+6nWhMKT6Hj8rdcGQU9k9j0xnktBSZ7yu/gjEQRFVmv5+6mWhMKTqHi8bdcGgU9k9j0xnktBSZ7yu/fjEQRFViv6O6mWhMKTqHi8bdcGgU9k9j0xnktBSR7yu/fjEQRFVmv6O6nWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/f');
+    audio.volume = 0.5;
+    audio.play().catch(e => console.log('Audio play failed:', e));
+  } catch (e) {
+    console.log('Audio notification failed:', e);
+  }
 }
 
 async function driverLogin() {
@@ -212,14 +285,12 @@ async function changeStatus() {
   
   const newStatus = document.getElementById('status_select').value;
   
-  // Prevent changing to busy manually
   if (newStatus === 'busy' && !auth.profile.active_order_id) {
     alert('Cannot set Busy manually. System sets it when you accept a delivery.');
     loadCurrentStatus();
     return;
   }
   
-  // Prevent changing status if has active order
   if ((newStatus === 'offline' || newStatus === 'available') && auth.profile.active_order_id) {
     alert('Cannot change status while having an active delivery!');
     loadCurrentStatus();
@@ -229,10 +300,9 @@ async function changeStatus() {
   log('🔄 Changing status to:', newStatus);
   
   try {
-    const res = await fetch(`/driver/${auth.profile.id}/status`, {
+    const res = await apiFetch(`/driver/status`, {
       method: 'PATCH',
-      headers: headers(),
-      body: JSON.stringify({status: newStatus})
+      body: JSON.stringify({ status: newStatus })
     });
     
     const data = await res.json();
@@ -241,7 +311,6 @@ async function changeStatus() {
       log('✅ Status updated to:', newStatus);
       updateStatusInfo(newStatus);
       
-      // Sync with go online/offline button
       isOnline = (newStatus === 'available');
       updateOnlineStatus();
     } else {
@@ -260,10 +329,7 @@ async function loadCurrentStatus() {
   if (!auth.profile?.id) return;
   
   try {
-    const res = await fetch(`/driver/${auth.profile.id}`, {
-      headers: headers()
-    });
-    
+    const res = await apiFetch(`/driver/${auth.profile.id}`);
     const data = await res.json();
     
     if (res.ok && data.data) {
@@ -301,94 +367,84 @@ async function toggleOnline() {
     alert('No driver profile!');
     return;
   }
-  
+
   const lat = parseFloat(document.getElementById('d_lat').value);
   const lng = parseFloat(document.getElementById('d_lng').value);
-  
+
   if (isNaN(lat) || isNaN(lng)) {
     alert('Invalid coordinates');
     return;
   }
-  
+
   isOnline = !isOnline;
-  
+
   if (isOnline) {
     log('🟢 GOING ONLINE...');
-    
+
     try {
-      // Update status
-      const statusRes = await fetch(`/driver/${auth.profile.id}/status`, {
-        method: 'PATCH',
-        headers: headers(),
-        body: JSON.stringify({status: 'available'})
+      const statusRes = await apiFetch(`/driver/status`, { 
+        method: 'PATCH', 
+        body: JSON.stringify({ status: 'available' }) 
       });
-      
+
       if (!statusRes.ok) throw new Error('Failed to update status');
-      
-      // Update location
-      const locationRes = await fetch(`/order/drivers/${auth.profile.id}/gps`, {
+
+      const locationRes = await apiFetch(`/order/drivers/${auth.profile.id}/gps`, {
         method: 'PUT',
-        headers: headers(),
-        body: JSON.stringify({longitude: lng, latitude: lat})
+        body: JSON.stringify({ longitude: lng, latitude: lat })
       });
-      
       if (!locationRes.ok) throw new Error('Failed to update location');
-      
+
       log('✅ NOW ONLINE');
-      log('Location: (' + lat + ', ' + lng + ')');
-      
-      // Sync status dropdown
+      log(`Location: (${lat}, ${lng})`);
+
       document.getElementById('status_select').value = 'available';
       updateStatusInfo('available');
-      
-      // Start periodic updates
+
       locationInterval = setInterval(() => {
         const lat = parseFloat(document.getElementById('d_lat').value);
         const lng = parseFloat(document.getElementById('d_lng').value);
         if (!isNaN(lat) && !isNaN(lng)) {
-          fetch(`/order/drivers/${auth.profile.id}/gps`, {
+          apiFetch(`/order/drivers/${auth.profile.id}/gps`, {
             method: 'PUT',
-            headers: headers(),
-            body: JSON.stringify({longitude: lng, latitude: lat})
+            body: JSON.stringify({ longitude: lng, latitude: lat })
           }).then(() => log('📍 Location updated'));
         }
       }, 30000);
-      
+
     } catch (e) {
       log('❌ Failed:', e.message);
       alert('Error: ' + e.message);
       isOnline = false;
     }
-    
+
   } else {
     log('🔴 GOING OFFLINE...');
-    
+
     try {
       if (locationInterval) {
         clearInterval(locationInterval);
         locationInterval = null;
       }
-      
-      const res = await fetch(`/driver/${auth.profile.id}/status`, {
-        method: 'PATCH',
-        headers: headers(),
-        body: JSON.stringify({status: 'offline'})
+
+      const res = await apiFetch(`/driver/status`, { 
+        method: 'PATCH', 
+        body: JSON.stringify({ status: 'offline' }) 
       });
-      
+
       if (!res.ok) throw new Error('Failed to update status');
-      
+
       log('✅ NOW OFFLINE');
-      
-      // Sync status dropdown
+
       document.getElementById('status_select').value = 'offline';
       updateStatusInfo('offline');
-      
+
     } catch (e) {
       log('❌ Failed:', e.message);
       alert('Error: ' + e.message);
     }
   }
-  
+
   updateOnlineStatus();
 }
 
@@ -416,10 +472,9 @@ async function acceptDelivery(orderId) {
   log('✅ Accepting order', orderId);
   
   try {
-    const r = await fetch(`/order/${orderId}/assign-driver`, {
+    const r = await apiFetch(`/order/${orderId}/assign-driver`, {
       method: 'POST',
-      headers: headers(),
-      body: JSON.stringify({driver_id: auth.profile.id})
+      body: JSON.stringify({ driver_id: auth.profile.id })
     });
     
     const j = await r.json();
@@ -436,7 +491,6 @@ async function acceptDelivery(orderId) {
         }
       });
       
-      // Reload status (should now be "busy")
       loadCurrentStatus();
       
       alert('Delivery accepted!');

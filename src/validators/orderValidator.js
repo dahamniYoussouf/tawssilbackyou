@@ -3,9 +3,7 @@ import { body, param, query } from "express-validator";
 // ==================== ORDER CRUD VALIDATORS ====================
 
 export const createOrderWithItemsValidator = [
-  body('client_id')
-    .notEmpty().withMessage('Client ID is required')
-    .isUUID().withMessage('Invalid client ID format'),
+
   
   body('restaurant_id')
     .notEmpty().withMessage('Restaurant ID is required')
@@ -72,9 +70,7 @@ export const createOrderWithItemsValidator = [
 ];
 
 export const createOrderValidator = [
-  body('client_id')
-    .notEmpty().withMessage('Client ID is required')
-    .isUUID().withMessage('Invalid client ID format'),
+
   
   body('restaurant_id')
     .notEmpty().withMessage('Restaurant ID is required')

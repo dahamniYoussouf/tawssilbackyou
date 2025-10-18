@@ -1,15 +1,70 @@
 {
   "swagger": "2.0",
   "info": {
-    "version": "1.0.0",
-    "title": "My API",
-    "description": "Documentation générée automatiquement"
+    "version": "2.0.0",
+    "title": "Food Delivery API",
+    "description": "Complete REST API documentation for Food Delivery Platform with real-time features"
   },
+  "host": "localhost:3000",
   "basePath": "/",
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "User authentication and authorization endpoints"
+    },
+    {
+      "name": "Restaurants",
+      "description": "Restaurant management and search operations"
+    },
+    {
+      "name": "Menu Items",
+      "description": "Menu item CRUD and availability management"
+    },
+    {
+      "name": "Food Categories",
+      "description": "Food category management for restaurants"
+    },
+    {
+      "name": "Orders",
+      "description": "Order lifecycle management and tracking"
+    },
+    {
+      "name": "Order Items",
+      "description": "Order item management"
+    },
+    {
+      "name": "Clients",
+      "description": "Client profile management"
+    },
+    {
+      "name": "Drivers",
+      "description": "Driver management and tracking"
+    },
+    {
+      "name": "Favorites",
+      "description": "Favorite restaurants and meals management"
+    },
+    {
+      "name": "Announcements",
+      "description": "System announcements and notifications"
+    },
+    {
+      "name": "Utilities",
+      "description": "File upload and geocoding utilities"
+    }
+  ],
   "schemes": [
     "http",
     "https"
   ],
+  "securityDefinitions": {
+    "bearerAuth": {
+      "type": "apiKey",
+      "in": "header",
+      "name": "Authorization",
+      "description": "JWT Bearer token (format: Bearer <token>)"
+    }
+  },
   "consumes": [
     "application/json"
   ],
@@ -17,15 +72,473 @@
     "application/json"
   ],
   "paths": {
-    "/create": {
+    "/otp/request": {
       "post": {
         "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "phone_number": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/otp/verify": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "phone_number": {
+                  "example": "any"
+                },
+                "otp": {
+                  "example": "any"
+                },
+                "device_id": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/register": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "device_id": {
+                  "example": "any"
+                },
+                "email": {
+                  "example": "any"
+                },
+                "password": {
+                  "example": "any"
+                },
+                "role": {
+                  "example": "any"
+                },
+                "profileData": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
         "responses": {
           "201": {
             "description": "Created"
           },
           "400": {
             "description": "Bad Request"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/login": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "example": "any"
+                },
+                "password": {
+                  "example": "any"
+                },
+                "device_id": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/refresh": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "refresh_token": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "5": {
+            "description": ""
+          },
+          "9": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/logout": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "refresh_token": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/profile": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Internal Server Error"
+          }
+        }
+      },
+      "put": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/getall": {
+      "get": {
+        "description": "",
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/nearbyfilter": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "categories": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/getnearbynames": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/details/{restaurantId}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "restaurantId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "500": {
+            "description": "Internal Server Error"
           }
         }
       }
@@ -42,11 +555,32 @@
           }
         ],
         "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
           "200": {
             "description": "OK"
           },
           "400": {
             "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
           }
         }
       }
@@ -63,93 +597,66 @@
           }
         ],
         "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
           "200": {
             "description": "OK"
           },
           "400": {
             "description": "Bad Request"
-          }
-        }
-      }
-    },
-    "/nearbyfilter": {
-      "post": {
-        "description": "",
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "categories": {
-                  "example": "any"
-                }
-              }
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
           },
-          "400": {
-            "description": "Bad Request"
-          }
-        }
-      }
-    },
-    "/getnearbynames": {
-      "post": {
-        "description": "",
-        "responses": {
-          "200": {
-            "description": "OK"
+          "401": {
+            "description": "Unauthorized"
           },
-          "400": {
-            "description": "Bad Request"
-          }
-        }
-      }
-    },
-    "/getall": {
-      "get": {
-        "description": "",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "400": {
-            "description": "Bad Request"
-          }
-        }
-      }
-    },
-    "/details/{restaurantId}": {
-      "get": {
-        "description": "",
-        "parameters": [
-          {
-            "name": "restaurantId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "client_id",
-            "in": "query",
-            "type": "string"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
+          "403": {
+            "description": "Forbidden"
           },
           "404": {
             "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/create": {
+      "post": {
+        "description": "",
+        "responses": {
+          "0": {
+            "description": ""
           },
-          "500": {
-            "description": "Internal Server Error"
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       }
@@ -176,14 +683,40 @@
             "in": "path",
             "required": true,
             "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
           }
         ],
         "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
           "200": {
             "description": "OK"
           },
           "400": {
             "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
           }
         }
       },
@@ -202,9 +735,6 @@
             "schema": {
               "type": "object",
               "properties": {
-                "restaurant_id": {
-                  "example": "any"
-                },
                 "nom": {
                   "example": "any"
                 },
@@ -312,47 +842,74 @@
         "description": "",
         "parameters": [
           {
-            "name": "body",
-            "in": "body",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "restaurant_id": {
-                  "example": "any"
-                },
-                "nom": {
-                  "example": "any"
-                },
-                "description": {
-                  "example": "any"
-                },
-                "icone_url": {
-                  "example": "any"
-                },
-                "ordre_affichage": {
-                  "example": "any"
-                }
-              }
-            }
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
           }
         ],
         "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
           "201": {
             "description": "Created"
           },
           "400": {
             "description": "Bad Request"
           },
-          "404": {
-            "description": "Not Found"
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       },
       "get": {
         "description": "",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
         "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
           "200": {
             "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
           }
         }
       }
@@ -374,6 +931,944 @@
           },
           "400": {
             "description": "Bad Request"
+          }
+        }
+      }
+    },
+    "/nearby": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/client/{clientId}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "clientId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/restaurant/{restaurant_id}/orders": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "restaurant_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "type": "string"
+          },
+          {
+            "name": "order_type",
+            "in": "query",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/drivers/{driverId}/gps": {
+      "put": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "driverId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "longitude": {
+                  "example": "any"
+                },
+                "latitude": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/{id}/tracking": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/{id}/accept": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/{id}/preparing": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/{id}/decline": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/{id}/assign-driver": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "driver_id": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/{id}/start-delivery": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/{id}/complete-delivery": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/{id}/rating": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "rating": {
+                  "example": "any"
+                },
+                "review_comment": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/bulk-create": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "order_id": {
+                  "example": "any"
+                },
+                "items": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
+    "/order/{order_id}": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "order_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          }
+        }
+      }
+    },
+    "/profile/me": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/status": {
+      "patch": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "example": "any"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/statistics/me": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/delete/{favorite_uuid}": {
+      "delete": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "favorite_uuid",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/getclientfavorites": {
+      "get": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/updatefavorite/{favorite_uuid}": {
+      "patch": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "favorite_uuid",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/getactive": {
+      "get": {
+        "description": "",
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -426,41 +1921,850 @@
     }
   },
   "definitions": {
+    "LoginRequest": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "example": "restaurant@example.com"
+        },
+        "password": {
+          "type": "string",
+          "example": "password123"
+        },
+        "device_id": {
+          "type": "string",
+          "example": "device-123"
+        }
+      }
+    },
+    "RegisterRequest": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "example": "user@example.com"
+        },
+        "password": {
+          "type": "string",
+          "example": "password123"
+        },
+        "role": {
+          "type": "string",
+          "example": "driver"
+        },
+        "first_name": {
+          "type": "string",
+          "example": "John"
+        },
+        "last_name": {
+          "type": "string",
+          "example": "Doe"
+        },
+        "phone": {
+          "type": "string",
+          "example": "+213555123456"
+        }
+      }
+    },
+    "OTPRequest": {
+      "type": "object",
+      "properties": {
+        "phone_number": {
+          "type": "string",
+          "example": "+213555123456"
+        }
+      }
+    },
+    "OTPVerify": {
+      "type": "object",
+      "properties": {
+        "phone_number": {
+          "type": "string",
+          "example": "+213555123456"
+        },
+        "otp": {
+          "type": "string",
+          "example": "123456"
+        },
+        "device_id": {
+          "type": "string",
+          "example": "device-123"
+        }
+      }
+    },
+    "RefreshTokenRequest": {
+      "type": "object",
+      "properties": {
+        "refresh_token": {
+          "type": "string",
+          "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        }
+      }
+    },
     "Restaurant": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "name": {
+          "type": "string",
+          "example": "Pizza Palace"
+        },
+        "description": {
+          "type": "string",
+          "example": "Best pizza in town"
+        },
+        "address": {
+          "type": "string",
+          "example": "123 Main Street, Oran"
+        },
+        "lat": {
+          "type": "number",
+          "example": 35.6976
+        },
+        "lng": {
+          "type": "number",
+          "example": -0.6337
+        },
+        "rating": {
+          "type": "number",
+          "example": 4.5
+        },
+        "image_url": {
+          "type": "string",
+          "example": "https://example.com/image.jpg"
+        },
+        "is_active": {
+          "type": "boolean",
+          "example": true
+        },
+        "is_premium": {
+          "type": "boolean",
+          "example": false
+        },
+        "status": {
+          "type": "string",
+          "example": "approved"
+        },
+        "categories": {
+          "type": "array",
+          "example": [
+            "pizza",
+            "burger"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "opening_hours": {
+          "type": "object",
+          "properties": {
+            "monday": {
+              "type": "object",
+              "properties": {
+                "open": {
+                  "type": "string",
+                  "example": "09:00"
+                },
+                "close": {
+                  "type": "string",
+                  "example": "22:00"
+                }
+              }
+            },
+            "tuesday": {
+              "type": "object",
+              "properties": {
+                "open": {
+                  "type": "string",
+                  "example": "09:00"
+                },
+                "close": {
+                  "type": "string",
+                  "example": "22:00"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "RestaurantCreate": {
       "type": "object",
       "properties": {
         "name": {
           "type": "string",
-          "example": "Le Bistrot"
+          "example": "Pizza Palace"
+        },
+        "description": {
+          "type": "string",
+          "example": "Best pizza in town"
         },
         "address": {
           "type": "string",
-          "example": "123 Rue de la Paix"
+          "example": "123 Main Street, Oran"
         },
-        "latitude": {
+        "lat": {
           "type": "number",
-          "example": 48.8566
+          "example": 35.6976
         },
-        "longitude": {
+        "lng": {
           "type": "number",
-          "example": 2.3522
+          "example": -0.6337
         },
-        "cuisine": {
+        "categories": {
+          "type": "array",
+          "example": [
+            "pizza"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "image_url": {
           "type": "string",
-          "example": "Française"
+          "example": "https://example.com/image.jpg"
         }
       }
     },
-    "Error": {
+    "NearbyFilterRequest": {
       "type": "object",
       "properties": {
+        "client_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "lat": {
+          "type": "number",
+          "example": 35.6976
+        },
+        "lng": {
+          "type": "number",
+          "example": -0.6337
+        },
+        "radius": {
+          "type": "number",
+          "example": 5000
+        },
+        "categories": {
+          "type": "array",
+          "example": [
+            "pizza",
+            "burger"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "q": {
+          "type": "string",
+          "example": "pizza"
+        },
+        "page": {
+          "type": "number",
+          "example": 1
+        },
+        "pageSize": {
+          "type": "number",
+          "example": 20
+        }
+      }
+    },
+    "MenuItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "category_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "nom": {
+          "type": "string",
+          "example": "Margherita Pizza"
+        },
+        "description": {
+          "type": "string",
+          "example": "Classic tomato and mozzarella"
+        },
+        "prix": {
+          "type": "number",
+          "example": 899.99
+        },
+        "photo_url": {
+          "type": "string",
+          "example": "https://example.com/pizza.jpg"
+        },
+        "is_available": {
+          "type": "boolean",
+          "example": true
+        },
+        "temps_preparation": {
+          "type": "number",
+          "example": 20
+        }
+      }
+    },
+    "MenuItemCreate": {
+      "type": "object",
+      "properties": {
+        "category_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "nom": {
+          "type": "string",
+          "example": "Margherita Pizza"
+        },
+        "description": {
+          "type": "string",
+          "example": "Classic tomato and mozzarella"
+        },
+        "prix": {
+          "type": "number",
+          "example": 899.99
+        },
+        "photo_url": {
+          "type": "string",
+          "example": "https://example.com/pizza.jpg"
+        },
+        "temps_preparation": {
+          "type": "number",
+          "example": 20
+        }
+      }
+    },
+    "FoodCategory": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "restaurant_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "nom": {
+          "type": "string",
+          "example": "Pizzas"
+        },
+        "description": {
+          "type": "string",
+          "example": "Our delicious pizzas"
+        },
+        "icone_url": {
+          "type": "string",
+          "example": "https://example.com/icon.png"
+        },
+        "ordre_affichage": {
+          "type": "number",
+          "example": 1
+        }
+      }
+    },
+    "Order": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "order_number": {
+          "type": "string",
+          "example": "DEL-20240118-0001"
+        },
+        "client_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "restaurant_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "order_type": {
+          "type": "string",
+          "example": "delivery"
+        },
+        "delivery_address": {
+          "type": "string",
+          "example": "456 Oak Street"
+        },
+        "status": {
+          "type": "string",
+          "example": "pending"
+        },
+        "payment_method": {
+          "type": "string",
+          "example": "cash_on_delivery"
+        },
+        "subtotal": {
+          "type": "number",
+          "example": 2500
+        },
+        "delivery_fee": {
+          "type": "number",
+          "example": 200
+        },
+        "total_amount": {
+          "type": "number",
+          "example": 2700
+        },
+        "estimated_delivery_time": {
+          "type": "string",
+          "example": "2024-01-18T14:30:00Z"
+        }
+      }
+    },
+    "OrderCreate": {
+      "type": "object",
+      "properties": {
+        "client_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "restaurant_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "order_type": {
+          "type": "string",
+          "example": "delivery"
+        },
+        "delivery_address": {
+          "type": "string",
+          "example": "456 Oak Street"
+        },
+        "lat": {
+          "type": "number",
+          "example": 35.6976
+        },
+        "lng": {
+          "type": "number",
+          "example": -0.6337
+        },
+        "payment_method": {
+          "type": "string",
+          "example": "cash_on_delivery"
+        },
+        "delivery_fee": {
+          "type": "number",
+          "example": 200
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "menu_item_id": {
+                "type": "string",
+                "example": "uuid"
+              },
+              "quantity": {
+                "type": "number",
+                "example": 2
+              },
+              "special_instructions": {
+                "type": "string",
+                "example": "Extra cheese"
+              }
+            }
+          }
+        }
+      }
+    },
+    "OrderTracking": {
+      "type": "object",
+      "properties": {
+        "order_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "status": {
+          "type": "string",
+          "example": "delivering"
+        },
+        "driver": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "example": "John Doe"
+            },
+            "phone": {
+              "type": "string",
+              "example": "+213555123456"
+            },
+            "current_location": {
+              "type": "object",
+              "properties": {
+                "lat": {
+                  "type": "number",
+                  "example": 35.6976
+                },
+                "lng": {
+                  "type": "number",
+                  "example": -0.6337
+                }
+              }
+            }
+          }
+        },
+        "destination": {
+          "type": "object",
+          "properties": {
+            "lat": {
+              "type": "number",
+              "example": 35.7
+            },
+            "lng": {
+              "type": "number",
+              "example": -0.64
+            }
+          }
+        },
+        "estimated_arrival": {
+          "type": "string",
+          "example": "2024-01-18T14:30:00Z"
+        }
+      }
+    },
+    "OrderItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "order_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "menu_item_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "quantite": {
+          "type": "number",
+          "example": 2
+        },
+        "prix_unitaire": {
+          "type": "number",
+          "example": 899.99
+        },
+        "prix_total": {
+          "type": "number",
+          "example": 1799.98
+        },
+        "instructions_speciales": {
+          "type": "string",
+          "example": "Extra cheese"
+        }
+      }
+    },
+    "Client": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "first_name": {
+          "type": "string",
+          "example": "Jane"
+        },
+        "last_name": {
+          "type": "string",
+          "example": "Doe"
+        },
+        "email": {
+          "type": "string",
+          "example": "jane@example.com"
+        },
+        "phone_number": {
+          "type": "string",
+          "example": "+213555123456"
+        },
+        "address": {
+          "type": "string",
+          "example": "456 Oak Street"
+        },
+        "loyalty_points": {
+          "type": "number",
+          "example": 150
+        },
+        "is_verified": {
+          "type": "boolean",
+          "example": true
+        },
+        "is_active": {
+          "type": "boolean",
+          "example": true
+        }
+      }
+    },
+    "Driver": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "driver_code": {
+          "type": "string",
+          "example": "DRV-0001"
+        },
+        "first_name": {
+          "type": "string",
+          "example": "John"
+        },
+        "last_name": {
+          "type": "string",
+          "example": "Smith"
+        },
+        "phone": {
+          "type": "string",
+          "example": "+213555654321"
+        },
+        "email": {
+          "type": "string",
+          "example": "driver@example.com"
+        },
+        "vehicle_type": {
+          "type": "string",
+          "example": "motorcycle"
+        },
+        "vehicle_plate": {
+          "type": "string",
+          "example": "ABC-123"
+        },
+        "status": {
+          "type": "string",
+          "example": "available"
+        },
+        "rating": {
+          "type": "number",
+          "example": 4.8
+        },
+        "total_deliveries": {
+          "type": "number",
+          "example": 156
+        },
+        "is_verified": {
+          "type": "boolean",
+          "example": true
+        }
+      }
+    },
+    "DriverGPSUpdate": {
+      "type": "object",
+      "properties": {
+        "longitude": {
+          "type": "number",
+          "example": -0.6337
+        },
+        "latitude": {
+          "type": "number",
+          "example": 35.6976
+        }
+      }
+    },
+    "FavoriteRestaurant": {
+      "type": "object",
+      "properties": {
+        "favorite_uuid": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "client_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "restaurant_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "notes": {
+          "type": "string",
+          "example": "Best pizza place"
+        },
+        "tags": {
+          "type": "array",
+          "example": [
+            "italian",
+            "fast-delivery"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "FavoriteMeal": {
+      "type": "object",
+      "properties": {
+        "favorite_uuid": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "client_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "meal_id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "customizations": {
+          "type": "string",
+          "example": "Extra cheese, no onions"
+        },
+        "notes": {
+          "type": "string",
+          "example": "Perfect for Friday nights"
+        }
+      }
+    },
+    "Announcement": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "uuid"
+        },
+        "title": {
+          "type": "string",
+          "example": "New Year Promotion"
+        },
+        "content": {
+          "type": "string",
+          "example": "Get 20% off on all orders"
+        },
+        "type": {
+          "type": "string",
+          "example": "info"
+        },
+        "is_active": {
+          "type": "boolean",
+          "example": true
+        },
+        "start_date": {
+          "type": "string",
+          "example": "2024-01-01T00:00:00Z"
+        },
+        "end_date": {
+          "type": "string",
+          "example": "2024-01-31T23:59:59Z"
+        }
+      }
+    },
+    "FileUploadResponse": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "example": true
+        },
+        "url": {
+          "type": "string",
+          "example": "https://supabase.co/storage/file.jpg"
+        }
+      }
+    },
+    "GeocodeRequest": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string",
+          "example": "123 Main Street, Oran, Algeria"
+        }
+      }
+    },
+    "GeocodeResponse": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "string",
+          "example": "35.6976"
+        },
+        "lng": {
+          "type": "string",
+          "example": "-0.6337"
+        },
+        "display_name": {
+          "type": "string",
+          "example": "123 Main Street, Oran, Algeria"
+        }
+      }
+    },
+    "SuccessResponse": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "example": true
+        },
         "message": {
           "type": "string",
-          "example": "Message d'erreur"
+          "example": "Operation completed successfully"
         },
-        "code": {
-          "type": "number",
-          "example": 400
+        "data": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "example": false
+        },
+        "message": {
+          "type": "string",
+          "example": "Error message"
+        },
+        "errors": {
+          "type": "array",
+          "example": [],
+          "items": {}
+        }
+      }
+    },
+    "PaginatedResponse": {
+      "type": "object",
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "example": true
+        },
+        "data": {
+          "type": "array",
+          "example": [],
+          "items": {}
+        },
+        "pagination": {
+          "type": "object",
+          "properties": {
+            "current_page": {
+              "type": "number",
+              "example": 1
+            },
+            "total_pages": {
+              "type": "number",
+              "example": 10
+            },
+            "total_items": {
+              "type": "number",
+              "example": 100
+            }
+          }
         }
       }
     }
