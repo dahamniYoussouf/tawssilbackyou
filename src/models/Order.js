@@ -7,6 +7,11 @@ const Order = sequelize.define('Order', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
+  preparation_time: {
+  type: DataTypes.INTEGER, // in minutes
+  allowNull: true,
+  comment: 'Estimated time in minutes for restaurant to prepare the order'
+},
   order_number: {
     type: DataTypes.STRING,
     allowNull: true,

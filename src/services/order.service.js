@@ -95,7 +95,16 @@ export async function acceptOrder(orderId, userId) {
     throw { status: 400, message: `Cannot accept order in ${order.status} status` };
   }
   
-  await order.update({ status: 'accepted' });
+const preparationMinutes = data?.preparation_time || 15; // default 15 mins
+
+const preparationEnd = new Date();
+preparationEnd.setMinutes(preparationEnd.getMinutes() + preparationMinutes);
+
+await order.update({
+  status: 'accepted',
+  preparation_time: preparationMinutes,
+  preparation_end_time: preparationEnd
+});
   
   // Notify client
    notify('client', order.client_id, {
@@ -103,7 +112,7 @@ export async function acceptOrder(orderId, userId) {
     orderId: order.id,
     orderNumber: order.order_number,
     restaurant: order.restaurant.name,
-    message: `${order.restaurant.name} accepted your order`
+  message: `${order.restaurant.name} accepted your order. Estimated preparation time: ${preparationMinutes} min`
   });
   
   setTimeout(() => startPreparing(orderId), 60000);

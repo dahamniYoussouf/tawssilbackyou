@@ -90,6 +90,12 @@ export const getOrderById = async (req, res, next) => {
 export const getClientOrders = async (req, res, next) => {
   try {
     const { clientId } = req.params;
+      if (!clientId) {
+      return res.status(400).json({
+        success: false,
+        message: "Client profile not found"
+      });
+    }
     const result = await orderService.getClientOrdersService(clientId, req.query);
     
     res.json({
@@ -109,12 +115,14 @@ export const acceptOrder = async (req, res, next) => {
   try {
     const { id } = req.params;
     const userId = req.user?.id; // Restaurant user ID
+        const { preparation_time } = req.body; // restaurant provides this
+
     
-    const order = await orderService.acceptOrder(id, userId);
+    const order = await orderService.acceptOrder(id, userId, { preparation_time });
     
     res.json({
       success: true,
-      message: "Order accepted successfully",
+      message: `Order accepted with ${preparation_time || 15} minutes preparation time`,
       data: order
     });
   } catch (err) {
