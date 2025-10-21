@@ -10,9 +10,8 @@ import Order from "../src/models/Order.js";
 import OrderItem from "../src/models/OrderItem.js";
 import FavoriteRestaurant from "../src/models/FavoriteRestaurant.js";
 import FavoriteMeal from "../src/models/FavoriteMeal.js";
-
-// Import associations
 import * as associations from "../src/models/index.js";
+import bcrypt from "bcryptjs";
 
 // ===============================
 //   Données de base
@@ -121,11 +120,14 @@ const seedDatabase = async () => {
   try {
     console.log("🌱 Starting database seeding...");
 
-    await sequelize.sync({ force: false });
+    await sequelize.sync({ force: true });
 
     console.log("🗑️  Clearing existing data...");
     await sequelize.query('SET CONSTRAINTS ALL DEFERRED');
     await sequelize.truncate({ cascade: true, restartIdentity: true });
+
+    // ✅ Hash password once
+    const hashedPassword = await bcrypt.hash("password123", 10);
 
     // ----------------------------
     // 1️⃣ Clients
@@ -135,7 +137,7 @@ const seedDatabase = async () => {
     for (let i = 0; i < clientNames.length; i++) {
       clientUsers.push({
         email: `client${i + 1}@example.com`,
-        password: "password123",
+password: "password123",
         role: "client",
         is_active: true
       });
@@ -167,7 +169,7 @@ const seedDatabase = async () => {
     for (let i = 0; i < driverNames.length; i++) {
       const user = await User.create({
         email: `driver${i + 1}@example.com`,
-        password: "password123",
+password: "password123",
         role: "driver",
         is_active: true
       });
@@ -201,7 +203,7 @@ const seedDatabase = async () => {
     for (let i = 0; i < 1000; i++) {
       restaurantUsers.push({
         email: `restaurant${i + 1}@example.com`,
-        password: "password123",
+        password: hashedPassword,
         role: "restaurant",
         is_active: true
       });
