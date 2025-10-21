@@ -85,7 +85,7 @@ async function notify(type, id, data) {
 
 // ==================== STATUS TRANSITIONS ====================
 
-export async function acceptOrder(orderId, userId) {
+export async function acceptOrder(orderId, userId, data = {}) {
   const order = await Order.findByPk(orderId, {
     include: [{ model: Client, as: 'client' }, { model: Restaurant, as: 'restaurant' }]
   });
@@ -95,27 +95,34 @@ export async function acceptOrder(orderId, userId) {
     throw { status: 400, message: `Cannot accept order in ${order.status} status` };
   }
   
-const preparationMinutes = data?.preparation_time || 15; // default 15 mins
+  // ✅ Get preparation time from restaurant (or default 15 min)
+  const preparationMinutes = data?.preparation_time || 15;
 
-const preparationEnd = new Date();
-preparationEnd.setMinutes(preparationEnd.getMinutes() + preparationMinutes);
+  // ✅ Calculate when preparation should end
+  const preparationEnd = new Date();
+  preparationEnd.setMinutes(preparationEnd.getMinutes() + preparationMinutes);
 
-await order.update({
-  status: 'accepted',
-  preparation_time: preparationMinutes,
-  preparation_end_time: preparationEnd
-});
+  await order.update({
+    status: 'accepted',
+    preparation_time: preparationMinutes,
+    accepted_at: new Date()  // ← Make sure this is set
+  });
   
   // Notify client
-   notify('client', order.client_id, {
+  notify('client', order.client_id, {
     type: 'order_accepted',
     orderId: order.id,
     orderNumber: order.order_number,
     restaurant: order.restaurant.name,
-  message: `${order.restaurant.name} accepted your order. Estimated preparation time: ${preparationMinutes} min`
+    message: `${order.restaurant.name} accepted your order. Estimated preparation time: ${preparationMinutes} min`
   });
   
+  // ✅ Auto-transition to PREPARING after 1 minute
   setTimeout(() => startPreparing(orderId), 60000);
+  
+  // ✅ NEW: Auto-add 7 minutes if preparation time exceeds
+  setTimeout(() => addExtraPreparationTime(orderId), preparationMinutes * 60 * 1000);
+  
   return order;
 }
 
@@ -739,3 +746,52 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
   };
 };
 
+// ✅ NEW FUNCTION: Add extra time if preparation exceeds
+async function addExtraPreparationTime(orderId) {
+  try {
+    const order = await Order.findByPk(orderId, {
+      include: [{ model: Client, as: 'client' }]
+    });
+    
+    // Only add time if still preparing
+    if (!order || order.status !== 'preparing') {
+      console.log(`⚠️ Order ${orderId} not in preparing status - skipping extra time`);
+      return;
+    }
+    
+    console.log(`⏰ Preparation time exceeded for order ${orderId} - adding 7 minutes`);
+    
+    // Add 7 minutes to preparation time
+    const newPrepTime = (order.preparation_time || 15) + 7;
+    
+    // Update estimated delivery time
+    if (order.estimated_delivery_time) {
+      const newEstimatedTime = new Date(order.estimated_delivery_time);
+      newEstimatedTime.setMinutes(newEstimatedTime.getMinutes() + 7);
+      
+      await order.update({
+        preparation_time: newPrepTime,
+        estimated_delivery_time: newEstimatedTime
+      });
+    } else {
+      await order.update({
+        preparation_time: newPrepTime
+      });
+    }
+    
+    // Notify client about delay
+    notify('client', order.client_id, {
+      type: 'preparation_delayed',
+      orderId: order.id,
+      orderNumber: order.order_number,
+      extra_minutes: 7,
+      new_preparation_time: newPrepTime,
+      message: `Your order preparation is taking a bit longer. Added 7 minutes. New estimate: ${newPrepTime} minutes total.`
+    });
+    
+    console.log(`✅ Added 7 minutes to order ${orderId}. New prep time: ${newPrepTime} min`);
+    
+  } catch (error) {
+    console.error(`❌ Error adding extra time to order ${orderId}:`, error);
+  }
+}
