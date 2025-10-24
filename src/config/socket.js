@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import Restaurant from "../models/Restaurant.js";
 import Driver from "../models/Driver.js";
 import Client from "../models/Client.js"; // ← IMPORTANT: Import Client model
+import Admin from "../models/Admin.js";
 
 let io;
 const driverLocations = new Map();
@@ -104,6 +105,26 @@ export function initSocket(server) {
           }
         } catch (e) {
           console.error("Error joining driver room:", e);
+        }
+      }
+
+      // --- ADMIN: Join admin profile room and global pool
+      if (socket.userRole === "admin") {
+        try {
+          const admin = await Admin.findOne({ where: { user_id: socket.userId } });
+          if (admin) {
+            const adminRoom = `admin:${admin.id}`;
+            socket.join(adminRoom);
+            socket.join("admins"); // Global pool
+            console.log(`🛵 admin joined profile room: ${adminRoom}`);
+            console.log(`   User ID: ${socket.userId}, admin ID: ${admin.id}`);
+            
+            socket.adminProfileId = admin.id;
+          } else {
+            console.warn(`⚠️ No admin profile found for user ${socket.userId}`);
+          }
+        } catch (e) {
+          console.error("Error joining admin room:", e);
         }
       }
     }
