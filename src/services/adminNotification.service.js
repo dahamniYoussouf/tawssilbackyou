@@ -110,6 +110,110 @@ export const createPendingOrderNotification = async (orderId) => {
   }
 };
 
+
+/**
+ * Créer une notification admin pour commande non répondue
+ */
+export const createAcceptedOrderNotification = async (orderId) => {
+  try {
+    // Récupérer toutes les infos de la commande
+    const order = await Order.findByPk(orderId, {
+      include: [
+        {
+          model: Restaurant,
+          as: 'restaurant',
+          attributes: ['id', 'name', 'address', 'phone', 'email']
+        },
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'first_name', 'last_name', 'phone_number', 'address']
+        },
+        {
+          model: OrderItem,
+          as: 'order_items',
+          include: [{
+            model: MenuItem,
+            as: 'menu_item',
+            attributes: ['nom', 'prix']
+          }]
+        }
+      ]
+    });
+
+    if (!order) {
+      console.error(`❌ Order ${orderId} not found for admin notification`);
+      return null;
+    }
+
+    // Vérifier si encore en pending
+    if (order.status !== 'accepted') {
+      console.log(`⚠️ Order ${orderId} no longer accepted, skipping notification`);
+      return null;
+    }
+
+    // Préparer les données
+    const orderDetails = {
+      order_number: order.order_number,
+      order_type: order.order_type,
+      total_amount: parseFloat(order.total_amount || 0),
+      delivery_address: order.delivery_address,
+      created_at: order.created_at,
+      items: order.order_items.map(item => ({
+        name: item.menu_item.nom,
+        quantity: item.quantite,
+        price: parseFloat(item.prix_unitaire),
+        total: parseFloat(item.prix_total)
+      })),
+      client: {
+        name: `${order.client.first_name} ${order.client.last_name}`,
+        phone: order.client.phone_number,
+        address: order.client.address
+      }
+    };
+
+    const restaurantInfo = {
+      id: order.restaurant.id,
+      name: order.restaurant.name,
+      address: order.restaurant.address,
+      phone: order.restaurant.phone || 'Non renseigné',
+      email: order.restaurant.email || 'Non renseigné'
+    };
+
+    const message = `⚠️ Commande #${order.order_number} sans réponse depuis 3 minutes.\n` +
+                    `Restaurant: ${order.restaurant.name}\n` +
+                    `Montant: ${order.total_amount} DA\n` +
+                    `📞 Contact restaurant: ${restaurantInfo.phone}`;
+
+    // Créer la notification en BDD
+    const notification = await AdminNotification.create({
+      order_id: orderId,
+      restaurant_id: order.restaurant_id,
+      type: 'accepted_order_timeout',
+      message,
+      order_details: orderDetails,
+      restaurant_info: restaurantInfo
+    });
+
+    console.log(`🔔 Admin notification created: ${notification.id}`);
+
+    // Envoyer via Socket.IO à tous les admins
+    emit('admin', 'new_notification', {
+      id: notification.id,
+      type: 'accepted_order_timeout',
+      message,
+      order: orderDetails,
+      restaurant: restaurantInfo,
+      created_at: notification.created_at
+    });
+
+    return notification;
+
+  } catch (error) {
+    console.error('❌ Error creating admin notification:', error);
+    return null;
+  }
+};
 /**
  * Récupérer toutes les notifications (avec filtres)
  */

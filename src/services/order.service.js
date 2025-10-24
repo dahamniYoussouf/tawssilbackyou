@@ -123,6 +123,7 @@ export async function acceptOrder(orderId, userId, data = {}) {
   // ✅ NEW: Auto-add 7 minutes if preparation time exceeds
   setTimeout(() => addExtraPreparationTime(orderId), preparationMinutes * 60 * 1000);
   
+  scheduleAdminNotificationDriver;
   return order;
 }
 
@@ -811,6 +812,29 @@ export async function scheduleAdminNotification(orderId) {
         
         // Create notification in database + emit via Socket.IO
         await createPendingOrderNotification(orderId);
+      }
+    } catch (error) {
+      console.error('❌ Error scheduling admin notification:', error);
+    }
+  }, 3 * 60 * 1000); // 3 minutes
+}
+
+
+// ✅ NEW: Schedule admin notification if restaurant doesn't respond
+export async function scheduleAdminNotificationDriver(orderId) {
+  setTimeout(async () => {
+    try {
+      const order = await Order.findByPk(orderId);
+      
+      // Only notify if still pending after 3 minutes
+      if (order && order.status === 'accepted') {
+        console.log(`⏰ 3 minutes elapsed - drivers haven't responded to order ${orderId}`);
+        
+        // Import the service
+        const { createAcceptedOrderNotification } = await import('./adminNotification.service.js');
+        
+        // Create notification in database + emit via Socket.IO
+        await createAcceptedOrderNotification(orderId);
       }
     } catch (error) {
       console.error('❌ Error scheduling admin notification:', error);
