@@ -8,6 +8,8 @@ import FavoriteMeal from "./FavoriteMeal.js";
 import FavoriteRestaurant from "./FavoriteRestaurant.js";
 import Driver from "./Driver.js";
 import User from "./User.js";
+import Admin from "./Admin.js";
+import AdminNotification from "./AdminNotification.js";
 
 
 // ==========================
@@ -244,6 +246,51 @@ Restaurant.belongsTo(User, {
   as: 'user'
 });
 
+
+// ✅ NEW: User <-> Admin
+User.hasOne(Admin, {
+  foreignKey: 'user_id',
+  as: 'adminProfile',
+  onDelete: 'CASCADE'
+});
+Admin.belongsTo(User, {
+  foreignKey: 'user_id',
+  as: 'user'
+});
+
+// ✅ NEW: AdminNotification associations
+AdminNotification.belongsTo(Order, {
+  foreignKey: 'order_id',
+  as: 'order'
+});
+Order.hasMany(AdminNotification, {
+  foreignKey: 'order_id',
+  as: 'admin_notifications'
+});
+
+AdminNotification.belongsTo(Restaurant, {
+  foreignKey: 'restaurant_id',
+  as: 'restaurant'
+});
+Restaurant.hasMany(AdminNotification, {
+  foreignKey: 'restaurant_id',
+  as: 'admin_notifications'
+});
+
+AdminNotification.belongsTo(Admin, {
+  foreignKey: 'resolved_by',
+  as: 'resolver'
+});
+Admin.hasMany(AdminNotification, {
+  foreignKey: 'resolved_by',
+  as: 'resolved_notifications'
+});
+
+
+
+
+
+
 export { 
   Restaurant, 
   MenuItem, 
@@ -254,6 +301,8 @@ export {
   FavoriteRestaurant,
   FavoriteMeal, 
   Driver,
-  User
+  User,
+   Admin, 
+  AdminNotification 
 };
 

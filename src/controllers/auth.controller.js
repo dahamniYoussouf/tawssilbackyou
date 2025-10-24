@@ -3,6 +3,8 @@ import User from '../models/User.js';
 import Client from '../models/Client.js';
 import Driver from '../models/Driver.js';
 import Restaurant from '../models/Restaurant.js';
+import Admin from '../models/Admin.js';
+
 
 // OTP Store (use Redis in production)
 const otpStore = new Map();
@@ -413,6 +415,11 @@ export const login = async (req, res) => {
         profile = await Restaurant.findOne({ where: { user_id: user.id } });
         restaurant_id = profile?.id || null;
         break;
+
+      case 'admin': 
+        profile = await Admin.findOne({ where: { user_id: user.id } });
+        admin_id = profile?.id || null;
+        break;
     }
 
     user.last_login = new Date();
@@ -425,8 +432,10 @@ export const login = async (req, res) => {
       {
         id: user.id,
         role: user.role,
-        driver_id,        // ajouté
-        restaurant_id,    // ajouté
+        driver_id,        
+        restaurant_id,    
+        admin_id, 
+
         type: 'access'
       },
       process.env.JWT_SECRET || 'your-secret-key',
@@ -439,6 +448,7 @@ export const login = async (req, res) => {
         role: user.role,
         driver_id,
         restaurant_id,
+        admin_id,
         type: 'refresh',
         deviceId: deviceIdentifier
       },

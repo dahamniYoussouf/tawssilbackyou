@@ -63,6 +63,10 @@ export const protect = async (req, res, next) => {
       req.user.restaurant_id = decoded.restaurant_id;
     }
 
+     if (decoded.admin_id) {
+      req.user.admin_id = decoded.admin_id;
+    }
+
     next();
     
   } catch (error) {
@@ -101,6 +105,13 @@ export const isDriver = (req, res, next) => {
 export const isRestaurant = (req, res, next) => {
   if (req.user.role !== 'restaurant') {
     return res.status(403).json({ message: 'Accès réservé aux restaurants' });
+  }
+  next();
+};
+
+export const isAdmin = (req, res, next) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: 'Accès réservé aux administrateurs' });
   }
   next();
 };
