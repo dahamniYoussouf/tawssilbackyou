@@ -30,7 +30,7 @@ const AdminNotification = sequelize.define('AdminNotification', {
     comment: "Reference to the restaurant"
   },
   type: {
-    type: DataTypes.ENUM('pending_order_timeout', 'restaurant_unresponsive'),
+    type: DataTypes.ENUM('pending_order_timeout', 'restaurant_unresponsive', 'driver_unresponsive'),
     defaultValue: 'pending_order_timeout',
     allowNull: false,
     comment: "Type of notification"

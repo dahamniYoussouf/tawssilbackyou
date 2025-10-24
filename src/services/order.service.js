@@ -142,7 +142,7 @@ export async function startPreparing(orderId) {
   await order.update({ status: 'preparing' });
     
   await transaction.commit();
-    scheduleAdminNotificationDriver;
+scheduleAdminNotificationDriver(orderId);
 
   console.log(`👨‍🍳 Order ${orderId} status changed to PREPARING`);
   

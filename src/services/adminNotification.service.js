@@ -147,7 +147,7 @@ export const createAcceptedOrderNotification = async (orderId) => {
     }
 
     // Vérifier si encore en accepted
-    if (order.status !== 'accepted') {
+    if (order.status !== 'preparing') {
       console.log(`⚠️ Order ${orderId} no longer accepted, skipping notification`);
       return null;
     }
@@ -189,7 +189,7 @@ export const createAcceptedOrderNotification = async (orderId) => {
     const notification = await AdminNotification.create({
       order_id: orderId,
       restaurant_id: order.restaurant_id,
-      type: 'assigned_order_timeout',
+      type: 'driver_unresponsive',
       message,
       order_details: orderDetails,
       restaurant_info: restaurantInfo
@@ -200,7 +200,7 @@ export const createAcceptedOrderNotification = async (orderId) => {
     // Envoyer via Socket.IO à tous les admins
     emit('admin', 'new_notification', {
       id: notification.id,
-      type: 'assigned_order_timeout',
+      type: 'driver_unresponsive',
       message,
       order: orderDetails,
       restaurant: restaurantInfo,
