@@ -6,6 +6,7 @@ import Restaurant from "../models/Restaurant.js";
 import Client from "../models/Client.js";
 import calculateRouteTime from "../services/routingService.js";
 import { emit } from "../config/socket.js";
+import {scheduleAdminNotification} from "../services/order.service.js"
 
 
 // Helper to notify
@@ -179,14 +180,19 @@ export async function createOrderWithItems(data) {
 
     await transaction.commit();
 
-    scheduleAdminNotification(order.id);
+   try {
+      scheduleAdminNotification(order.id);
 
       notify('restaurant', data.restaurant_id, {
-    type: 'new_order',
-    orderId: order.id,
-    orderNumber: order.order_number,
-    total: order.total
-  });
+        type: 'new_order',
+        orderId: order.id,
+        orderNumber: order.order_number,
+        total: order.total
+      });
+      console.log("emitting notification to admin");
+    } catch (notifyError) {
+      console.error("Post-commit notification failed:", notifyError.message);
+    }
     // Return complete order with delivery duration
     return {
       ...completeOrder.toJSON(),
