@@ -179,6 +179,8 @@ export async function createOrderWithItems(data) {
 
     await transaction.commit();
 
+    scheduleAdminNotification(order.id);
+
       notify('restaurant', data.restaurant_id, {
     type: 'new_order',
     orderId: order.id,

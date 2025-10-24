@@ -795,3 +795,25 @@ async function addExtraPreparationTime(orderId) {
     console.error(`❌ Error adding extra time to order ${orderId}:`, error);
   }
 }
+
+// ✅ NEW: Schedule admin notification if restaurant doesn't respond
+export async function scheduleAdminNotification(orderId) {
+  setTimeout(async () => {
+    try {
+      const order = await Order.findByPk(orderId);
+      
+      // Only notify if still pending after 3 minutes
+      if (order && order.status === 'pending') {
+        console.log(`⏰ 3 minutes elapsed - Restaurant hasn't responded to order ${orderId}`);
+        
+        // Import the service
+        const { createPendingOrderNotification } = await import('./adminNotification.service.js');
+        
+        // Create notification in database + emit via Socket.IO
+        await createPendingOrderNotification(orderId);
+      }
+    } catch (error) {
+      console.error('❌ Error scheduling admin notification:', error);
+    }
+  }, 3 * 60 * 1000); // 3 minutes
+}
