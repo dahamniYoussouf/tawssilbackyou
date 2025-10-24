@@ -5,7 +5,7 @@ import MenuItem from "../models/MenuItem.js";
 import Restaurant from "../models/Restaurant.js";
 import Client from "../models/Client.js";
 import calculateRouteTime from "../services/routingService.js";
-import { emit, notifyNearbyDrivers } from "../config/socket.js";
+import { emit } from "../config/socket.js";
 
 
 // Helper to notify

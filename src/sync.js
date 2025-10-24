@@ -11,6 +11,9 @@ import "./models/FavoriteRestaurant.js";
 import "./models/Announcement.js";
 import "./models/Driver.js";
 import "./models/User.js";
+import "./models/Admin.js";
+import "./models/AdminNotification.js";
+
 
 // Import associations
 import "./models/index.js";
