@@ -113,10 +113,10 @@ export function initSocket(server) {
         try {
           const admin = await Admin.findOne({ where: { user_id: socket.userId } });
           if (admin) {
-            const adminRoom = `admin:${admin.id}`;
+            const adminRoom = `admin`;
             socket.join(adminRoom);
             socket.join("admins"); // Global pool
-            console.log(`🛵 admin joined profile room: ${adminRoom}`);
+            console.log(`🛵 admin joined `);
             console.log(`   User ID: ${socket.userId}, admin ID: ${admin.id}`);
             
             socket.adminProfileId = admin.id;
