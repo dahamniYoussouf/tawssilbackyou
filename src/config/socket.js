@@ -116,7 +116,7 @@ export function initSocket(server) {
             const adminRoom = `admin`;
             socket.join(adminRoom);
             socket.join("admins"); // Global pool
-            console.log(`🛵 admin joined `);
+            console.log(` admin joined `);
             console.log(`   User ID: ${socket.userId}, admin ID: ${admin.id}`);
             
             socket.adminProfileId = admin.id;
