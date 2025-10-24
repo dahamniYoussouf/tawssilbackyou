@@ -27,6 +27,8 @@ import driver from "./routes/driver.routes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import geocodeRoutes from "./routes/geocode.js";
 import auth from "./routes/auth.route.js";
+import admin from "./routes/admin.routes.js"; 
+
 
 const app = express();
 const server = http.createServer(app);
@@ -62,6 +64,7 @@ app.use("/announcement", announcement);
 app.use("/favoriterestaurant", favoriteRestaurant);
 app.use("/favoritemeal", favoriteMeal);
 app.use("/driver", driver);
+app.use("/admin", admin);
 app.use("/api", uploadRoutes);
 app.use("/api", geocodeRoutes);
 
@@ -77,6 +80,7 @@ app.use("/api/v1/announcements", announcement);
 app.use("/api/v1/favorite-restaurants", favoriteRestaurant);
 app.use("/api/v1/favorite-meals", favoriteMeal);
 app.use("/api/v1/drivers", driver);
+app.use("/api/v1/admin", admin);
 app.use("/api/v1/uploads", uploadRoutes);
 app.use("/api/v1/geocode", geocodeRoutes);
 
