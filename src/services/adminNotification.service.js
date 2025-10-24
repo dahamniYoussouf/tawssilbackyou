@@ -17,7 +17,7 @@ export const createPendingOrderNotification = async (orderId) => {
         {
           model: Restaurant,
           as: 'restaurant',
-          attributes: ['id', 'name', 'address', 'phone', 'email']
+          attributes: ['id', 'name', 'address']
         },
         {
           model: Client,
@@ -122,7 +122,7 @@ export const createAcceptedOrderNotification = async (orderId) => {
         {
           model: Restaurant,
           as: 'restaurant',
-          attributes: ['id', 'name', 'address', 'phone', 'email']
+          attributes: ['id', 'name', 'address']
         },
         {
           model: Client,
@@ -146,7 +146,7 @@ export const createAcceptedOrderNotification = async (orderId) => {
       return null;
     }
 
-    // Vérifier si encore en pending
+    // Vérifier si encore en accepted
     if (order.status !== 'accepted') {
       console.log(`⚠️ Order ${orderId} no longer accepted, skipping notification`);
       return null;
@@ -189,7 +189,7 @@ export const createAcceptedOrderNotification = async (orderId) => {
     const notification = await AdminNotification.create({
       order_id: orderId,
       restaurant_id: order.restaurant_id,
-      type: 'accepted_order_timeout',
+      type: 'assigned_order_timeout',
       message,
       order_details: orderDetails,
       restaurant_info: restaurantInfo
@@ -200,7 +200,7 @@ export const createAcceptedOrderNotification = async (orderId) => {
     // Envoyer via Socket.IO à tous les admins
     emit('admin', 'new_notification', {
       id: notification.id,
-      type: 'accepted_order_timeout',
+      type: 'assigned_order_timeout',
       message,
       order: orderDetails,
       restaurant: restaurantInfo,

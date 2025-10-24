@@ -1,4 +1,5 @@
 import { Op, literal } from "sequelize";
+import { sequelize } from "../config/database.js";
 import Order from "../models/Order.js";
 import Restaurant from "../models/Restaurant.js";
 import Client from "../models/Client.js";
@@ -123,11 +124,12 @@ export async function acceptOrder(orderId, userId, data = {}) {
   // ✅ NEW: Auto-add 7 minutes if preparation time exceeds
   setTimeout(() => addExtraPreparationTime(orderId), preparationMinutes * 60 * 1000);
   
-  scheduleAdminNotificationDriver;
   return order;
 }
 
 export async function startPreparing(orderId) {
+    const transaction = await sequelize.transaction();
+
   const order = await Order.findByPk(orderId, {
     include: [{ model: Client, as: 'client' }, { model: Restaurant, as: 'restaurant' }]
   });
@@ -138,7 +140,10 @@ export async function startPreparing(orderId) {
   }
   
   await order.update({ status: 'preparing' });
-  
+    
+  await transaction.commit();
+    scheduleAdminNotificationDriver;
+
   console.log(`👨‍🍳 Order ${orderId} status changed to PREPARING`);
   
   // Notify client
@@ -827,7 +832,7 @@ export async function scheduleAdminNotificationDriver(orderId) {
       const order = await Order.findByPk(orderId);
       
       // Only notify if still pending after 3 minutes
-      if (order && order.status === 'accepted') {
+      if (order && order.status === 'preparing') {
         console.log(`⏰ 3 minutes elapsed - drivers haven't responded to order ${orderId}`);
         
         // Import the service
@@ -839,5 +844,5 @@ export async function scheduleAdminNotificationDriver(orderId) {
     } catch (error) {
       console.error('❌ Error scheduling admin notification:', error);
     }
-  }, 3 * 60 * 1000); // 3 minutes
+  }, 2 * 60 * 1000); // 3 minutes
 }

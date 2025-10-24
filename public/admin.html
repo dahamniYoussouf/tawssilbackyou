@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin - Notifications Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<style>
+body{font-family:Arial,Helvetica,sans-serif;background:#f4f6fa;margin:0;padding:20px;min-height:100vh}
+.container{max-width:1200px;margin:0 auto}
+h1{text-align:center;color:#0f62fe;margin-bottom:30px}
+.section{background:#fff;padding:20px;border-radius:10px;box-shadow:0 4px 10px rgba(0,0,0,.1);margin-bottom:20px}
+h2{margin-top:0;color:#0f62fe;font-size:18px;border-bottom:2px solid #e5e7eb;padding-bottom:10px}
+input,button,select{width:100%;padding:10px;margin:6px 0;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;font-size:14px}
+button{background:#0f62fe;color:#fff;font-weight:bold;cursor:pointer;border:none}
+button:hover{background:#084cd2}
+button.danger{background:#dc2626}
+button.danger:hover{background:#991b1b}
+button.success{background:#10b981}
+button.success:hover{background:#059669}
+.card{border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:12px 0;background:#fafbff;position:relative}
+.card.unread{border-left:4px solid #0f62fe;background:#eef2ff}
+.card.pending{border-left:4px solid #f59e0b;background:#fef3c7}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+.status-badge{display:inline-block;background:#eef2ff;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:bold;color:#0f62fe;margin:4px 0}
+.status-badge.unread{background:#fef3c7;color:#92400e}
+.status-badge.resolved{background:#d1fae5;color:#065f46}
+.log{background:#0b1020;color:#d1fae5;padding:15px;border-radius:6px;height:300px;overflow:auto;font-family:monospace;font-size:12px}
+.empty{color:#999;font-style:italic;text-align:center;padding:20px}
+.notification-header{display:flex;justify-content:space-between;align-items:start;margin-bottom:10px}
+.notification-details{background:#f9fafb;padding:10px;border-radius:6px;margin:10px 0;font-size:13px}
+.action-buttons{display:flex;gap:8px;margin-top:10px}
+.action-buttons button{width:auto;padding:8px 16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:15px;margin-bottom:20px}
+.stat-card{background:#fff;padding:15px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.1);text-align:center}
+.stat-value{font-size:32px;font-weight:bold;color:#0f62fe}
+.stat-label{font-size:14px;color:#666;margin-top:5px}
+.filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:15px}
+.toast{position:fixed;top:20px;right:20px;background:#10b981;color:#fff;padding:15px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.2);animation:slideIn 0.3s;z-index:1000}
+.toast.error{background:#dc2626}
+.toast.warning{background:#f59e0b}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.order-info{font-size:13px;line-height:1.6}
+.order-info strong{color:#0f62fe}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🔔 Admin - Notifications Dashboard</h1>
+
+<!-- Login Section -->
+<div class="section">
+<h2>🔐 Admin Login</h2>
+<input id="admin_email" type="email" placeholder="Email" value="admin1@example.com">
+<input id="admin_password" type="password" placeholder="Password" value="password123">
+<button onclick="adminLogin()">Login as Admin</button>
+<div id="login_status" class="status-badge" style="display:none;margin-top:10px"></div>
+</div>
+
+<!-- Statistics -->
+<div class="stats" id="stats_section" style="display:none">
+<div class="stat-card">
+<div class="stat-value" id="stat_total">0</div>
+<div class="stat-label">Total Notifications</div>
+</div>
+<div class="stat-card">
+<div class="stat-value" id="stat_unread">0</div>
+<div class="stat-label">Unread</div>
+</div>
+<div class="stat-card">
+<div class="stat-value" id="stat_pending">0</div>
+<div class="stat-label">Pending Action</div>
+</div>
+<div class="stat-card">
+<div class="stat-value" id="stat_resolved">0</div>
+<div class="stat-label">Resolved</div>
+</div>
+</div>
+
+<!-- Filters -->
+<div class="section" id="filter_section" style="display:none">
+<h2>🔍 Filters</h2>
+<div class="filters">
+<select id="filter_read">
+<option value="">All Read Status</option>
+<option value="false">Unread Only</option>
+<option value="true">Read Only</option>
+</select>
+<select id="filter_resolved">
+<option value="">All Resolved Status</option>
+<option value="false">Pending Only</option>
+<option value="true">Resolved Only</option>
+</select>
+<select id="filter_type">
+<option value="">All Types</option>
+<option value="pending_order_timeout">Pending Order Timeout</option>
+<option value="restaurant_unresponsive">Restaurant Unresponsive</option>
+</select>
+</div>
+<button onclick="loadNotifications()">🔄 Apply Filters</button>
+</div>
+
+<!-- Notifications List -->
+<div class="section" id="notifications_section" style="display:none">
+<h2>📬 Notifications</h2>
+<div id="notifications_list">
+<div class="empty">No notifications yet</div>
+</div>
+</div>
+
+<!-- Activity Log -->
+<div class="section" id="log_section" style="display:none">
+<h2>📊 Activity Log</h2>
+<pre id="admin_log" class="log">Waiting for connection...</pre>
+</div>
+</div>
+
+<script>
+let socket = null;
+let auth = {role: null, token: null, user: null, profile: null};
+let notifications = [];
+
+function log(...msg) {
+const e = document.getElementById('admin_log');
+if (e) {
+e.textContent = `[${new Date().toLocaleTimeString()}] ${msg.join(' ')}\n` + e.textContent;
+}
+}
+
+function showToast(message, type = 'success') {
+const toast = document.createElement('div');
+toast.className = `toast ${type}`;
+toast.textContent = message;
+document.body.appendChild(toast);
+setTimeout(() => toast.remove(), 3000);
+}
+
+async function apiFetch(url, options = {}) {
+const token = auth.token || '';
+const headers = {
+'Content-Type': 'application/json',
+...(options.headers || {}),
+...(token ? { Authorization: `Bearer ${token}` } : {})
+};
+const response = await fetch(url, { ...options, headers });
+return response;
+}
+
+function initSocket() {
+if (socket) {
+log('⚠️ Socket already exists');
+return;
+}
+
+log('🔌 Connecting socket as admin...');
+
+socket = io(location.origin, {
+auth: {token: auth.token}
+});
+
+socket.on('connect', () => {
+log('✅ Socket connected! ID:', socket.id);
+log('👤 Admin Profile ID:', auth.profile?.id);
+
+// Join admin room
+socket.emit('join', 'admin');
+socket.emit('join', 'admins');
+log('📍 Joined admin rooms');
+});
+
+socket.on('connect_error', (error) => {
+log('❌ Connection error:', error.message);
+});
+
+// Listen for new notifications
+socket.on('new_notification', data => {
+log('🔔 NEW NOTIFICATION RECEIVED!');
+log('Data:', JSON.stringify(data));
+
+showToast('New notification received!', 'warning');
+
+// Add to list
+addNotificationToUI(data);
+
+// Play sound
+playNotificationSound();
+
+// Browser notification
+if (Notification.permission === 'granted') {
+new Notification('Admin Alert! 🚨', {
+body: data.message || 'New notification received',
+icon: '🔔',
+requireInteraction: true
+});
+}
+});
+
+socket.on('disconnect', () => {
+log('❌ Disconnected from server');
+});
+
+// Debug: log ALL events
+socket.onAny((event, ...args) => {
+log(`🔔 Event: ${event}`, JSON.stringify(args));
+});
+}
+
+async function adminLogin() {
+const email = document.getElementById('admin_email').value;
+const password = document.getElementById('admin_password').value;
+
+if (!email || !password) {
+alert('Please enter email and password');
+return;
+}
+
+log('🔐 Logging in as admin...');
+
+try {
+const r = await fetch('/auth/login', {
+method: 'POST',
+headers: {'Content-Type': 'application/json'},
+body: JSON.stringify({email, password})
+});
+
+const j = await r.json();
+
+if (r.ok) {
+auth = {role: 'admin', token: j.access_token, user: j.user, profile: j.profile};
+
+document.getElementById('login_status').style.display = 'inline-block';
+document.getElementById('login_status').textContent = '✅ Logged in as ' + j.user.email;
+
+log('✅ ADMIN LOGGED IN');
+log('Admin Profile:', j.profile);
+
+// Show sections
+document.getElementById('stats_section').style.display = 'grid';
+document.getElementById('filter_section').style.display = 'block';
+document.getElementById('notifications_section').style.display = 'block';
+document.getElementById('log_section').style.display = 'block';
+
+// Initialize socket
+initSocket();
+
+// Request browser notifications
+if ('Notification' in window && Notification.permission === 'default') {
+Notification.requestPermission();
+}
+
+// Load notifications
+await loadNotifications();
+
+showToast('Admin logged in successfully!');
+} else {
+alert('Login failed: ' + (j.message || 'Unknown'));
+log('❌ Failed:', j.message);
+}
+} catch (e) {
+alert('Error: ' + e.message);
+log('❌ Error:', e.message);
+}
+}
+
+async function loadNotifications() {
+if (!auth.token) return;
+
+log('📡 Loading notifications...');
+
+try {
+const params = new URLSearchParams();
+const read = document.getElementById('filter_read').value;
+const resolved = document.getElementById('filter_resolved').value;
+const type = document.getElementById('filter_type').value;
+
+if (read) params.append('is_read', read);
+if (resolved) params.append('is_resolved', resolved);
+if (type) params.append('type', type);
+
+const r = await apiFetch(`/admin/notifications?${params}`);
+const j = await r.json();
+
+if (r.ok) {
+notifications = j.data || [];
+renderNotifications();
+updateStats();
+log(`✅ Loaded ${notifications.length} notifications`);
+showToast(`Loaded ${notifications.length} notifications`);
+} else {
+alert('Error: ' + (j.message || 'Failed to load'));
+log('❌ Failed:', j.message);
+}
+} catch (e) {
+alert('Error: ' + e.message);
+log('❌ Error:', e.message);
+}
+}
+
+function renderNotifications() {
+const box = document.getElementById('notifications_list');
+box.innerHTML = '';
+
+if (notifications.length === 0) {
+box.innerHTML = '<div class="empty">No notifications found</div>';
+return;
+}
+
+notifications.forEach(n => {
+const div = document.createElement('div');
+div.className = `card ${!n.is_read ? 'unread' : ''} ${!n.is_resolved ? 'pending' : ''}`;
+div.id = `notif-${n.id}`;
+
+const order = n.order_details || {};
+const restaurant = n.restaurant_info || {};
+
+div.innerHTML = `
+<div class="notification-header">
+<div>
+<strong style="font-size:16px">${n.type.replace(/_/g, ' ').toUpperCase()}</strong><br>
+<span class="status-badge ${!n.is_read ? 'unread' : ''}">${n.is_read ? 'Read' : 'Unread'}</span>
+<span class="status-badge ${!n.is_resolved ? 'unread' : 'resolved'}">${n.is_resolved ? 'Resolved' : 'Pending'}</span>
+</div>
+<div style="text-align:right;font-size:12px;color:#666">
+${new Date(n.created_at).toLocaleString()}
+</div>
+</div>
+
+<div class="notification-details">
+<p style="white-space:pre-wrap;margin:0">${n.message}</p>
+</div>
+
+<div class="order-info">
+<strong>📦 Order:</strong> #${order.order_number || 'N/A'}<br>
+<strong>💰 Amount:</strong> ${order.total_amount || 0} DA<br>
+<strong>📍 Address:</strong> ${order.delivery_address || 'N/A'}<br>
+<strong>🍴 Restaurant:</strong> ${restaurant.name || 'N/A'}<br>
+<strong>📞 Contact:</strong> ${restaurant.phone || 'N/A'}
+</div>
+
+<div class="action-buttons">
+${!n.is_read ? `<button class="success" onclick="markAsRead('${n.id}')">✓ Mark Read</button>` : ''}
+${!n.is_resolved ? `
+<button onclick="resolveNotification('${n.id}', 'force_accept')">✅ Force Accept</button>
+<button class="danger" onclick="resolveNotification('${n.id}', 'cancel_order')">❌ Cancel Order</button>
+<button onclick="resolveNotification('${n.id}', 'contacted_restaurant')">📞 Called Restaurant</button>
+` : ''}
+${n.is_resolved ? `<div style="color:#10b981;font-size:13px">✓ Resolved by admin</div>` : ''}
+</div>
+`;
+
+box.appendChild(div);
+});
+}
+
+function addNotificationToUI(data) {
+// Add to array
+const notification = {
+id: data.id,
+type: data.type,
+message: data.message,
+is_read: false,
+is_resolved: false,
+created_at: data.created_at || new Date().toISOString(),
+order_details: data.order || {},
+restaurant_info: data.restaurant || {}
+};
+
+notifications.unshift(notification);
+
+// Re-render
+renderNotifications();
+updateStats();
+}
+
+function updateStats() {
+const total = notifications.length;
+const unread = notifications.filter(n => !n.is_read).length;
+const pending = notifications.filter(n => !n.is_resolved).length;
+const resolved = notifications.filter(n => n.is_resolved).length;
+
+document.getElementById('stat_total').textContent = total;
+document.getElementById('stat_unread').textContent = unread;
+document.getElementById('stat_pending').textContent = pending;
+document.getElementById('stat_resolved').textContent = resolved;
+}
+
+async function markAsRead(notificationId) {
+log('📖 Marking notification as read:', notificationId);
+
+try {
+const r = await apiFetch(`/admin/notifications/${notificationId}/read`, {
+method: 'PATCH'
+});
+
+const j = await r.json();
+
+if (r.ok) {
+log('✅ Marked as read');
+showToast('Marked as read');
+
+// Update in array
+const n = notifications.find(x => x.id === notificationId);
+if (n) n.is_read = true;
+
+// Re-render
+renderNotifications();
+updateStats();
+} else {
+alert('Error: ' + (j.message || 'Failed'));
+log('❌ Failed:', j.message);
+}
+} catch (e) {
+alert('Error: ' + e.message);
+log('❌ Error:', e.message);
+}
+}
+
+async function resolveNotification(notificationId, action) {
+const notes = prompt(`Action: ${action}\nAdd notes (optional):`);
+
+log(`✅ Resolving notification ${notificationId} with action: ${action}`);
+
+try {
+const r = await apiFetch(`/admin/notifications/${notificationId}/resolve`, {
+method: 'POST',
+body: JSON.stringify({ action, notes })
+});
+
+const j = await r.json();
+
+if (r.ok) {
+log('✅ Notification resolved');
+showToast(`Resolved with action: ${action}`);
+
+// Update in array
+const n = notifications.find(x => x.id === notificationId);
+if (n) {
+n.is_resolved = true;
+n.is_read = true;
+}
+
+// Re-render
+renderNotifications();
+updateStats();
+} else {
+alert('Error: ' + (j.message || 'Failed'));
+log('❌ Failed:', j.message);
+}
+} catch (e) {
+alert('Error: ' + e.message);
+log('❌ Error:', e.message);
+}
+}
+
+function playNotificationSound() {
+try {
+const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSqGzvLRfzMGH2S77eeXQAoRVq/n7bJiGgU+lNrywn0pBSh+zPDajEULFlqx6P+oUxMJS6Hh8LdgGgU7k9r0xnktBSV7zPDajUMLFlqx6PCkWBMKTaPi8LJeGgU6ktjzx3ktBSR6y+/fjEULFlqw5/CmWhMKTqPl8bhgGQU8k9j0x3ktBSR6y+/fjEQLFVqx6O+pWxMKT6Pm8rxfGgU9lNr0xnksBS17y+/fjEQKFVmw6PCmWhMKT6Pl8bdgGQU9lNn0xnktBSV7y+/gjEQLFVmw6PKlWhIKTqPl8bdgGQU9lNn0xnktBSV7yu/gjEQLFVmw6O+oWxMKTqPi8LZgGgU7k9n0xngtBSV8y+/gjEURFViv6PCmWhMKTaPh8LZhGgU7k9j0xnktBSZ8yu/fjEURFViv5/CmWhMKTqLi8LdeGgU7k9j0xnktBSZ7yu/fjEQRFVmv5+6nWRMKT6Lk8bdeGgU+k9j0xnktBSZ7yu/fjEQRFViv5+6mWhMKT6Lk8bdeGgU+k9j0xnktBSZ7yu/fjEQRFVmv5+6lWhMKTqHj8rdcGQU9k9j0xnktBSZ8y+/gjEQRFViv5+6lWhMKTqDk8bdeGgU9k9n0xngtBSZ7yu/fjEQRFVmw5+6nWhMKT6Hj8rdcGQU9k9j0xngtBSZ7yu/gjEQQFVmv5+6nWhMKT6Hj8rdcGQU9k9j0xnktBSZ7yu/gjEQRFVmv5+6mWhMKTqHi8bdcGgU9k9j0xnktBSZ7yu/fjEQRFViv6O6mWhMKTqHi8bdcGgU9k9j0xnktBSR7yu/fjEQRFVmv6O6nWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/f');
+audio.volume = 0.3;
+audio.play().catch(e => console.log('Audio play failed:', e));
+} catch (e) {
+console.log('Audio notification failed:', e);
+}
+}
+</script>
+</body>
+</html>
