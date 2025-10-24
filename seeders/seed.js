@@ -4,6 +4,8 @@ import User from "../src/models/User.js";
 import Client from "../src/models/Client.js";
 import Driver from "../src/models/Driver.js";
 import Restaurant from "../src/models/Restaurant.js";
+import Admin from "../src/models/Admin.js";
+import AdminNotification from "../src/models/AdminNotification.js";
 import FoodCategory from "../src/models/FoodCategory.js";
 import MenuItem from "../src/models/MenuItem.js";
 import Order from "../src/models/Order.js";
@@ -37,6 +39,12 @@ const driverNames = [
   { first: "Amine", last: "Djebar" },
   { first: "Farid", last: "Mohand" },
   { first: "Walid", last: "Saidi" }
+];
+
+const adminNames = [
+  { first: "Kamel", last: "Bensalah", role: "super_admin" },
+  { first: "Sarah", last: "Boudiaf", role: "admin" },
+  { first: "Riad", last: "Mahrez", role: "moderator" }
 ];
 
 const restaurantModels = [
@@ -130,14 +138,40 @@ const seedDatabase = async () => {
     const hashedPassword = await bcrypt.hash("password123", 10);
 
     // ----------------------------
-    // 1️⃣ Clients
+    // 1️⃣ Admins
+    // ----------------------------
+    console.log("👨‍💼 Creating admins...");
+    const admins = [];
+    for (let i = 0; i < adminNames.length; i++) {
+      const adminData = adminNames[i];
+      const user = await User.create({
+        email: `admin${i + 1}@example.com`,
+        password: "password123",
+        role: "admin",
+        is_active: true
+      });
+
+      admins.push(await Admin.create({
+        user_id: user.id,
+        first_name: adminData.first,
+        last_name: adminData.last,
+        email: `admin${i + 1}@example.com`,
+        phone: `+21377712${String(i).padStart(4, '0')}`,
+        role_level: adminData.role,
+        is_active: true
+      }));
+    }
+    console.log(`✅ ${admins.length} admins created`);
+
+    // ----------------------------
+    // 2️⃣ Clients
     // ----------------------------
     console.log("👥 Creating clients...");
     const clientUsers = [];
     for (let i = 0; i < clientNames.length; i++) {
       clientUsers.push({
         email: `client${i + 1}@example.com`,
-password: "password123",
+        password: hashedPassword,
         role: "client",
         is_active: true
       });
@@ -160,16 +194,17 @@ password: "password123",
         location: getRandomLocation()
       }));
     }
+    console.log(`✅ ${clients.length} clients created`);
 
     // ----------------------------
-    // 2️⃣ Drivers
+    // 3️⃣ Drivers
     // ----------------------------
     console.log("🚗 Creating drivers...");
     const drivers = [];
     for (let i = 0; i < driverNames.length; i++) {
       const user = await User.create({
         email: `driver${i + 1}@example.com`,
-password: "password123",
+        password: "password123",
         role: "driver",
         is_active: true
       });
@@ -192,9 +227,10 @@ password: "password123",
         current_location: getRandomLocation()
       }));
     }
+    console.log(`✅ ${drivers.length} drivers created`);
 
     // ----------------------------
-    // 3️⃣ Restaurants (1000)
+    // 4️⃣ Restaurants (1000)
     // ----------------------------
     console.log("🍽️  Creating 1000 restaurants...");
     const restaurantUsers = [];
@@ -239,14 +275,15 @@ password: "password123",
     }
 
     const restaurants = await Restaurant.bulkCreate(restaurantList, { returning: true });
+    console.log(`✅ ${restaurants.length} restaurants created`);
 
     // ----------------------------
-    // 4️⃣ Catégories & Menus
+    // 5️⃣ Catégories & Menus
     // ----------------------------
     console.log("🍕 Creating food categories and menu items...");
     const allMenuItems = [];
 
-    for (const restaurant of restaurants.slice(0, 20)) { // Limité à 20 pour rapidité
+    for (const restaurant of restaurants.slice(0, 20)) {
       for (const categoryType of restaurant.categories) {
         const category = await FoodCategory.create({
           restaurant_id: restaurant.id,
@@ -270,16 +307,105 @@ password: "password123",
         }
       }
     }
+    console.log(`✅ ${allMenuItems.length} menu items created`);
 
-    console.log(`✅ ${restaurants.length} restaurants créés !`);
-    console.log(`🍔 ${allMenuItems.length} plats créés !`);
+    // ----------------------------
+    // 6️⃣ Sample Orders (for testing notifications)
+    // ----------------------------
+    console.log("📦 Creating sample orders...");
+    const sampleOrders = [];
+    
+    // Create 5 pending orders for admin notifications testing
+    for (let i = 0; i < 5; i++) {
+      const client = clients[i % clients.length];
+      const restaurant = restaurants[i % 20];
+      
+      const order = await Order.create({
+        client_id: client.id,
+        restaurant_id: restaurant.id,
+        order_type: 'delivery',
+        delivery_address: client.address,
+        delivery_location: client.location,
+        subtotal: 1500 + (i * 200),
+        delivery_fee: 200,
+        total_amount: 1700 + (i * 200),
+        payment_method: 'cash_on_delivery',
+        status: 'pending',
+        delivery_instructions: `Sample order ${i + 1}`
+      });
 
+      await order.generateOrderNumber();
+      await order.save();
+      
+      sampleOrders.push(order);
+    }
+    console.log(`✅ ${sampleOrders.length} sample orders created`);
+
+    // ----------------------------
+    // 7️⃣ Admin Notifications
+    // ----------------------------
+    console.log("🔔 Creating admin notifications...");
+    const notifications = [];
+
+    // Create notifications for the pending orders
+    for (let i = 0; i < 3; i++) {
+      const order = sampleOrders[i];
+      const restaurant = restaurants.find(r => r.id === order.restaurant_id);
+      const client = clients.find(c => c.id === order.client_id);
+
+      const notification = await AdminNotification.create({
+        order_id: order.id,
+        restaurant_id: order.restaurant_id,
+        type: 'pending_order_timeout',
+        message: `⚠️ Commande #${order.order_number} sans réponse depuis 3 minutes.\n` +
+                 `Restaurant: ${restaurant.name}\n` +
+                 `Montant: ${order.total_amount} DA`,
+        order_details: {
+          order_number: order.order_number,
+          order_type: order.order_type,
+          total_amount: parseFloat(order.total_amount),
+          delivery_address: order.delivery_address,
+          created_at: order.created_at,
+          client: {
+            name: `${client.first_name} ${client.last_name}`,
+            phone: client.phone_number,
+            address: client.address
+          }
+        },
+        restaurant_info: {
+          id: restaurant.id,
+          name: restaurant.name,
+          address: restaurant.address,
+          phone: 'Non renseigné',
+          email: `restaurant${i + 1}@example.com`
+        },
+        is_read: i === 0, // First one is read
+        is_resolved: false
+      });
+
+      notifications.push(notification);
+    }
+    console.log(`✅ ${notifications.length} admin notifications created`);
+
+    // ----------------------------
+    // 📊 Résumé final
+    // ----------------------------
     console.log("\n📊 Résumé :");
+    console.log(`- ${admins.length} admins (super_admin, admin, moderator)`);
     console.log(`- ${clients.length} clients`);
     console.log(`- ${drivers.length} livreurs`);
     console.log(`- ${restaurants.length} restaurants`);
     console.log(`- ${allMenuItems.length} items de menu`);
-    console.log("\n🔑 Identifiants : restaurant1@example.com → restaurant1000@example.com / password123");
+    console.log(`- ${sampleOrders.length} sample orders`);
+    console.log(`- ${notifications.length} admin notifications`);
+    
+    console.log("\n🔑 Identifiants :");
+    console.log("Admins:");
+    console.log("  - admin1@example.com (Super Admin) / password123");
+    console.log("  - admin2@example.com (Admin) / password123");
+    console.log("  - admin3@example.com (Moderator) / password123");
+    console.log("Restaurants: restaurant1@example.com → restaurant1000@example.com / password123");
+    console.log("Drivers: driver1@example.com → driver7@example.com / password123");
 
   } catch (err) {
     console.error("❌ Seeding failed:", err);

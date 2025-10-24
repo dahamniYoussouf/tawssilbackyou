@@ -404,6 +404,8 @@ export const login = async (req, res) => {
     let profile;
     let driver_id = null;
     let restaurant_id = null;
+        let admin_id = null;
+
 
     switch (user.role) {
       case 'driver':
