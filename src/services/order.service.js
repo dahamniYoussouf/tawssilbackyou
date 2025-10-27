@@ -86,6 +86,8 @@ async function notify(type, id, data) {
 
 // ==================== STATUS TRANSITIONS ====================
 
+// ==================== STATUS TRANSITIONS ====================
+
 export async function acceptOrder(orderId, userId, data = {}) {
   const order = await Order.findByPk(orderId, {
     include: [{ model: Client, as: 'client' }, { model: Restaurant, as: 'restaurant' }]
@@ -106,7 +108,7 @@ export async function acceptOrder(orderId, userId, data = {}) {
   await order.update({
     status: 'accepted',
     preparation_time: preparationMinutes,
-    accepted_at: new Date()  // ← Make sure this is set
+    accepted_at: new Date()
   });
   
   // Notify client
@@ -118,44 +120,7 @@ export async function acceptOrder(orderId, userId, data = {}) {
     message: `${order.restaurant.name} accepted your order. Estimated preparation time: ${preparationMinutes} min`
   });
   
-  // ✅ Auto-transition to PREPARING after 1 minute
-  setTimeout(() => startPreparing(orderId), 60000);
-  
-  // ✅ NEW: Auto-add 7 minutes if preparation time exceeds
-  setTimeout(() => addExtraPreparationTime(orderId), preparationMinutes * 60 * 1000);
-  
-  return order;
-}
-
-export async function startPreparing(orderId) {
-    const transaction = await sequelize.transaction();
-
-  const order = await Order.findByPk(orderId, {
-    include: [{ model: Client, as: 'client' }, { model: Restaurant, as: 'restaurant' }]
-  });
-  
-  if (!order || order.status !== 'accepted') {
-    console.log(`⚠️ Order ${orderId} not found or not in accepted status`);
-    return;
-  }
-  
-  await order.update({ status: 'preparing' });
-    
-  await transaction.commit();
-scheduleAdminNotificationDriver(orderId);
-
-  console.log(`👨‍🍳 Order ${orderId} status changed to PREPARING`);
-  
-  // Notify client
-  notify('client', order.client_id, {
-    type: 'order_preparing',
-    orderId: order.id,
-    message: 'Your order is being prepared'
-  });
-  
-  console.log(`✅ Client ${order.client_id} notified`);
-  
-  // Notify NEARBY drivers only (delivery only)
+  // ✅ MOVED: Notify NEARBY drivers here (after accepting, for delivery only)
   if (order.order_type === 'delivery') {
     const coords = order.delivery_location?.coordinates;
     
@@ -190,7 +155,46 @@ scheduleAdminNotificationDriver(orderId);
   } else {
     console.log(`📦 Order ${orderId} is PICKUP - no driver notification needed`);
   }
+  
+  // Schedule admin notification if no driver accepts within 2 minutes
+  scheduleAdminNotificationDriver(orderId);
+  
+  // ✅ Auto-transition to PREPARING after 1 minute
+  setTimeout(() => startPreparing(orderId), 60000);
+  
+  // ✅ Auto-add 7 minutes if preparation time exceeds
+  setTimeout(() => addExtraPreparationTime(orderId), preparationMinutes * 60 * 1000);
+  
+  return order;
 }
+
+export async function startPreparing(orderId) {
+  const transaction = await sequelize.transaction();
+
+  const order = await Order.findByPk(orderId, {
+    include: [{ model: Client, as: 'client' }, { model: Restaurant, as: 'restaurant' }]
+  });
+  
+  if (!order || order.status !== 'accepted') {
+    console.log(`⚠️ Order ${orderId} not found or not in accepted status`);
+    return;
+  }
+  
+  await order.update({ status: 'preparing' });
+    
+  await transaction.commit();
+
+  console.log(`👨‍🍳 Order ${orderId} status changed to PREPARING`);
+  
+  // Notify client
+  notify('client', order.client_id, {
+    type: 'order_preparing',
+    orderId: order.id,
+    message: 'Your order is being prepared'
+  });
+  
+  console.log(`✅ Client ${order.client_id} notified`);
+  }
 
 export async function assignDriverOrComplete(orderId, driverId = null) {
   const order = await Order.findByPk(orderId, {
@@ -745,7 +749,7 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
   };
 };
 
-// ✅ NEW FUNCTION: Add extra time if preparation exceeds
+//  Add extra time if preparation exceeds
 async function addExtraPreparationTime(orderId) {
   try {
     const order = await Order.findByPk(orderId, {
@@ -795,7 +799,7 @@ async function addExtraPreparationTime(orderId) {
   }
 }
 
-// ✅ NEW: Schedule admin notification if restaurant doesn't respond
+// Schedule admin notification if restaurant doesn't respond
 export async function scheduleAdminNotification(orderId) {
   setTimeout(async () => {
     try {
@@ -818,7 +822,7 @@ export async function scheduleAdminNotification(orderId) {
 }
 
 
-// ✅ NEW: Schedule admin notification if restaurant doesn't respond
+// Schedule admin notification if restaurant doesn't respond
 export async function scheduleAdminNotificationDriver(orderId) {
   setTimeout(async () => {
     try {
