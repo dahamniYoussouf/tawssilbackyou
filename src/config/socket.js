@@ -1,221 +1,179 @@
 import { Server } from "socket.io";
 import sequelize from "../config/database.js";
-
 import jwt from "jsonwebtoken";
 import Restaurant from "../models/Restaurant.js";
 import Driver from "../models/Driver.js";
-import Client from "../models/Client.js"; // ← IMPORTANT: Import Client model
+import Client from "../models/Client.js"; 
 import Admin from "../models/Admin.js";
 
 let io;
-const driverLocations = new Map();
 
 export function initSocket(server) {
   io = new Server(server, {
     cors: { origin: "*" },
+    pingTimeout: 60000,
+    pingInterval: 25000
   });
 
-  // Authenticate sockets
+  // ========================================
+  // AUTHENTICATION MIDDLEWARE
+  // ========================================
   io.use((socket, next) => {
     const token = socket.handshake.auth?.token;
-    if (!token) return next(); // allow guests
+    if (!token) return next(); // Allow guest connections
+    
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || "your-secret-key");
       socket.userId = decoded.id;
       socket.userRole = decoded.role;
+      socket.clientProfileId = decoded.client_id;
+      socket.driverProfileId = decoded.driver_id;
+      socket.restaurantProfileId = decoded.restaurant_id;
+      socket.adminProfileId = decoded.admin_id;
     } catch (err) {
       console.warn("❌ Invalid socket token:", err.message);
     }
     next();
   });
 
-  // Connection handler
+  // ========================================
+  // CONNECTION HANDLER
+  // ========================================
   io.on("connection", async (socket) => {
-    console.log("✅ User connected:", socket.id, "Role:", socket.userRole);
+    console.log(`✅ Connected: ${socket.id} | Role: ${socket.userRole || 'guest'}`);
 
-    // --- Authenticated user joins their personal and role-based rooms
-    if (socket.userId && socket.userRole) {
-      // Join user-based room (for admin purposes)
-      const userRoom = `${socket.userRole}:${socket.userId}`;
-      socket.join(userRoom);
-      console.log(`➡️ Joined user room: ${userRoom}`);
-
-      // Join general role room
-      socket.join(socket.userRole);
-
-      // --- CLIENT: Join client profile room (THIS IS THE FIX!)
-      if (socket.userRole === "client") {
-        try {
-          const client = await Client.findOne({ where: { user_id: socket.userId } });
-          if (client) {
-            const clientProfileRoom = `client:${client.id}`;
-            socket.join(clientProfileRoom);
-            console.log(`👤 Client joined profile room: ${clientProfileRoom}`);
-            console.log(`   User ID: ${socket.userId}, Profile ID: ${client.id}`);
-            
-            // Store for reference
-            socket.clientProfileId = client.id;
-            
-            // Send confirmation to client
-            socket.emit('notification', {
-              type: 'connection_success',
-              message: `Connected! Listening for orders on client:${client.id}`
-            });
-          } else {
-            console.warn(`⚠️ No client profile found for user ${socket.userId}`);
-          }
-        } catch (e) {
-          console.error("Error joining client room:", e);
-        }
-      }
-
-      // --- RESTAURANT: Join restaurant profile room
-      if (socket.userRole === "restaurant") {
-        try {
-          const restaurant = await Restaurant.findOne({ where: { user_id: socket.userId } });
-          if (restaurant) {
-            const restaurantRoom = `restaurant:${restaurant.id}`;
-            socket.join(restaurantRoom);
-            console.log(`🍴 Restaurant joined profile room: ${restaurantRoom}`);
-            console.log(`   User ID: ${socket.userId}, Restaurant ID: ${restaurant.id}`);
-            
-            socket.restaurantProfileId = restaurant.id;
-          } else {
-            console.warn(`⚠️ No restaurant found for user ${socket.userId}`);
-          }
-        } catch (e) {
-          console.error("Error joining restaurant room:", e);
-        }
-      }
-
-      // --- DRIVER: Join driver profile room and global pool
-      if (socket.userRole === "driver") {
-        try {
-          const driver = await Driver.findOne({ where: { user_id: socket.userId } });
-          if (driver) {
-            const driverRoom = `driver:${driver.id}`;
-            socket.join(driverRoom);
-            socket.join("drivers"); // Global pool
-            console.log(`🛵 Driver joined profile room: ${driverRoom}`);
-            console.log(`   User ID: ${socket.userId}, Driver ID: ${driver.id}`);
-            
-            socket.driverProfileId = driver.id;
-          } else {
-            console.warn(`⚠️ No driver profile found for user ${socket.userId}`);
-          }
-        } catch (e) {
-          console.error("Error joining driver room:", e);
-        }
-      }
-
-      // --- ADMIN: Join admin profile room and global pool
-      if (socket.userRole === "admin") {
-        try {
-          const admin = await Admin.findOne({ where: { user_id: socket.userId } });
-          if (admin) {
-            const adminRoom = `admin`;
-            socket.join(adminRoom);
-            socket.join("admins"); // Global pool
-            console.log(` admin joined `);
-            console.log(`   User ID: ${socket.userId}, admin ID: ${admin.id}`);
-            
-            socket.adminProfileId = admin.id;
-          } else {
-            console.warn(`⚠️ No admin profile found for user ${socket.userId}`);
-          }
-        } catch (e) {
-          console.error("Error joining admin room:", e);
-        }
-      }
+    // Only proceed if authenticated
+    if (!socket.userId || !socket.userRole) {
+      console.log(`⚠️ Guest connection (no token): ${socket.id}`);
+      return;
     }
 
-    // --- Manual join (for testing)
-    socket.on("join", (room) => {
-      socket.join(room);
-      console.log(`Manual join → ${room}`);
-    });
+    // ========================================
+    // AUTO-JOIN ROOMS
+    // ========================================
+    try {
+      // Join role-based room
+      socket.join(socket.userRole);
 
-    // --- Driver online / updates
-    socket.on("driver_online", async ({ driverId, lat, lng }) => {
-      console.log(`🟢 Driver going online: driverId=${driverId}, lat=${lat}, lng=${lng}`);
-      
-      const driver = await Driver.findByPk(driverId);
-      
-      if (driver) {
-        // Store with availability = true by default
-        driverLocations.set(driver.user_id, { 
-          lat, 
-          lng, 
-          socketId: socket.id,
-          isAvailable: true,
-          profileId: driverId
-        });
-        
-        socket.join("drivers");
-        console.log(`✅ Driver stored: user_id=${driver.user_id}, available=true`);
-        console.log(`📊 Total online drivers: ${driverLocations.size}`);
-      } else {
-        console.error(`❌ Driver profile ${driverId} not found in database`);
+      // CLIENT
+      if (socket.userRole === "client") {
+        const client = await Client.findOne({ where: { user_id: socket.userId } });
+        if (client) {
+          socket.join(`client:${client.id}`);
+          socket.clientProfileId = client.id;
+          console.log(`👤 Client joined: client:${client.id}`);
+        }
       }
-    });
 
-    // Update location also updates availability
-    socket.on("update_location", async ({ driverId, lat, lng }) => {
-      const driver = await Driver.findByPk(driverId);
-      
-      if (driver) {
-        const existing = driverLocations.get(driver.user_id);
-        if (existing) {
-          driverLocations.set(driver.user_id, {
-            ...existing,
-            lat,
-            lng,
-            isAvailable: driver.status === 'available' && !driver.active_order_id
-          });
+      // RESTAURANT
+      if (socket.userRole === "restaurant") {
+        const restaurant = await Restaurant.findOne({ where: { user_id: socket.userId } });
+        if (restaurant) {
+          socket.join(`restaurant:${restaurant.id}`);
+          socket.restaurantProfileId = restaurant.id;
+          console.log(`🍴 Restaurant joined: restaurant:${restaurant.id}`);
+        }
+      }
+
+      // DRIVER
+      if (socket.userRole === "driver") {
+        const driver = await Driver.findOne({ where: { user_id: socket.userId } });
+        if (driver) {
+          socket.join(`driver:${driver.id}`);
+          socket.join("drivers"); // Global pool
+          socket.driverProfileId = driver.id;
+          
+          // ✅ Update status to 'available' when connected
+          if (driver.status === 'offline') {
+            await driver.update({
+              status: 'available',
+              last_active_at: new Date()
+            });
+            console.log(`🟢 Driver ${driver.id} status → available`);
+          }
+          
+          console.log(`🛵 Driver joined: driver:${driver.id}`);
+        }
+      }
+
+      // ADMIN
+      if (socket.userRole === "admin") {
+        const admin = await Admin.findOne({ where: { user_id: socket.userId } });
+        if (admin) {
+          socket.join("admin");
+          socket.join("admins");
+          socket.adminProfileId = admin.id;
+          console.log(`👮 Admin joined: admin`);
+        }
+      }
+
+    } catch (error) {
+      console.error(`❌ Error during connection setup for ${socket.id}:`, error);
+    }
+
+    // ========================================
+    // DISCONNECT HANDLER
+    // ========================================
+    socket.on("disconnect", async (reason) => {
+      console.log(`❌ Disconnected: ${socket.id} | Reason: ${reason}`);
+
+      // ✅ If driver, set status to offline
+      if (socket.userRole === 'driver' && socket.driverProfileId) {
+        try {
+          const driver = await Driver.findByPk(socket.driverProfileId);
+          
+          if (driver) {
+            // Only set offline if not in active delivery
+            if (driver.status !== 'busy' || !driver.active_order_id) {
+              await driver.update({
+                status: 'offline',
+                last_active_at: new Date()
+              });
+              console.log(`🔴 Driver ${driver.id} status → offline`);
+            } else {
+              console.log(`⚠️ Driver ${driver.id} disconnected but has active order`);
+            }
+          }
+        } catch (error) {
+          console.error(`❌ Error updating driver status:`, error);
         }
       }
     });
 
-    // --- Driver offline
-    socket.on("driver_offline", ({ driverId }) => {
-      const driver = driverLocations.get(driverId);
-      if (driver) {
-        driverLocations.delete(driverId);
-        console.log(`🔴 Driver ${driverId} went offline`);
-      }
-    });
-
-    // --- Disconnect cleanup
-    socket.on("disconnect", () => {
-      // Clean up driver locations
-      for (const [driverId, data] of driverLocations.entries()) {
-        if (data.socketId === socket.id) {
-          driverLocations.delete(driverId);
-          console.log(`🔴 Driver ${driverId} offline (disconnect)`);
-        }
-      }
-      console.log("❌ User disconnected:", socket.id);
-    });
-  });
+  }); // End of io.on("connection")
 
   return io;
 }
 
-/* -------- Exports for services -------- */
+// ========================================
+// EXPORTS FOR SERVICES
+// ========================================
+
 export function getIO() {
+  if (!io) {
+    console.warn('⚠️ Socket.IO not initialized');
+  }
   return io;
 }
 
+/**
+ * Emit event to a specific room
+ * @param {string} room - Room name (e.g., 'client:123', 'drivers')
+ * @param {string} event - Event name (e.g., 'notification', 'order_update')
+ * @param {object} data - Data to send
+ */
 export function emit(room, event, data) {
   if (!io) {
     console.warn('⚠️ Socket.IO not initialized');
     return;
   }
-  console.log(`📤 Emitting '${event}' to room '${room}':`, data);
+  console.log(`📤 [${event}] → Room: ${room}`);
   io.to(room).emit(event, data);
 }
 
-/* -------- Notify near driver -------- */
+// ========================================
+// NOTIFY NEARBY DRIVERS
+// ========================================
 
 export async function notifyNearbyDrivers(orderLat, orderLng, data, radius = 10) {
   if (!io) {
@@ -223,33 +181,17 @@ export async function notifyNearbyDrivers(orderLat, orderLng, data, radius = 10)
     return [];
   }
 
-  // radius en kilomètres → conversion en mètres
   const radiusMeters = radius * 1000;
 
-  console.log(`🔍 Searching nearby drivers within ${radius} km via PostGIS query`);
+  console.log(`🔍 Searching nearby drivers within ${radius} km`);
 
-  // 📡 BROADCAST TO ALL DRIVERS FIRST (before querying nearby)
-  const broadcastData = {
-    type: 'new_order_broadcast',
-    message: 'New delivery order available',
-    orderLat,
-    orderLng,
-    orderId: data.orderId,
-    orderNumber: data.orderNumber,
-    timestamp: new Date().toISOString()
-  };
-  
-  // Emit to BOTH 'driver' and 'drivers' rooms to be safe
-  io.to('driver').emit('order_broadcast', broadcastData);
-  io.to('drivers').emit('order_broadcast', broadcastData);
-  console.log(`📡 Broadcast sent to all drivers in 'driver' and 'drivers' rooms`);
-  console.log(`📡 Broadcast data:`, broadcastData);
 
-  // Trouver les drivers disponibles dans la zone via ST_DWithin
+  // 🔍 FIND NEARBY DRIVERS (PostGIS query)
   const nearbyDrivers = await Driver.findAll({
     where: sequelize.literal(`
       status = 'available'
       AND active_order_id IS NULL
+      AND current_location IS NOT NULL
       AND ST_DWithin(
         current_location,
         ST_GeogFromText('POINT(${orderLng} ${orderLat})'),
@@ -268,50 +210,59 @@ export async function notifyNearbyDrivers(orderLat, orderLng, data, radius = 10)
           'distance_meters'
         ]
       ]
-    }
+    },
+    order: [[sequelize.literal('distance_meters'), 'ASC']]
   });
 
-  console.log(`✅ Found ${nearbyDrivers.length} available drivers within ${radius} km`);
+  console.log(`✅ Found ${nearbyDrivers.length} nearby drivers`);
 
-  // 🔔 Notification détaillée aux drivers proches
+  // 🔔 SEND DETAILED NOTIFICATION TO NEARBY DRIVERS
   for (const driver of nearbyDrivers) {
     const distance = (driver.getDataValue('distance_meters') / 1000).toFixed(2);
     const driverRoom = `driver:${driver.id}`;
-    const driverUserRoom = `driver:${driver.user_id}`;
 
     const notificationData = {
       ...data,
       distance,
+      distance_km: parseFloat(distance),
       timestamp: new Date().toISOString()
     };
 
-    // Emit to driver profile room and user room
     io.to(driverRoom).emit('new_delivery', notificationData);
-        
-    console.log(`📢 Notified driver ${driver.id} (user: ${driver.user_id}) at ${distance} km`);
-    console.log(`   Rooms: ${driverRoom}, ${driverUserRoom}`);
-    console.log(`   Data:`, notificationData);
+    console.log(`📢 Notified driver ${driver.id} (${distance} km)`);
   }
 
-  console.log(`✅ Total: ${nearbyDrivers.length} nearby drivers notified + broadcast to all drivers`);
   return nearbyDrivers;
 }
 
-// Helper to get all connected clients in a room (for debugging)
+// ========================================
+// DEBUG HELPERS
+// ========================================
+
 export function getClientsInRoom(room) {
   if (!io) return [];
-  return Array.from(io.sockets.adapter.rooms.get(room) || []);
+  const clients = io.sockets.adapter.rooms.get(room);
+  return clients ? Array.from(clients) : [];
 }
 
-// Debug function to list all active rooms
+export function getOnlineDriversCount() {
+  if (!io) return 0;
+  const driversRoom = io.sockets.adapter.rooms.get('drivers');
+  return driversRoom ? driversRoom.size : 0;
+}
+
 export function debugRooms() {
-  if (!io) return;
+  if (!io) {
+    console.log('⚠️ Socket.IO not initialized');
+    return;
+  }
+  
   console.log('\n=== ACTIVE SOCKET ROOMS ===');
   for (const [room, sockets] of io.sockets.adapter.rooms) {
-    // Skip socket ID rooms (they're auto-created)
+    // Skip individual socket ID rooms
     if (!io.sockets.sockets.has(room)) {
-      console.log(`Room: ${room} | Clients: ${sockets.size}`);
+      console.log(`  ${room} | ${sockets.size} client(s)`);
     }
   }
-  console.log('========================\n');
+  console.log('===========================\n');
 }

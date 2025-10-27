@@ -1194,6 +1194,18 @@
             "name": "authorization",
             "in": "header",
             "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "preparation_time": {
+                  "example": "any"
+                }
+              }
+            }
           }
         ],
         "responses": {

@@ -234,14 +234,7 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
     driver: driver.getFullName(),
     phone: driver.phone
   });
-  
-  // Notify driver
-  notify('driver', driverId, {
-    type: 'order_confirmed',
-    orderId: order.id,
-    message: 'Order assigned to you'
-  });
-  
+    
   return order;
 }
 
