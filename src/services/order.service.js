@@ -289,6 +289,7 @@ export async function updateDriverGPS(driverId, longitude, latitude) {
       const [destLng, destLat] = destinationCoords;
       routeInfo = await calculateRouteTime(longitude, latitude, destLng, destLat);
     }
+      if (order.status == "delivering") { 
 
     notify('client', order.client_id, {
       type: 'order_location',
@@ -301,6 +302,7 @@ export async function updateDriverGPS(driverId, longitude, latitude) {
         ? `Your order is ${routeInfo.distanceKm} km away (${routeInfo.timeMin}-${routeInfo.timeMax} min)`
         : 'Your order is on the way'
     });
+     };
   }
     
   return { driver_id: driverId, order_id: driver.active_order_id };
