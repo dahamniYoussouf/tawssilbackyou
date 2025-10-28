@@ -32,7 +32,6 @@ import admin from "./routes/admin.routes.js";
 
 const app = express();
 const server = http.createServer(app);
-app.use(express.static("public"));
 
 // Initialize Socket.IO
 initSocket(server);
@@ -85,6 +84,7 @@ app.use("/api/v1/admin", admin);
 app.use("/api/v1/uploads", uploadRoutes);
 app.use("/api/v1/geocode", geocodeRoutes);
 
+app.use(express.static("public"));
 
 app.use(errorHandler);
 app.use("*", notFoundHandler);
