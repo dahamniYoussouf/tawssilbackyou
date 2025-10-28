@@ -32,6 +32,7 @@ import admin from "./routes/admin.routes.js";
 
 const app = express();
 const server = http.createServer(app);
+app.use(express.static("public"));
 
 // Initialize Socket.IO
 initSocket(server);
@@ -67,6 +68,7 @@ app.use("/admin", admin);
 app.use("/api", uploadRoutes);
 app.use("/api", geocodeRoutes);
 
+
 app.use("/api/v1/auth", auth);
 app.use("/api/v1/restaurants", restaurant);
 app.use("/api/v1/food-categories", foodcategory);
@@ -82,7 +84,6 @@ app.use("/api/v1/admin", admin);
 app.use("/api/v1/uploads", uploadRoutes);
 app.use("/api/v1/geocode", geocodeRoutes);
 
-app.use(express.static("public"));
 
 app.use(errorHandler);
 app.use("*", notFoundHandler);
