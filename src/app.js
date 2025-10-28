@@ -67,8 +67,6 @@ app.use("/admin", admin);
 app.use("/api", uploadRoutes);
 app.use("/api", geocodeRoutes);
 
-app.use("/client/*", notFoundHandler);
-
 app.use("/api/v1/auth", auth);
 app.use("/api/v1/restaurants", restaurant);
 app.use("/api/v1/food-categories", foodcategory);
