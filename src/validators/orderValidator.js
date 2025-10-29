@@ -325,3 +325,15 @@ export const getNearbyOrdersValidator = [
     .isInt({ min: 1, max: 100 })
     .withMessage('Page size must be between 1 and 100')
 ];
+
+export const driverCancelOrderValidator = [
+  param('id')
+    .notEmpty().withMessage('Order ID is required')
+    .isUUID().withMessage('Invalid order ID format'),
+  
+  body('reason')
+    .notEmpty().withMessage('Cancellation reason is required')
+    .isString().withMessage('Reason must be a string')
+    .isLength({ min: 10, max: 500 }).withMessage('Reason must be between 10 and 500 characters')
+    .trim()
+];

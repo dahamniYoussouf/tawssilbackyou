@@ -183,7 +183,7 @@ export const declineOrder = async (req, res, next) => {
 export const assignDriverOrComplete = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { driver_id } = req.body; // Optional - auto-assign if not provided
+    const driver_id = req.user.driver_id; 
     
     const order = await orderService.assignDriverOrComplete(id, driver_id);
     
@@ -454,6 +454,67 @@ export const getNearbyOrders = async (req, res, next) => {
     }
     if (err.status === 400) {
       return res.status(400).json({
+        success: false,
+        message: err.message
+      });
+    }
+    next(err);
+  }
+};
+
+
+/**
+ * POST /api/orders/:id/driver-cancel
+ * Driver cancels an order they're assigned to
+ */
+export const driverCancelOrder = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    
+    // Récupérer l'ID du livreur depuis le JWT
+    const driverId = req.user.driver_id;
+    
+    if (!driverId) {
+      return res.status(400).json({
+        success: false,
+        message: "Driver profile not found in token"
+      });
+    }
+
+    if (!reason || reason.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: "Cancellation reason must be at least 10 characters"
+      });
+    }
+    
+    const result = await orderService.driverCancelOrder(id, driverId, reason);
+    
+    res.json({
+      success: true,
+      message: "Order cancelled successfully",
+      data: {
+        order: {
+          id: result.order.id,
+          order_number: result.order.order_number,
+          status: result.order.status
+        },
+        driver: result.driver,
+        warning: result.driver.cancellation_count >= 3 
+          ? "Warning: Multiple cancellations detected. Admin has been notified."
+          : null
+      }
+    });
+  } catch (err) {
+    if (err.status === 404) {
+      return res.status(404).json({
+        success: false,
+        message: err.message
+      });
+    }
+    if (err.status === 400 || err.status === 403) {
+      return res.status(err.status).json({
         success: false,
         message: err.message
       });

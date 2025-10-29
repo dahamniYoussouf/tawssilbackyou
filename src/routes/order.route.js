@@ -8,7 +8,8 @@ import {
   createOrderWithItemsValidator,
   declineOrderValidator,
   assignDriverValidator,
-  updateDriverGPSValidator
+  updateDriverGPSValidator,
+  driverCancelOrderValidator 
 } from "../validators/orderValidator.js";
 import { validate } from "../middlewares/validate.js";
 import { protect, isClient, isRestaurant, isDriver } from "../middlewares/auth.js";
@@ -45,7 +46,7 @@ router.post('/:id/decline', protect, isRestaurant, declineOrderValidator, valida
 router.post('/:id/assign-driver', protect, assignDriverValidator, validate, orderController.assignDriverOrComplete);
 router.post('/:id/start-delivery', protect, isDriver, getOrderByIdValidator, validate, orderController.startDelivering);
 router.post('/:id/complete-delivery', protect, isDriver, getOrderByIdValidator, validate, orderController.completeDelivery);
-
+router.post('/:id/driver-cancel', protect, isDriver, driverCancelOrderValidator,validate, orderController.driverCancelOrder);
 // ==================== RATING ====================
 
 router.post('/:id/rating', protect, isClient, addRatingValidator, validate, orderController.addRating);

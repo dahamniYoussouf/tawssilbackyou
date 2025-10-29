@@ -30,7 +30,7 @@ const AdminNotification = sequelize.define('AdminNotification', {
     comment: "Reference to the restaurant"
   },
   type: {
-    type: DataTypes.ENUM('pending_order_timeout', 'restaurant_unresponsive', 'driver_unresponsive'),
+    type: DataTypes.ENUM('pending_order_timeout', 'restaurant_unresponsive', 'driver_unresponsive', 'driver_excessive_cancellations'),
     defaultValue: 'pending_order_timeout',
     allowNull: false,
     comment: "Type of notification"
@@ -85,7 +85,16 @@ const AdminNotification = sequelize.define('AdminNotification', {
     type: DataTypes.TEXT,
     allowNull: true,
     comment: "Admin's notes about the resolution"
-  }
+  }, 
+  driver_id: {
+  type: DataTypes.UUID,
+  allowNull: true,
+  references: {
+    model: 'drivers',
+    key: 'id'
+  },
+  comment: "Driver involved in the notification"
+}
 }, {
   tableName: 'admin_notifications',
   timestamps: true,

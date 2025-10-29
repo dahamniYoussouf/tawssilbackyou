@@ -286,6 +286,14 @@ Admin.hasMany(AdminNotification, {
   as: 'resolved_notifications'
 });
 
+AdminNotification.belongsTo(Driver, {
+  foreignKey: 'driver_id',
+  as: 'driver'
+});
+Driver.hasMany(AdminNotification, {
+  foreignKey: 'driver_id',
+  as: 'admin_notifications'
+});
 
 
 

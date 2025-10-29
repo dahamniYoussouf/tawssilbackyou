@@ -124,7 +124,13 @@ const Driver = sequelize.define('Driver', {
     type: DataTypes.TEXT,
     allowNull: true,
     comment: "Admin notes about driver"
-  }
+  },
+  cancellation_count: {
+  type: DataTypes.INTEGER,
+  defaultValue: 0,
+  allowNull: false,
+  comment: "Number of order cancellations by driver"
+}
 }, {
   tableName: 'drivers',
   timestamps: true,
@@ -187,6 +193,16 @@ Driver.prototype.updateRating = function(newRating) {
     this.rating = (totalRating + newRating) / (this.total_deliveries + 1);
   }
   this.total_deliveries += 1;
+};
+
+Driver.prototype.incrementCancellations = async function() {
+  this.cancellation_count += 1;
+  await this.save();
+  return this.cancellation_count;
+};
+
+Driver.prototype.shouldNotifyAdmin = function() {
+  return this.cancellation_count >= 3;
 };
 
 export default Driver;

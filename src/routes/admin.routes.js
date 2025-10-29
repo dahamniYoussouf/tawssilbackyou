@@ -18,5 +18,8 @@ router.post('/notifications/:id/resolve', adminCtrl.resolveNotification);
 // Actions sur les commandes
 router.post('/orders/:id/force-accept', adminCtrl.forceAcceptOrder);
 router.post('/orders/:id/force-cancel', adminCtrl.forceCancelOrder);
+router.get('/drivers/:id/cancellations', adminCtrl.getDriverCancellations);
+router.post('/drivers/:id/reset-cancellations', adminCtrl.resetDriverCancellations);
+router.post('/drivers/:id/suspend', adminCtrl.suspendDriver);
 
 export default router;

@@ -43,11 +43,11 @@ export const protect = async (req, res, next) => {
     });
 
     if (!req.user) {
-      return res.status(401).json({ message: 'Utilisateur non trouvé' });
+      return res.status(401).json({ message: 'User not found' });
     }
 
     if (!req.user.is_active) {
-      return res.status(403).json({ message: 'Compte désactivé' });
+      return res.status(403).json({ message: 'Account disabled' });
     }
 
     // Add profile IDs from token (no DB query needed!)
@@ -71,7 +71,7 @@ export const protect = async (req, res, next) => {
     
   } catch (error) {
     console.error('Auth middleware error:', error);
-    return res.status(401).json({ message: 'Non autorisé' });
+    return res.status(401).json({ message: 'Not authorized' });
   }
 };
 
@@ -90,7 +90,7 @@ export const authorize = (...roles) => {
 // Role-specific middlewares
 export const isClient = (req, res, next) => {
   if (req.user.role !== 'client') {
-    return res.status(403).json({ message: 'Accès réservé aux clients' });
+    return res.status(403).json({ message: 'Access reserved for customers' });
   }
   next();
 };
@@ -111,7 +111,7 @@ export const isRestaurant = (req, res, next) => {
 
 export const isAdmin = (req, res, next) => {
   if (req.user.role !== 'admin') {
-    return res.status(403).json({ message: 'Accès réservé aux administrateurs' });
+    return res.status(403).json({ message: 'Access restricted to administrators' });
   }
   next();
 };

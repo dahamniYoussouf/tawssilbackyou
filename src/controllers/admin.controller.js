@@ -1,6 +1,8 @@
 import * as adminNotificationService from "../services/adminNotification.service.js";
 import Order from "../models/Order.js";
 import Admin from "../models/Admin.js";
+import Driver from "../models/Driver.js";
+
 
 /**
  * GET /admin/notifications
@@ -201,6 +203,201 @@ export const getProfile = async (req, res, next) => {
     res.json({
       success: true,
       data: admin
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /admin/drivers/:id/cancellations
+ * Récupérer l'historique des annulations d'un livreur
+ */
+export const getDriverCancellations = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    const driver = await Driver.findByPk(id, {
+      attributes: [
+        'id', 
+        'driver_code', 
+        'first_name', 
+        'last_name', 
+        'phone', 
+        'email',
+        'cancellation_count',
+        'total_deliveries',
+        'rating',
+        'status',
+        'is_active',
+        'created_at'
+      ]
+    });
+    
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: "Driver not found"
+      });
+    }
+
+    // Récupérer toutes les commandes annulées par ce livreur
+    const cancelledOrders = await Order.findAll({
+      where: {
+        decline_reason: {
+          [Op.like]: '[DRIVER CANCELLED]%'
+        }
+      },
+      include: [
+        {
+          model: Restaurant,
+          as: 'restaurant',
+          attributes: ['id', 'name', 'address']
+        },
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'first_name', 'last_name', 'phone_number']
+        }
+      ],
+      order: [['updated_at', 'DESC']],
+      limit: 50
+    });
+
+    // Statistiques
+    const stats = {
+      total_cancellations: driver.cancellation_count,
+      total_deliveries: driver.total_deliveries,
+      cancellation_rate: driver.total_deliveries > 0 
+        ? ((driver.cancellation_count / (driver.total_deliveries + driver.cancellation_count)) * 100).toFixed(2)
+        : 0,
+      current_status: driver.status,
+      is_active: driver.is_active,
+      rating: driver.rating
+    };
+
+    res.json({
+      success: true,
+      data: {
+        driver: {
+          id: driver.id,
+          driver_code: driver.driver_code,
+          name: driver.getFullName(),
+          phone: driver.phone,
+          email: driver.email
+        },
+        stats,
+        cancelled_orders: cancelledOrders.map(order => ({
+          id: order.id,
+          order_number: order.order_number,
+          restaurant: order.restaurant.name,
+          client_name: `${order.client.first_name} ${order.client.last_name}`,
+          reason: order.decline_reason.replace('[DRIVER CANCELLED] ', ''),
+          cancelled_at: order.updated_at,
+          order_value: parseFloat(order.total_amount || 0)
+        }))
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /admin/drivers/:id/reset-cancellations
+ * Réinitialiser le compteur d'annulations d'un livreur
+ */
+export const resetDriverCancellations = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    
+    const driver = await Driver.findByPk(id);
+    
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: "Driver not found"
+      });
+    }
+
+    const previousCount = driver.cancellation_count;
+    
+    await driver.update({
+      cancellation_count: 0,
+      notes: notes 
+        ? `${driver.notes || ''}\n[${new Date().toISOString()}] Annulations réinitialisées (${previousCount}): ${notes}`
+        : driver.notes
+    });
+
+    console.log(`✅ Admin reset cancellation count for driver ${driver.driver_code} (was ${previousCount})`);
+
+    res.json({
+      success: true,
+      message: "Cancellation count reset successfully",
+      data: {
+        driver_id: driver.id,
+        driver_code: driver.driver_code,
+        previous_count: previousCount,
+        new_count: 0
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /admin/drivers/:id/suspend
+ * Suspendre un livreur
+ */
+export const suspendDriver = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason, duration_days } = req.body;
+    
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: "Suspension reason is required"
+      });
+    }
+
+    const driver = await Driver.findByPk(id);
+    
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: "Driver not found"
+      });
+    }
+
+    // Calculer la date de fin de suspension si durée fournie
+    let suspensionNote = `[${new Date().toISOString()}] SUSPENDU: ${reason}`;
+    if (duration_days) {
+      const endDate = new Date();
+      endDate.setDate(endDate.getDate() + parseInt(duration_days));
+      suspensionNote += ` (jusqu'au ${endDate.toLocaleDateString()})`;
+    }
+
+    await driver.update({
+      status: 'suspended',
+      is_active: false,
+      notes: `${driver.notes || ''}\n${suspensionNote}`
+    });
+
+    console.log(`🚫 Admin suspended driver ${driver.driver_code}: ${reason}`);
+
+    res.json({
+      success: true,
+      message: "Driver suspended successfully",
+      data: {
+        driver_id: driver.id,
+        driver_code: driver.driver_code,
+        status: driver.status,
+        reason: reason,
+        duration_days: duration_days || 'Indefinite'
+      }
     });
   } catch (err) {
     next(err);
