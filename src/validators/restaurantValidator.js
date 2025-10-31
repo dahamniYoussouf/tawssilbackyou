@@ -295,3 +295,34 @@ export const nearbyFilterValidator = [
     return true;
   })
 ];
+
+
+/**
+ * Validator for getting restaurant statistics
+ */
+export const getRestaurantStatisticsValidator = [
+  param("id")
+    .optional()
+    .isUUID()
+    .withMessage("Invalid restaurant ID format"),
+
+  query("date_from")
+    .optional()
+    .isISO8601()
+    .withMessage("date_from must be a valid ISO 8601 date"),
+
+  query("date_to")
+    .optional()
+    .isISO8601()
+    .withMessage("date_to must be a valid ISO 8601 date")
+    .custom((value, { req }) => {
+      if (req.query.date_from && value) {
+        const from = new Date(req.query.date_from);
+        const to = new Date(value);
+        if (to < from) {
+          throw new Error("date_to must be after date_from");
+        }
+      }
+      return true;
+    })
+];

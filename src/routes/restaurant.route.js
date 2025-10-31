@@ -3,11 +3,11 @@ import { Router } from "express";
 import { protect, isClient, isRestaurant, authorize } from "../middlewares/auth.js";
 import * as restaurantCtrl from "../controllers/restaurant.controller.js";
 import { 
-  createRestaurantValidator, 
   nearbyRestaurantValidator, 
   deleteRestaurantValidator, 
   updateRestaurantValidator, 
-  nearbyFilterValidator 
+  nearbyFilterValidator , 
+  getRestaurantStatisticsValidator
 } from "../validators/restaurantValidator.js";
 import { validate } from "../middlewares/validate.js";
 
@@ -25,5 +25,6 @@ router.get('/details/:restaurantId', protect, isClient, restaurantCtrl.getRestau
 router.put("/profile", protect, isRestaurant, updateRestaurantValidator, validate, restaurantCtrl.updateProfile);
 router.put("/update/:id", protect, authorize('admin'), updateRestaurantValidator, validate, restaurantCtrl.update);
 router.delete("/delete/:id", protect, authorize('admin', 'restaurant'), deleteRestaurantValidator, validate, restaurantCtrl.remove);
-
+router.get("/statistics/me", protect, isRestaurant, getRestaurantStatisticsValidator,  validate, restaurantCtrl.getRestaurantStatistics);
+router.get(  "/:id/statistics", protect, authorize('admin'),  getRestaurantStatisticsValidator,  validate,  restaurantCtrl.getRestaurantStatistics);
 export default router;

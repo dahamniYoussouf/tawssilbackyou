@@ -2,6 +2,8 @@ import Restaurant from "../models/Restaurant.js";
 import FavoriteRestaurant from "../models/FavoriteRestaurant.js";
 import FoodCategory from "../models/FoodCategory.js";
 import MenuItem from "../models/MenuItem.js";
+import Client from "../models/Client.js";
+import Order from "../models/Order.js";
 import { Op, literal } from "sequelize";
 import axios from "axios";
 import calculateRouteTime from "../services/routingService.js"
@@ -387,5 +389,135 @@ export const getCategoriesWithMenuItems = async (restaurantId, clientId = null) 
     categories: formattedCategories,
     total_categories: formattedCategories.length,
     total_items: formattedCategories.reduce((sum, cat) => sum + cat.items_count, 0)
+  };
+};
+
+/**
+ * Get restaurant statistics
+ */
+export const getRestaurantStatistics = async (restaurantId, filters = {}) => {
+  const { date_from, date_to } = filters;
+
+  // Verify restaurant exists
+  const restaurant = await Restaurant.findByPk(restaurantId);
+  if (!restaurant) {
+    throw new Error('Restaurant not found');
+  }
+
+  // Build date filter
+  const dateWhere = {};
+  if (date_from) dateWhere[Op.gte] = new Date(date_from);
+  if (date_to) dateWhere[Op.lte] = new Date(date_to);
+
+  const orderWhere = {
+    restaurant_id: restaurantId,
+    ...(Object.keys(dateWhere).length > 0 && { created_at: dateWhere })
+  };
+
+  // Get all orders for this restaurant
+  const orders = await Order.findAll({
+    where: orderWhere,
+    attributes: [
+      'id',
+      'status',
+      'order_type',
+      'total_amount',
+      'rating',
+      'created_at'
+    ]
+  });
+
+  // Calculate statistics
+  const totalOrders = orders.length;
+  const completedOrders = orders.filter(o => o.status === 'delivered').length;
+  const pendingOrders = orders.filter(o => o.status === 'pending').length;
+  const preparingOrders = orders.filter(o => o.status === 'preparing').length;
+  const deliveringOrders = orders.filter(o => o.status === 'delivering').length;
+  const declinedOrders = orders.filter(o => o.status === 'declined').length;
+
+  // Calculate revenue (only completed orders)
+  const totalRevenue = orders
+    .filter(o => o.status === 'delivered')
+    .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
+
+  // Calculate average order value
+  const averageOrderValue = completedOrders > 0 
+    ? (totalRevenue / completedOrders).toFixed(2) 
+    : 0;
+
+  // Calculate ratings
+  const ratedOrders = orders.filter(o => o.rating !== null && o.rating !== undefined);
+  const averageRating = ratedOrders.length > 0
+    ? (ratedOrders.reduce((sum, o) => sum + parseFloat(o.rating), 0) / ratedOrders.length).toFixed(1)
+    : null;
+
+  // Order type breakdown
+  const deliveryOrders = orders.filter(o => o.order_type === 'delivery').length;
+  const pickupOrders = orders.filter(o => o.order_type === 'pickup').length;
+
+  // Get recent orders (last 10)
+  const recentOrders = await Order.findAll({
+    where: { restaurant_id: restaurantId },
+    include: [
+      {
+        model: Client,
+        as: 'client',
+        attributes: ['id', 'first_name', 'last_name']
+      }
+    ],
+    order: [['created_at', 'DESC']],
+    limit: 10,
+    attributes: ['id', 'order_number', 'status', 'total_amount', 'created_at']
+  });
+
+  // Calculate completion rate
+  const completionRate = totalOrders > 0 
+    ? ((completedOrders / totalOrders) * 100).toFixed(1) 
+    : 0;
+
+  return {
+    restaurant: {
+      id: restaurant.id,
+      name: restaurant.name,
+      rating: restaurant.rating,
+      is_active: restaurant.is_active,
+      is_premium: restaurant.is_premium
+    },
+    statistics: {
+      total_orders: totalOrders,
+      completed_orders: completedOrders,
+      pending_orders: pendingOrders,
+      preparing_orders: preparingOrders,
+      delivering_orders: deliveringOrders,
+      declined_orders: declinedOrders,
+      total_revenue: parseFloat(totalRevenue.toFixed(2)),
+      average_order_value: parseFloat(averageOrderValue),
+      average_rating: averageRating ? parseFloat(averageRating) : null,
+      rated_orders_count: ratedOrders.length,
+      delivery_orders: deliveryOrders,
+      pickup_orders: pickupOrders,
+      completion_rate: parseFloat(completionRate)
+    },
+    order_status_breakdown: {
+      pending: pendingOrders,
+      accepted: orders.filter(o => o.status === 'accepted').length,
+      preparing: preparingOrders,
+      assigned: orders.filter(o => o.status === 'assigned').length,
+      delivering: deliveringOrders,
+      delivered: completedOrders,
+      declined: declinedOrders
+    },
+    recent_orders: recentOrders.map(order => ({
+      id: order.id,
+      order_number: order.order_number,
+      status: order.status,
+      total_amount: parseFloat(order.total_amount || 0),
+      client_name: order.client ? `${order.client.first_name} ${order.client.last_name}` : 'N/A',
+      created_at: order.created_at
+    })),
+    period: {
+      from: date_from || null,
+      to: date_to || null
+    }
   };
 };

@@ -187,3 +187,43 @@ export const getRestaurantMenu = async (req, res) => {
     });
   }
 };
+
+
+/**
+ * Get restaurant statistics
+ * GET /api/restaurants/statistics/me (for authenticated restaurant)
+ * GET /api/restaurants/:id/statistics (for admin)
+ */
+export const getRestaurantStatistics = async (req, res, next) => {
+  try {
+    // Get restaurant_id from JWT token or URL parameter
+    const restaurantId = req.user?.restaurant_id || req.params.id;
+    
+    if (!restaurantId) {
+      return res.status(400).json({
+        success: false,
+        message: "Restaurant ID not found"
+      });
+    }
+
+    const filters = {
+      date_from: req.query.date_from,
+      date_to: req.query.date_to
+    };
+
+    const stats = await restaurantService.getRestaurantStatistics(restaurantId, filters);
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (err) {
+    if (err.message === 'Restaurant not found') {
+      return res.status(404).json({
+        success: false,
+        message: err.message
+      });
+    }
+    next(err);
+  }
+};

@@ -173,7 +173,8 @@ export async function startPreparing(orderId) {
   const transaction = await sequelize.transaction();
 
   const order = await Order.findByPk(orderId, {
-    include: [{ model: Client, as: 'client' }, { model: Restaurant, as: 'restaurant' }]
+    include: [{ model: Client, as: 'client' }, { model: Restaurant, as: 'restaurant' }],
+    transaction 
   });
   
   if (!order || order.status !== 'accepted') {
@@ -181,8 +182,7 @@ export async function startPreparing(orderId) {
     return;
   }
   
-  await order.update({ status: 'preparing' });
-    
+  await order.update({ status: 'preparing' }, { transaction });
   await transaction.commit();
 
   console.log(`👨‍🍳 Order ${orderId} status changed to PREPARING`);
