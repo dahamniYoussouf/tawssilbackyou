@@ -66,9 +66,7 @@ export const createClientValidator = [
 // Validator for updating a client
 // ----------------------------
 export const updateClientValidator = [
-  param("id")
-    .isUUID()
-    .withMessage("Invalid client UUID"),
+
 
   body("first_name")
     .optional()
