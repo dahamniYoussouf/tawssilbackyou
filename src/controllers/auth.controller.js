@@ -5,7 +5,6 @@ import Driver from '../models/Driver.js';
 import Restaurant from '../models/Restaurant.js';
 import Admin from '../models/Admin.js';
 
-
 // OTP Store (use Redis in production)
 const otpStore = new Map();
 
@@ -21,7 +20,7 @@ const generateAccessToken = (userId, role) => {
   return jwt.sign(
     { id: userId, role, type: 'access' },
     process.env.JWT_SECRET || 'your-secret-key',
-    { expiresIn: '30d' }  // Short-lived for security
+    { expiresIn: '30d' } // Short-lived for security
   );
 };
 
@@ -30,7 +29,7 @@ const generateRefreshToken = (userId, role, deviceId) => {
   return jwt.sign(
     { id: userId, role, type: 'refresh', deviceId },
     process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key',
-    { expiresIn: '30d' }  // Long-lived for convenience
+    { expiresIn: '30d' } // Long-lived for convenience
   );
 };
 
@@ -41,7 +40,7 @@ const generateOTP = () => {
 
 // Send OTP via SMS
 const sendOTP = async (phoneOrEmail, otp) => {
-  console.log(`📱 OTP envoyé à ${phoneOrEmail}: ${otp}`);
+  console.log(`📱 OTP sent to ${phoneOrEmail}: ${otp}`);
   // TODO: Integrate real SMS service
   return true;
 };
@@ -56,20 +55,20 @@ export const requestOTP = async (req, res) => {
     const { phone_number } = req.body;
 
     if (!phone_number) {
-      return res.status(400).json({ message: 'Numéro de téléphone requis' });
+      return res.status(400).json({ message: 'Phone number is required' });
     }
 
     // Check if client exists
     let client = await Client.findOne({ where: { phone_number } });
     let isNewUser = false;
-    
+
     // Create new client if doesn't exist
     if (!client) {
       const tempEmail = `${phone_number}@temp.local`;
-      const user = await User.create({ 
-        email: tempEmail, 
+      const user = await User.create({
+        email: tempEmail,
         password: Math.random().toString(36),
-        role: 'client' 
+        role: 'client'
       });
 
       client = await Client.create({
@@ -79,7 +78,7 @@ export const requestOTP = async (req, res) => {
         first_name: '',
         last_name: ''
       });
-      
+
       isNewUser = true;
       console.log(`✨ New client registered: ${phone_number}`);
     }
@@ -90,22 +89,22 @@ export const requestOTP = async (req, res) => {
       code: otp,
       clientId: client.id,
       userId: client.user_id,
-      expiresAt: Date.now() + 5 * 60 * 1000  // 5 minutes
+      expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
     });
 
     // Send OTP
     await sendOTP(phone_number, otp);
 
-    res.json({ 
-      message: 'OTP envoyé avec succès',
+    res.json({
+      message: 'OTP sent successfully',
       phone_number,
       is_new_user: isNewUser,
-      dev_otp: otp 
+      dev_otp: otp
     });
-    
+
   } catch (error) {
-    console.error('Erreur requestOTP:', error);
-    res.status(500).json({ message: 'Échec envoi OTP', error: error.message });
+    console.error('requestOTP error:', error);
+    res.status(500).json({ message: 'Failed to send OTP', error: error.message });
   }
 };
 
@@ -115,22 +114,22 @@ export const verifyOTP = async (req, res) => {
     const { phone_number, otp, device_id } = req.body;
 
     if (!phone_number || !otp) {
-      return res.status(400).json({ message: 'Téléphone et OTP requis' });
+      return res.status(400).json({ message: 'Phone number and OTP are required' });
     }
 
     const storedData = otpStore.get(phone_number);
 
     if (!storedData) {
-      return res.status(400).json({ message: 'OTP non trouvé ou expiré' });
+      return res.status(400).json({ message: 'OTP not found or expired' });
     }
 
     if (Date.now() > storedData.expiresAt) {
       otpStore.delete(phone_number);
-      return res.status(400).json({ message: 'OTP expiré' });
+      return res.status(400).json({ message: 'OTP expired' });
     }
 
     if (storedData.code !== otp) {
-      return res.status(400).json({ message: 'OTP invalide' });
+      return res.status(400).json({ message: 'Invalid OTP' });
     }
 
     otpStore.delete(phone_number);
@@ -148,7 +147,7 @@ export const verifyOTP = async (req, res) => {
       {
         id: user.id,
         role: user.role,
-        client_id: client.id,  // ← Added
+        client_id: client.id,
         type: 'access'
       },
       process.env.JWT_SECRET || 'your-secret-key',
@@ -159,7 +158,7 @@ export const verifyOTP = async (req, res) => {
       {
         id: user.id,
         role: user.role,
-        client_id: client.id,  // ← Added
+        client_id: client.id,
         type: 'refresh',
         deviceId: deviceIdentifier
       },
@@ -174,7 +173,7 @@ export const verifyOTP = async (req, res) => {
     });
 
     res.json({
-      message: 'Connexion réussie',
+      message: 'Login successful',
       access_token: accessToken,
       refresh_token: refreshToken,
       expires_in: 900,
@@ -185,10 +184,10 @@ export const verifyOTP = async (req, res) => {
       },
       profile: client
     });
-    
+
   } catch (error) {
-    console.error('Erreur verifyOTP:', error);
-    res.status(500).json({ message: 'Échec vérification OTP', error: error.message });
+    console.error('verifyOTP error:', error);
+    res.status(500).json({ message: 'Failed to verify OTP', error: error.message });
   }
 };
 
@@ -198,44 +197,44 @@ export const refreshAccessToken = async (req, res) => {
     const { refresh_token } = req.body;
 
     if (!refresh_token) {
-      return res.status(400).json({ message: 'Refresh token requis' });
+      return res.status(400).json({ message: 'Refresh token is required' });
     }
 
     // Verify refresh token
     let decoded;
     try {
       decoded = jwt.verify(
-        refresh_token, 
+        refresh_token,
         process.env.JWT_REFRESH_SECRET || 'your-refresh-secret-key'
       );
     } catch (error) {
-      return res.status(401).json({ message: 'Refresh token invalide ou expiré' });
+      return res.status(401).json({ message: 'Invalid or expired refresh token' });
     }
 
     // Check if token exists in store
     const tokenData = deviceTokens.get(refresh_token);
     if (!tokenData) {
-      return res.status(401).json({ message: 'Refresh token révoqué' });
+      return res.status(401).json({ message: 'Refresh token revoked' });
     }
 
     // Load user
     const user = await User.findByPk(decoded.id);
     if (!user || !user.is_active) {
-      return res.status(401).json({ message: 'Utilisateur invalide' });
+      return res.status(401).json({ message: 'Invalid user' });
     }
 
     // Generate new access token (refresh token stays the same)
     const newAccessToken = generateAccessToken(user.id, user.role);
 
     res.json({
-      message: 'Token rafraîchi',
+      message: 'Token refreshed successfully',
       access_token: newAccessToken,
-      expires_in: 900  // 15 minutes
+      expires_in: 900 // 15 minutes
     });
-    
+
   } catch (error) {
-    console.error('Erreur refreshAccessToken:', error);
-    res.status(500).json({ message: 'Échec rafraîchissement token' });
+    console.error('refreshAccessToken error:', error);
+    res.status(500).json({ message: 'Failed to refresh token' });
   }
 };
 
@@ -250,11 +249,11 @@ export const logout = async (req, res) => {
       console.log('🔓 User logged out, token revoked');
     }
 
-    res.json({ message: 'Déconnexion réussie' });
-    
+    res.json({ message: 'Logout successful' });
+
   } catch (error) {
-    console.error('Erreur logout:', error);
-    res.status(500).json({ message: 'Échec déconnexion' });
+    console.error('logout error:', error);
+    res.status(500).json({ message: 'Logout failed' });
   }
 };
 
@@ -267,8 +266,8 @@ export const register = async (req, res) => {
     const { email, password, role, ...profileData } = req.body;
 
     if (!['driver', 'restaurant'].includes(role)) {
-      return res.status(400).json({ 
-        message: 'Invalid role. Must be driver or restaurant' 
+      return res.status(400).json({
+        message: 'Invalid role. Must be driver or restaurant'
       });
     }
 
@@ -294,7 +293,7 @@ export const register = async (req, res) => {
           license_number: profileData.license_number || null
         });
         break;
-      
+
       case 'restaurant': {
         const { lat, lng } = profileData;
         const latitude = parseFloat(lat);
@@ -309,15 +308,19 @@ export const register = async (req, res) => {
           throw new Error('At least one category is required');
         }
 
-        const isActive = profileData.is_active === undefined ? true : 
-                         (typeof profileData.is_active === 'string' ? 
-                          profileData.is_active === 'true' : 
-                          profileData.is_active);
-        
-        const isPremium = profileData.is_premium === undefined ? false : 
-                          (typeof profileData.is_premium === 'string' ? 
-                           profileData.is_premium === 'true' : 
-                           profileData.is_premium);
+        const isActive =
+          profileData.is_active === undefined
+            ? true
+            : typeof profileData.is_active === 'string'
+            ? profileData.is_active === 'true'
+            : profileData.is_active;
+
+        const isPremium =
+          profileData.is_premium === undefined
+            ? false
+            : typeof profileData.is_premium === 'string'
+            ? profileData.is_premium === 'true'
+            : profileData.is_premium;
 
         let rating = 0.0;
         if (profileData.rating !== undefined && profileData.rating !== null) {
@@ -371,7 +374,7 @@ export const register = async (req, res) => {
       },
       profile
     });
-    
+
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ message: 'Registration failed', error: error.message });
@@ -404,8 +407,7 @@ export const login = async (req, res) => {
     let profile;
     let driver_id = null;
     let restaurant_id = null;
-        let admin_id = null;
-
+    let admin_id = null;
 
     switch (user.role) {
       case 'driver':
@@ -418,7 +420,7 @@ export const login = async (req, res) => {
         restaurant_id = profile?.id || null;
         break;
 
-      case 'admin': 
+      case 'admin':
         profile = await Admin.findOne({ where: { user_id: user.id } });
         admin_id = profile?.id || null;
         break;
@@ -434,10 +436,9 @@ export const login = async (req, res) => {
       {
         id: user.id,
         role: user.role,
-        driver_id,        
-        restaurant_id,    
-        admin_id, 
-
+        driver_id,
+        restaurant_id,
+        admin_id,
         type: 'access'
       },
       process.env.JWT_SECRET || 'your-secret-key',
@@ -485,7 +486,6 @@ export const login = async (req, res) => {
   }
 };
 
-
 export const getProfile = async (req, res) => {
   try {
     const user = await User.findByPk(req.user.id, {
@@ -510,7 +510,7 @@ export const getProfile = async (req, res) => {
     }
 
     res.json({ user, profile });
-    
+
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(500).json({ message: 'Failed to get profile' });

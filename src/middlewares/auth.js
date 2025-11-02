@@ -1,7 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
-
 // Protect routes - verify access token
 export const protect = async (req, res, next) => {
   try {
@@ -13,7 +12,7 @@ export const protect = async (req, res, next) => {
     }
 
     if (!token) {
-      return res.status(401).json({ message: 'Non autorisé - Token manquant' });
+      return res.status(401).json({ message: 'Unauthorized - Missing token' });
     }
 
     // Verify access token
@@ -24,17 +23,17 @@ export const protect = async (req, res, next) => {
       // Token expired or invalid
       if (error.name === 'TokenExpiredError') {
         return res.status(401).json({ 
-          message: 'Token expiré',
+          message: 'Token expired',
           code: 'TOKEN_EXPIRED',
           expired: true 
         });
       }
-      return res.status(401).json({ message: 'Token invalide' });
+      return res.status(401).json({ message: 'Invalid token' });
     }
 
     // Must be an access token
     if (decoded.type !== 'access') {
-      return res.status(401).json({ message: 'Type de token invalide' });
+      return res.status(401).json({ message: 'Invalid token type' });
     }
 
     // Load user
@@ -63,7 +62,7 @@ export const protect = async (req, res, next) => {
       req.user.restaurant_id = decoded.restaurant_id;
     }
 
-     if (decoded.admin_id) {
+    if (decoded.admin_id) {
       req.user.admin_id = decoded.admin_id;
     }
 
@@ -80,7 +79,7 @@ export const authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ 
-        message: `Rôle ${req.user.role} non autorisé pour cette action` 
+        message: `Role ${req.user.role} not authorized for this action` 
       });
     }
     next();
@@ -90,21 +89,21 @@ export const authorize = (...roles) => {
 // Role-specific middlewares
 export const isClient = (req, res, next) => {
   if (req.user.role !== 'client') {
-    return res.status(403).json({ message: 'Access reserved for customers' });
+    return res.status(403).json({ message: 'Access restricted to customers' });
   }
   next();
 };
 
 export const isDriver = (req, res, next) => {
   if (req.user.role !== 'driver') {
-    return res.status(403).json({ message: 'Accès réservé aux livreurs' });
+    return res.status(403).json({ message: 'Access restricted to drivers' });
   }
   next();
 };
 
 export const isRestaurant = (req, res, next) => {
   if (req.user.role !== 'restaurant') {
-    return res.status(403).json({ message: 'Accès réservé aux restaurants' });
+    return res.status(403).json({ message: 'Access restricted to restaurants' });
   }
   next();
 };
