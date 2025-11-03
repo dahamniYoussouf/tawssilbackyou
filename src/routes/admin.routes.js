@@ -1,6 +1,18 @@
 import express from 'express';
 import { protect, authorize } from '../middlewares/auth.js';
 import * as adminCtrl from '../controllers/admin.controller.js';
+import { 
+  getDeliveryConfig, 
+  updateMaxOrders, 
+  updateMaxDistance 
+} from '../controllers/admin.controller.js';
+import { 
+  updateMaxOrdersValidator, 
+  updateMaxDistanceValidator 
+} from '../validators/configValidator.js';
+import { validate } from '../middlewares/validate.js';
+
+
 
 const router = express.Router();
 
@@ -22,4 +34,8 @@ router.get('/drivers/:id/cancellations', adminCtrl.getDriverCancellations);
 router.post('/drivers/:id/reset-cancellations', adminCtrl.resetDriverCancellations);
 router.post('/drivers/:id/suspend', adminCtrl.suspendDriver);
 
+// Configuration de livraison
+router.get('/config/delivery', getDeliveryConfig);
+router.put('/config/delivery/max-orders', updateMaxOrdersValidator, validate, updateMaxOrders);
+router.put('/config/delivery/max-distance', updateMaxDistanceValidator, validate, updateMaxDistance);
 export default router;

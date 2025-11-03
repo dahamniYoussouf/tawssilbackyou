@@ -199,7 +199,10 @@ export async function startPreparing(orderId) {
 
 export async function assignDriverOrComplete(orderId, driverId = null) {
   const order = await Order.findByPk(orderId, {
-    include: [{ model: Client, as: 'client' }, { model: Restaurant, as: 'restaurant' }]
+    include: [
+      { model: Client, as: 'client' },
+      { model: Restaurant, as: 'restaurant' }
+    ]
   });
   
   if (!order) throw { status: 404, message: "Order not found" };
@@ -207,7 +210,7 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
     throw { status: 400, message: "Order must be in preparing status" };
   }
   
-  // PICKUP
+  // PICKUP - compléter directement
   if (order.order_type === 'pickup') {
     await order.update({ status: 'delivered' });
     notify('client', order.client_id, {
@@ -218,21 +221,58 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
     return order;
   }
   
-  // Check if already assigned
+  // DELIVERY - vérifier si déjà assigné
   if (order.livreur_id) {
     throw { status: 400, message: "Order already assigned" };
   }
   
   const driver = await Driver.findByPk(driverId);
-  if (!driver || !driver.isAvailable()) {
-    throw { status: 400, message: "Driver not available" };
+  if (!driver) {
+    throw { status: 400, message: "Driver not found" };
   }
+
+  // ✅ NOUVELLE LOGIQUE : Vérifier si le livreur peut accepter
+  const canAccept = await canDriverAcceptOrder(driverId, orderId);
   
-  await order.update({ status: 'assigned', livreur_id: driverId });
-  await Driver.update({ status: 'busy', active_order_id: orderId }, { where: { id: driverId } });
+  if (!canAccept.canAccept) {
+    throw { 
+      status: 400, 
+      message: canAccept.reason || "Driver cannot accept this order" 
+    };
+  }
+
+  // Assigner la commande
+  await order.update({ 
+    status: 'assigned', 
+    livreur_id: driverId 
+  });
+
+  // ✅ Ajouter la commande aux commandes actives du livreur
+  await driver.addActiveOrder(orderId);
+
+  // Notifier le client et le livreur
+  notify('client', order.client_id, {
+    type: 'driver_assigned',
+    orderId: order.id,
+    driver: {
+      name: driver.getFullName(),
+      phone: driver.phone,
+      vehicle: driver.vehicle_type
+    }
+  });
+
+  notify('driver', driverId, {
+    type: 'order_assigned',
+    orderId: order.id,
+    orderNumber: order.order_number,
+    restaurant: order.restaurant.name,
+    deliveryAddress: order.delivery_address,
+    active_orders_count: driver.getActiveOrdersCount()
+  });
     
   return order;
 }
+
 
 export async function startDelivering(orderId) {
   const order = await Order.findByPk(orderId, {
@@ -300,9 +340,67 @@ export async function updateDriverGPS(driverId, longitude, latitude) {
   return { driver_id: driverId, order_id: driver.active_order_id };
 }
 
+export async function getDriverActiveOrders(driverId) {
+  const driver = await Driver.findByPk(driverId);
+  
+  if (!driver) {
+    throw { status: 404, message: "Driver not found" };
+  }
+
+  if (!driver.hasActiveOrders()) {
+    return {
+      driver_id: driverId,
+      active_orders: [],
+      count: 0
+    };
+  }
+
+  const orders = await Order.findAll({
+    where: {
+      id: driver.active_orders
+    },
+    include: [
+      {
+        model: Restaurant,
+        as: 'restaurant',
+        attributes: ['id', 'name', 'address', 'location']
+      },
+      {
+        model: Client,
+        as: 'client',
+        attributes: ['id', 'first_name', 'last_name', 'phone_number']
+      }
+    ],
+    order: [['assigned_at', 'ASC']]
+  });
+
+  return {
+    driver_id: driverId,
+    active_orders: orders.map(order => ({
+      id: order.id,
+      order_number: order.order_number,
+      status: order.status,
+      restaurant: {
+        name: order.restaurant.name,
+        address: order.restaurant.address,
+        location: order.restaurant.location?.coordinates
+      },
+      delivery_address: order.delivery_address,
+      delivery_location: order.delivery_location?.coordinates,
+      total_amount: parseFloat(order.total_amount),
+      assigned_at: order.assigned_at
+    })),
+    count: orders.length,
+    capacity: driver.max_orders_capacity
+  };
+}
+
 export async function completeDelivery(orderId) {
   const order = await Order.findByPk(orderId, {
-    include: [{ model: Client, as: 'client' }, { model: Driver, as: 'driver' }]
+    include: [
+      { model: Client, as: 'client' },
+      { model: Driver, as: 'driver' }
+    ]
   });
   
   if (!order) throw { status: 404, message: "Order not found" };
@@ -312,13 +410,23 @@ export async function completeDelivery(orderId) {
   
   await order.update({ status: 'delivered' });
   
+  // ✅ Retirer la commande des commandes actives du livreur
   if (order.livreur_id) {
     const driver = await Driver.findByPk(order.livreur_id);
     if (driver) {
-      driver.active_order_id = null;
-      driver.status = 'available';
+      await driver.removeActiveOrder(orderId);
       driver.total_deliveries += 1;
       await driver.save();
+
+      // Notifier le livreur du nombre de commandes restantes
+      notify('driver', driver.id, {
+        type: 'delivery_complete',
+        orderId: order.id,
+        active_orders_count: driver.getActiveOrdersCount(),
+        message: driver.getActiveOrdersCount() > 0 
+          ? `Delivery completed! ${driver.getActiveOrdersCount()} order(s) remaining`
+          : 'All deliveries completed! You are now available'
+      });
     }
   }
   
@@ -327,13 +435,6 @@ export async function completeDelivery(orderId) {
     orderId: order.id,
     message: 'Order delivered!'
   });
-  
-  if (order.driver) {
-    notify('driver', order.driver.id, {
-      type: 'delivery_complete',
-      message: 'Delivery completed'
-    });
-  }
   
   return order;
 }
@@ -358,6 +459,7 @@ export async function declineOrder(orderId, reason) {
   
   return order;
 }
+
 
 // ==================== CRUD OPERATIONS ====================
 

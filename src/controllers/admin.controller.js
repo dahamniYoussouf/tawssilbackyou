@@ -2,7 +2,12 @@ import * as adminNotificationService from "../services/adminNotification.service
 import Order from "../models/Order.js";
 import Admin from "../models/Admin.js";
 import Driver from "../models/Driver.js";
-
+import { 
+  getMaxOrdersPerDriver, 
+  updateMaxOrdersPerDriver 
+} from '../services/multiDeliveryService.js';
+import SystemConfig from '../models/SystemConfig.js';
+import { emit } from '../config/socket.js';
 
 /**
  * GET /admin/notifications
@@ -397,6 +402,121 @@ export const suspendDriver = async (req, res, next) => {
         status: driver.status,
         reason: reason,
         duration_days: duration_days || 'Indefinite'
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+/**
+ * GET /admin/config/delivery
+ * Récupérer la configuration de livraison
+ */
+export const getDeliveryConfig = async (req, res, next) => {
+  try {
+    const maxOrders = await getMaxOrdersPerDriver();
+    const maxDistance = await SystemConfig.get('max_distance_between_restaurants', 500);
+
+    res.json({
+      success: true,
+      data: {
+        max_orders_per_driver: maxOrders,
+        max_distance_between_restaurants: maxDistance
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * PUT /admin/config/delivery/max-orders
+ * Mettre à jour le nombre max de commandes par livreur
+ */
+export const updateMaxOrders = async (req, res, next) => {
+  try {
+    const { max_orders } = req.body;
+    const adminId = req.user.admin_id;
+
+    if (!adminId) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin profile not found in token"
+      });
+    }
+
+    if (!max_orders || max_orders < 1 || max_orders > 10) {
+      return res.status(400).json({
+        success: false,
+        message: "max_orders must be between 1 and 10"
+      });
+    }
+
+    const config = await updateMaxOrdersPerDriver(max_orders, adminId);
+
+    // 🔔 Notifier TOUS les livreurs de la nouvelle capacité
+    emit('drivers', 'config_update', {
+      type: 'max_orders_updated',
+      max_orders_per_driver: max_orders,
+      message: `Maximum orders capacity updated to ${max_orders}`,
+      timestamp: new Date().toISOString()
+    });
+
+    console.log(`✅ Max orders per driver updated to ${max_orders} by admin ${adminId}`);
+
+    res.json({
+      success: true,
+      message: `Max orders per driver updated to ${max_orders}. All drivers notified.`,
+      data: {
+        max_orders_per_driver: max_orders,
+        updated_at: config.updated_at
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * PUT /admin/config/delivery/max-distance
+ * Mettre à jour la distance max entre restaurants
+ */
+export const updateMaxDistance = async (req, res, next) => {
+  try {
+    const { max_distance } = req.body;
+    const adminId = req.user.admin_id;
+
+    if (!adminId) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin profile not found in token"
+      });
+    }
+
+    if (!max_distance || max_distance < 100 || max_distance > 5000) {
+      return res.status(400).json({
+        success: false,
+        message: "max_distance must be between 100 and 5000 meters"
+      });
+    }
+
+    const config = await SystemConfig.set(
+      'max_distance_between_restaurants',
+      max_distance,
+      adminId,
+      'Maximum distance between restaurants for multi-delivery'
+    );
+
+    console.log(`✅ Max distance between restaurants updated to ${max_distance}m by admin ${adminId}`);
+
+    res.json({
+      success: true,
+      message: `Max distance between restaurants updated to ${max_distance}m`,
+      data: {
+        max_distance_between_restaurants: max_distance,
+        updated_at: config.updated_at
       }
     });
   } catch (err) {

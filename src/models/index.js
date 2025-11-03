@@ -10,6 +10,8 @@ import Driver from "./Driver.js";
 import User from "./User.js";
 import Admin from "./Admin.js";
 import AdminNotification from "./AdminNotification.js";
+import SystemConfig from "./SystemConfig.js";
+
 
 
 // ==========================
@@ -296,7 +298,18 @@ Driver.hasMany(AdminNotification, {
 });
 
 
+// ==========================
+// ⚙️ SystemConfig & Admin
+// ==========================
+SystemConfig.belongsTo(Admin, {
+  foreignKey: 'updated_by',
+  as: 'admin'
+});
 
+Admin.hasMany(SystemConfig, {
+  foreignKey: 'updated_by',
+  as: 'config_updates'
+});
 
 
 export { 
@@ -311,6 +324,7 @@ export {
   Driver,
   User,
    Admin, 
-  AdminNotification 
+  AdminNotification, 
+  SystemConfig  
 };
 

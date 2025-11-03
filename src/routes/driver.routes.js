@@ -10,8 +10,10 @@ import {
   updateStatus,
   getStatistics, 
   getProfile, 
-  updateProfile
+  updateProfile, 
+  getActiveOrders
 } from "../controllers/driver.controller.js";
+
 import {
   getAllDriversValidator,
   getDriverByIdValidator,
@@ -30,6 +32,9 @@ router.get("/profile/me", protect, isDriver, getProfile);
 router.put("/profile", protect, isDriver, updateDriverValidator, validate, updateProfile);
 router.patch("/status", protect, isDriver, updateStatusValidator, validate, updateStatus);
 router.get("/statistics/me", protect, isDriver, getStatistics);
+
+// Commandes actives du livreur
+router.get('/active-orders', protect, isDriver, getActiveOrders);
 
 // ===== ROUTES WITH :id PARAMETER (Must come after specific routes) =====
 router.get("/:id", protect, getDriverByIdValidator, validate, getById);

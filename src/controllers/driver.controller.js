@@ -6,6 +6,7 @@ import {
   updateDriverStatus,
   getDriverStatistics
 } from "../services/driver.service.js";
+import { getDriverActiveOrders } from '../services/order.service.js';
 
 
 
@@ -263,6 +264,33 @@ export const getStatistics = async (req, res, next) => {
     }
 
     res.json({ success: true, data: stats });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+/**
+ * GET /driver/active-orders
+ * Récupérer toutes les commandes actives du livreur connecté
+ */
+export const getActiveOrders = async (req, res, next) => {
+  try {
+    const driverId = req.user.driver_id;
+    
+    if (!driverId) {
+      return res.status(400).json({
+        success: false,
+        message: "Driver profile not found in token"
+      });
+    }
+
+    const result = await getDriverActiveOrders(driverId);
+
+    res.json({
+      success: true,
+      data: result
+    });
   } catch (err) {
     next(err);
   }

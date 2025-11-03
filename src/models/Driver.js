@@ -98,10 +98,17 @@ const Driver = sequelize.define('Driver', {
     allowNull: false,
     comment: "Total number of completed deliveries"
   },
-  active_order_id: {
-    type: DataTypes.UUID,
-    allowNull: true,
-    comment: "Current active order ID"
+    active_orders: {
+    type: DataTypes.ARRAY(DataTypes.UUID),
+    defaultValue: [],
+    allowNull: false,
+    comment: "Array of active order IDs (multiple deliveries)"
+  },
+    max_orders_capacity: {
+    type: DataTypes.INTEGER,
+    defaultValue: 5,
+    allowNull: false,
+    comment: "Maximum number of orders this driver can handle simultaneously"
   },
   is_verified: {
     type: DataTypes.BOOLEAN,
@@ -178,12 +185,12 @@ Driver.prototype.getCurrentCoordinates = function() {
 };
 
 Driver.prototype.isAvailable = function() {
-  return this.status === 'available' && this.is_active && !this.active_order_id;
-};
+  return NOT(this.status === 'available' && 
+         this.is_active && 
+         this.active_orders.length < this.max_orders_capacity)
+  };
 
-Driver.prototype.isBusy = function() {
-  return this.status === 'busy' && this.active_order_id !== null;
-};
+
 
 Driver.prototype.updateRating = function(newRating) {
   if (this.total_deliveries === 0) {
@@ -205,4 +212,39 @@ Driver.prototype.shouldNotifyAdmin = function() {
   return this.cancellation_count >= 3;
 };
 
+
+Driver.prototype.canAcceptMoreOrders = function() {
+  return this.status === 'available' && 
+         this.is_active && 
+         this.active_orders.length < this.max_orders_capacity;
+};
+
+Driver.prototype.hasActiveOrders = function() {
+  return this.active_orders && this.active_orders.length > 0;
+};
+
+Driver.prototype.addActiveOrder = async function(orderId) {
+  if (!this.active_orders.includes(orderId)) {
+    this.active_orders.push(orderId);
+    this.status = 'busy';
+    await this.save();
+  }
+  return this.active_orders;
+};
+
+Driver.prototype.removeActiveOrder = async function(orderId) {
+  this.active_orders = this.active_orders.filter(id => id !== orderId);
+  
+  // Si plus de commandes, redevenir disponible
+  if (this.active_orders.length === 0) {
+    this.status = 'available';
+  }
+  
+  await this.save();
+  return this.active_orders;
+};
+
+Driver.prototype.getActiveOrdersCount = function() {
+  return this.active_orders.length;
+};
 export default Driver;
