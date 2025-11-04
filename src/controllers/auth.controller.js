@@ -64,24 +64,34 @@ export const requestOTP = async (req, res) => {
 
     // Create new client if doesn't exist
     if (!client) {
-      const tempEmail = `${phone_number}@temp.local`;
-      const user = await User.create({
-        email: tempEmail,
-        password: Math.random().toString(36),
-        role: 'client'
-      });
-
-      client = await Client.create({
-        user_id: user.id,
-        email: tempEmail,
-        phone_number,
-        first_name: '',
-        last_name: ''
-      });
-
-      isNewUser = true;
-      console.log(`✨ New client registered: ${phone_number}`);
+  const tempEmail = `${phone_number}@temp.local`;
+  
+  // ✅ Use findOrCreate to avoid duplicates
+  const [user, userCreated] = await User.findOrCreate({
+    where: { email: tempEmail },
+    defaults: {
+      email: tempEmail,
+      password: Math.random().toString(36),
+      role: 'client'
     }
+  });
+
+  // Check if client exists for this user
+  [client, isNewUser] = await Client.findOrCreate({
+    where: { user_id: user.id },
+    defaults: {
+      user_id: user.id,
+      email: tempEmail,
+      phone_number,
+      first_name: '',
+      last_name: ''
+    }
+  });
+
+  if (isNewUser) {
+    console.log(`✨ New client registered: ${phone_number}`);
+  }
+}
 
     // Generate and store OTP
     const otp = generateOTP();
