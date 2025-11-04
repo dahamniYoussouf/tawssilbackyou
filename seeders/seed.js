@@ -6,6 +6,7 @@ import Driver from "../src/models/Driver.js";
 import Restaurant from "../src/models/Restaurant.js";
 import Admin from "../src/models/Admin.js";
 import AdminNotification from "../src/models/AdminNotification.js";
+import SystemConfig from "../src/models/SystemConfig.js"; 
 import FoodCategory from "../src/models/FoodCategory.js";
 import MenuItem from "../src/models/MenuItem.js";
 import Order from "../src/models/Order.js";
@@ -164,6 +165,31 @@ const seedDatabase = async () => {
     console.log(`✅ ${admins.length} admins created`);
 
     // ----------------------------
+    // 🆕 SYSTEM CONFIGURATIONS
+    // ----------------------------
+    console.log("⚙️  Initializing system configurations...");
+    
+    // Configuration 1: Nombre max de commandes par livreur
+    await SystemConfig.create({
+      config_key: 'max_orders_per_driver',
+      config_value: 5,
+      description: 'Maximum number of orders a driver can handle simultaneously',
+      updated_by: admins[0].id // Super admin
+    });
+    
+    // Configuration 2: Distance max entre restaurants (en mètres)
+    await SystemConfig.create({
+      config_key: 'max_distance_between_restaurants',
+      config_value: 500,
+      description: 'Maximum distance (in meters) between restaurants for multi-delivery',
+      updated_by: admins[0].id
+    });
+    
+    console.log("✅ System configurations initialized:");
+    console.log("   - max_orders_per_driver: 5");
+    console.log("   - max_distance_between_restaurants: 500m");
+
+    // ----------------------------
     // 2️⃣ Clients
     // ----------------------------
     console.log("👥 Creating clients...");
@@ -197,7 +223,7 @@ const seedDatabase = async () => {
     console.log(`✅ ${clients.length} clients created`);
 
     // ----------------------------
-    // 3️⃣ Drivers
+    // 3️⃣ Drivers (✅ avec max_orders_capacity)
     // ----------------------------
     console.log("🚗 Creating drivers...");
     const drivers = [];
@@ -224,10 +250,12 @@ const seedDatabase = async () => {
         total_deliveries: Math.floor(Math.random() * 500) + 50,
         is_verified: true,
         is_active: true,
-        current_location: getRandomLocation()
+        current_location: getRandomLocation(),
+        max_orders_capacity: 5, // ✅ AJOUTÉ
+        active_orders: [] // ✅ AJOUTÉ
       }));
     }
-    console.log(`✅ ${drivers.length} drivers created`);
+    console.log(`✅ ${drivers.length} drivers created (capacity: 5 orders each)`);
 
     // ----------------------------
     // 4️⃣ Restaurants (1000)
@@ -393,11 +421,14 @@ const seedDatabase = async () => {
     console.log("\n📊 Résumé :");
     console.log(`- ${admins.length} admins (super_admin, admin, moderator)`);
     console.log(`- ${clients.length} clients`);
-    console.log(`- ${drivers.length} livreurs`);
+    console.log(`- ${drivers.length} livreurs (capacity: 5 orders/driver)`);
     console.log(`- ${restaurants.length} restaurants`);
     console.log(`- ${allMenuItems.length} items de menu`);
     console.log(`- ${sampleOrders.length} sample orders`);
     console.log(`- ${notifications.length} admin notifications`);
+    console.log("\n⚙️  System Configurations:");
+    console.log("- max_orders_per_driver: 5");
+    console.log("- max_distance_between_restaurants: 500m");
     
     console.log("\n🔑 Identifiants :");
     console.log("Admins:");
@@ -406,6 +437,11 @@ const seedDatabase = async () => {
     console.log("  - admin3@example.com (Moderator) / password123");
     console.log("Restaurants: restaurant1@example.com → restaurant1000@example.com / password123");
     console.log("Drivers: driver1@example.com → driver7@example.com / password123");
+    
+    console.log("\n✅ Multi-delivery system ready!");
+    console.log("🔧 Admin can modify configs via:");
+    console.log("   PUT /admin/config/delivery/max-orders");
+    console.log("   PUT /admin/config/delivery/max-distance");
 
   } catch (err) {
     console.error("❌ Seeding failed:", err);
