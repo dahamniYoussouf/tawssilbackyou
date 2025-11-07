@@ -7,30 +7,56 @@
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <style>
 body{font-family:Arial,Helvetica,sans-serif;background:#f4f6fa;margin:0;padding:20px;min-height:100vh}
-.container{max-width:700px;margin:0 auto}
+.container{max-width:900px;margin:0 auto}
 h1{text-align:center;color:#0f62fe;margin-bottom:30px}
 .section{background:#fff;padding:20px;border-radius:10px;box-shadow:0 4px 10px rgba(0,0,0,.1);margin-bottom:20px}
-h2{margin-top:0;color:#0f62fe;font-size:18px;border-bottom:2px solid #e5e7eb;padding-bottom:10px}
+h2{margin-top:0;color:#0f62fe;font-size:18px;border-bottom:2px solid #e5e7eb;padding-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+h2 .count-badge{background:#eef2ff;color:#0f62fe;padding:4px 12px;border-radius:999px;font-size:14px;font-weight:bold}
 input,button,select{width:100%;padding:10px;margin:6px 0;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;font-size:14px}
 button{background:#0f62fe;color:#fff;font-weight:bold;cursor:pointer;border:none}
 button:hover{background:#084cd2}
 button.success{background:#10b981}
 button.success:hover{background:#059669}
+button.danger{background:#dc2626}
+button.danger:hover{background:#991b1b}
+button.warning{background:#f59e0b}
+button.warning:hover{background:#d97706}
 button.online{background:#10b981;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
 .card{border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:12px 0;background:#fafbff;position:relative}
 .card.highlight{border-color:#0f62fe;border-width:2px;box-shadow:0 0 0 3px rgba(15,98,254,.1)}
+.card.active-order{border-left:4px solid #10b981;background:#f0fdf4}
 .row{display:flex;gap:8px}
 .row>*{flex:1}
-.status-badge{display:inline-block;background:#eef2ff;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:bold;color:#0f62fe}
+.status-badge{display:inline-block;background:#eef2ff;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:bold;color:#0f62fe;margin:4px 0}
 .status-badge.online{background:#d1fae5;color:#065f46}
 .status-badge.offline{background:#fee2e2;color:#991b1b}
+.status-badge.assigned{background:#dbeafe;color:#1e40af}
+.status-badge.delivering{background:#fef3c7;color:#92400e}
 .log{background:#0b1020;color:#d1fae5;padding:15px;border-radius:6px;height:250px;overflow:auto;font-family:monospace;font-size:12px}
 .empty{color:#999;font-style:italic;text-align:center;padding:20px}
 .delivery-badge{position:absolute;top:10px;right:10px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:bold}
 .location-info{background:#f9fafb;padding:10px;border-radius:6px;margin:10px 0;font-size:13px}
 .broadcast-notice{animation:slideIn 0.3s ease-out}
 @keyframes slideIn{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.capacity-info{background:#eef2ff;padding:12px;border-radius:8px;margin:15px 0;font-size:14px}
+.capacity-bar{background:#e5e7eb;height:28px;border-radius:14px;overflow:hidden;margin-top:10px;position:relative}
+.capacity-fill{background:linear-gradient(90deg, #10b981, #059669);height:100%;transition:width 0.3s;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:13px}
+.capacity-fill.full{background:linear-gradient(90deg, #f59e0b, #d97706)}
+.order-actions{display:flex;gap:8px;margin-top:12px}
+.order-actions button{width:auto;padding:8px 16px;font-size:13px}
+.order-number{font-size:16px;font-weight:bold;color:#0f62fe}
+.tabs{display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid #e5e7eb}
+.tab{padding:10px 20px;cursor:pointer;border:none;background:none;color:#666;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s}
+.tab:hover{color:#0f62fe}
+.tab.active{color:#0f62fe;border-bottom-color:#0f62fe}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.tab .badge{background:#dc2626;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px}
+.order-route{background:#fff;padding:12px;border-radius:8px;margin:10px 0;border:1px solid #e5e7eb}
+.route-step{display:flex;align-items:start;margin:8px 0;padding:8px;border-left:3px solid #e5e7eb;padding-left:12px}
+.route-step.current{border-left-color:#10b981;background:#f0fdf4}
+.route-step-icon{margin-right:10px;font-size:18px}
 </style>
 </head>
 <body>
@@ -64,12 +90,59 @@ button.online{background:#10b981;animation:pulse 2s infinite}
 </div>
 <button id="online_btn" onclick="toggleOnline()" disabled>🟢 Go Online</button>
 <div id="driver_status" style="margin-top:10px"></div>
+
+<!-- Capacity Info -->
+<div id="capacity_display" style="display:none">
+<div class="capacity-info">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <strong>📦 Active Orders</strong>
+    <span id="capacity_text">0 / 5</span>
+  </div>
+  <div class="capacity-bar">
+    <div id="capacity_fill" class="capacity-fill" style="width:0%">0%</div>
+  </div>
+  <div style="margin-top:8px;font-size:12px;color:#666;text-align:center">
+    <span id="capacity_message">Ready to accept orders</span>
+  </div>
+</div>
+</div>
 </div>
 
-<div class="section">
+<!-- Active Orders Section -->
+<div class="section" id="active_orders_section" style="display:none">
+<h2>
+  <span>🚚 My Active Orders</span>
+  <span class="count-badge" id="active_count">0</span>
+</h2>
+<button onclick="loadActiveOrders()" style="margin-bottom:15px">🔄 Refresh Active Orders</button>
+<div id="active_orders_list">
+<div class="empty">No active orders</div>
+</div>
+</div>
+
+<!-- Available Deliveries Section -->
+<div class="section" id="deliveries_section" style="display:none">
 <h2>🚨 Available Deliveries</h2>
-<div id="d_deliveries">
-<div class="empty">No deliveries available. Go online to receive requests!</div>
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('available')">
+    📋 Available <span class="badge" id="available_count">0</span>
+  </button>
+  <button class="tab" onclick="switchTab('nearby')">
+    📍 Nearby
+  </button>
+</div>
+
+<div id="tab_available" class="tab-content active">
+  <div id="d_deliveries">
+    <div class="empty">No deliveries available. Go online to receive requests!</div>
+  </div>
+</div>
+
+<div id="tab_nearby" class="tab-content">
+  <button onclick="loadNearbyOrders()" style="margin-bottom:15px">🔄 Refresh Nearby</button>
+  <div id="nearby_deliveries">
+    <div class="empty">Click refresh to load nearby orders</div>
+  </div>
 </div>
 </div>
 
@@ -84,6 +157,8 @@ let socket = null;
 let auth = {role: null, token: null, user: null, profile: null};
 let isOnline = false;
 let locationInterval = null;
+let activeOrders = [];
+let maxCapacity = 5;
 
 async function apiFetch(url, options = {}) {
   const token = auth.token || '';
@@ -99,6 +174,34 @@ async function apiFetch(url, options = {}) {
 function log(...msg) {
   const e = document.getElementById('d_log');
   e.textContent = `[${new Date().toLocaleTimeString()}] ${msg.join(' ')}\n` + e.textContent;
+}
+
+function switchTab(tabName) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  
+  document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
+  document.getElementById(`tab_${tabName}`).classList.add('active');
+}
+
+function updateCapacity() {
+  const count = activeOrders.length;
+  const percentage = (count / maxCapacity) * 100;
+  
+  document.getElementById('capacity_text').textContent = `${count} / ${maxCapacity}`;
+  document.getElementById('capacity_fill').style.width = `${percentage}%`;
+  document.getElementById('capacity_fill').textContent = `${Math.round(percentage)}%`;
+  document.getElementById('active_count').textContent = count;
+  
+  const fill = document.getElementById('capacity_fill');
+  if (count >= maxCapacity) {
+    fill.classList.add('full');
+    document.getElementById('capacity_message').textContent = '⚠️ At maximum capacity';
+  } else {
+    fill.classList.remove('full');
+    const remaining = maxCapacity - count;
+    document.getElementById('capacity_message').textContent = `Can accept ${remaining} more order${remaining !== 1 ? 's' : ''}`;
+  }
 }
 
 function initSocket() {
@@ -119,56 +222,45 @@ function initSocket() {
     log('📡 Listening for deliveries...');
     document.getElementById('online_btn').disabled = false;
     
-    // Manually join driver rooms
     if (auth.profile?.id) {
       socket.emit('join', `driver:${auth.profile.id}`);
       socket.emit('join', 'driver');
       socket.emit('join', 'drivers');
       log(`📍 Joined rooms: driver:${auth.profile.id}, driver, drivers`);
     }
+    
+    loadActiveOrders();
   });
   
   socket.on('connect_error', (error) => {
     log('❌ Connection error:', error.message);
   });
   
-  // 📡 Listen for BROADCAST to all drivers
   socket.on('order_broadcast', data => {
-    log('📡 BROADCAST RECEIVED! New order available somewhere');
-    log('Broadcast data:', JSON.stringify(data));
-    
-    // Show a subtle notification that there's an order available
-    const box = document.getElementById('d_deliveries');
-    const existingBroadcast = box.querySelector('.broadcast-notice');
-    if (!existingBroadcast) {
-      const notice = document.createElement('div');
-      notice.className = 'card broadcast-notice';
-      notice.style.background = '#fef3c7';
-      notice.style.borderColor = '#f59e0b';
-      notice.innerHTML = `
-        <strong>📡 New Order Available!</strong>
-        <p style="margin:5px 0;font-size:13px">An order was just placed. You may receive details if you're nearby.</p>
-      `;
-      box.prepend(notice);
-      
-      // Remove after 10 seconds
-      setTimeout(() => notice.remove(), 10000);
-    }
+    log('📡 BROADCAST: New order available somewhere');
+    const availableCount = document.getElementById('available_count');
+    availableCount.textContent = parseInt(availableCount.textContent || 0) + 1;
   });
   
-  // 🚨 Listen for SPECIFIC delivery (nearby drivers)
   socket.on('new_delivery', data => {
-    log('🚨 NEW_DELIVERY EVENT RECEIVED!');
+    log('🚨 NEW_DELIVERY: Order assigned to you!');
     log('Data:', JSON.stringify(data));
     handleNewDelivery(data);
   });
   
-  // 📬 General notification listener
   socket.on('notification', data => {
-    log('📬 General Notification:', JSON.stringify(data));
+    log('📬 Notification:', JSON.stringify(data));
     
     if (data.type === 'new_delivery' || data.orderId) {
       handleNewDelivery(data);
+    } else if (data.type === 'delivery_complete') {
+      log(`✅ Delivery completed! ${data.active_orders_count} order(s) remaining`);
+      loadActiveOrders();
+      updateCapacity();
+    } else if (data.type === 'config_update') {
+      log(`⚙️ Config updated: ${data.message}`);
+      maxCapacity = data.max_orders_per_driver || 5;
+      updateCapacity();
     }
   });
   
@@ -176,7 +268,6 @@ function initSocket() {
     log('❌ Disconnected');
   });
   
-  // Debug: log ALL events received
   socket.onAny((event, ...args) => {
     log(`🔔 Event: ${event}`, JSON.stringify(args));
   });
@@ -191,9 +282,10 @@ function handleNewDelivery(data) {
   
   const div = document.createElement('div');
   div.className = 'card highlight';
+  div.id = `delivery_${data.orderId}`;
   div.innerHTML = `
     <div class="delivery-badge">NEW!</div>
-    <strong style="font-size:18px;color:#0f62fe">Order #${data.orderNumber || data.orderId}</strong>
+    <strong class="order-number">Order #${data.orderNumber || data.orderId}</strong>
     <div class="location-info">
       <strong>📍 Distance:</strong> ${data.distance || '?'} km<br>
       <strong>💰 Delivery Fee:</strong> ${data.fee || 0} DA<br>
@@ -204,7 +296,10 @@ function handleNewDelivery(data) {
   `;
   box.prepend(div);
   
-  // Browser notification
+  // Update available count
+  const availableCount = document.getElementById('available_count');
+  availableCount.textContent = box.querySelectorAll('.card').length;
+  
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification('New Delivery Available! 🚨', {
       body: `Order #${data.orderNumber} - ${data.distance} km away - ${data.fee} DA`,
@@ -213,13 +308,129 @@ function handleNewDelivery(data) {
     });
   }
   
-  // Sound notification
+  playNotificationSound();
+}
+
+async function loadActiveOrders() {
+  if (!auth.profile?.id) return;
+  
+  log('📡 Loading active orders...');
+  
   try {
-    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSqGzvLRfzMGH2S77eeXQAoRVq/n7bJiGgU+lNrywn0pBSh+zPDajEULFlqx6P+oUxMJS6Hh8LdgGgU7k9r0xnktBSV7zPDajUMLFlqx6PCkWBMKTaPi8LJeGgU6ktjzx3ktBSR6y+/fjEULFlqw5/CmWhMKTqPl8bhgGQU8k9j0x3ktBSR6y+/fjEQLFVqx6O+pWxMKT6Pm8rxfGgU9lNr0xnksBS17y+/fjEQKFVmw6PCmWhMKT6Pl8bdgGQU9lNn0xnktBSV7y+/gjEQLFVmw6PKlWhIKTqPl8bdgGQU9lNn0xnktBSV7yu/gjEQLFVmw6O+oWxMKTqPi8LZgGgU7k9n0xngtBSV8y+/gjEURFViv6PCmWhMKTaPh8LZhGgU7k9j0xnktBSZ8yu/fjEURFViv5/CmWhMKTqLi8LdeGgU7k9j0xnktBSZ7yu/fjEQRFVmv5+6nWRMKT6Lk8bdeGgU+k9j0xnktBSZ7yu/fjEQRFViv5+6mWhMKT6Lk8bdeGgU+k9j0xnktBSZ7yu/fjEQRFVmv5+6lWhMKTqHj8rdcGQU9k9j0xnktBSZ8y+/gjEQRFViv5+6lWhMKTqDk8bdeGgU9k9n0xngtBSZ7yu/fjEQRFVmw5+6nWhMKT6Hj8rdcGQU9k9j0xngtBSZ7yu/gjEQQFVmv5+6nWhMKT6Hj8rdcGQU9k9j0xnktBSZ7yu/gjEQRFVmv5+6mWhMKTqHi8bdcGgU9k9j0xnktBSZ7yu/fjEQRFViv6O6mWhMKTqHi8bdcGgU9k9j0xnktBSR7yu/fjEQRFVmv6O6nWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/f');
-    audio.volume = 0.5;
-    audio.play().catch(e => console.log('Audio play failed:', e));
-  } catch (e) {
-    console.log('Audio notification failed:', e);
+    const res = await apiFetch('/driver/active-orders');
+    const data = await res.json();
+    
+    if (res.ok) {
+      activeOrders = data.data?.active_orders || [];
+      maxCapacity = data.data?.capacity || 5;
+      
+      renderActiveOrders();
+      updateCapacity();
+      
+      document.getElementById('active_orders_section').style.display = 'block';
+      document.getElementById('capacity_display').style.display = 'block';
+      
+      log(`✅ Loaded ${activeOrders.length} active orders`);
+    } else {
+      log('❌ Failed to load active orders:', data.message);
+    }
+  } catch (error) {
+    log('❌ Error loading active orders:', error.message);
+  }
+}
+
+function renderActiveOrders() {
+  const box = document.getElementById('active_orders_list');
+  
+  if (activeOrders.length === 0) {
+    box.innerHTML = '<div class="empty">No active orders</div>';
+    return;
+  }
+  
+  box.innerHTML = '';
+  
+  activeOrders.forEach((order, index) => {
+    const div = document.createElement('div');
+    div.className = 'card active-order';
+    div.innerHTML = `
+      <strong class="order-number">#${order.order_number}</strong>
+      <span class="status-badge ${order.status}">${order.status.toUpperCase()}</span>
+      
+      <div class="order-route">
+        <div class="route-step ${order.status === 'assigned' ? 'current' : ''}">
+          <div class="route-step-icon">🍴</div>
+          <div>
+            <strong>${order.restaurant.name}</strong><br>
+            <small style="color:#666">${order.restaurant.address}</small>
+          </div>
+        </div>
+        <div class="route-step ${order.status === 'delivering' ? 'current' : ''}">
+          <div class="route-step-icon">📍</div>
+          <div>
+            <strong>Delivery Address</strong><br>
+            <small style="color:#666">${order.delivery_address}</small>
+          </div>
+        </div>
+      </div>
+      
+      <div class="location-info">
+        <strong>💰 Amount:</strong> ${order.total_amount} DA<br>
+        <strong>📞 Client:</strong> Contact via app<br>
+        <strong>⏰ Assigned:</strong> ${new Date(order.assigned_at).toLocaleTimeString()}
+      </div>
+      
+      <div class="order-actions">
+        ${order.status === 'assigned' ? 
+          `<button class="success" onclick="startDelivery('${order.id}')">🚀 Start Delivery</button>` : ''}
+        ${order.status === 'delivering' ? 
+          `<button class="success" onclick="completeDelivery('${order.id}')">✅ Complete Delivery</button>` : ''}
+        <button class="danger" onclick="cancelOrder('${order.id}')">❌ Cancel</button>
+      </div>
+    `;
+    box.appendChild(div);
+  });
+}
+
+async function loadNearbyOrders() {
+  if (!auth.profile?.id) return;
+  
+  log('📍 Loading nearby orders...');
+  
+  try {
+    const res = await apiFetch('/order/nearby?radius=5000&pageSize=20');
+    const data = await res.json();
+    
+    if (res.ok) {
+      const orders = data.data || [];
+      const box = document.getElementById('nearby_deliveries');
+      
+      if (orders.length === 0) {
+        box.innerHTML = '<div class="empty">No nearby orders found</div>';
+        return;
+      }
+      
+      box.innerHTML = '';
+      
+      orders.forEach(order => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+          <strong class="order-number">Order #${order.order_number}</strong>
+          <div class="location-info">
+            <strong>📍 Distance:</strong> ${order.distance_km} km<br>
+            <strong>💰 Fee:</strong> ${order.delivery_fee} DA<br>
+            <strong>📍 Address:</strong> ${order.delivery_address}<br>
+            <strong>🍴 Restaurant:</strong> ${order.restaurant.name}
+          </div>
+          <button class="success" onclick="acceptDelivery('${order.id}')">✅ Accept</button>
+        `;
+        box.appendChild(div);
+      });
+      
+      log(`✅ Loaded ${orders.length} nearby orders`);
+    }
+  } catch (error) {
+    log('❌ Error loading nearby orders:', error.message);
   }
 }
 
@@ -259,9 +470,8 @@ async function driverLogin() {
       }
       
       initSocket();
-      
-      // Enable status management
       document.getElementById('status_select').disabled = false;
+      document.getElementById('deliveries_section').style.display = 'block';
       loadCurrentStatus();
       
       if ('Notification' in window && Notification.permission === 'default') {
@@ -285,14 +495,14 @@ async function changeStatus() {
   
   const newStatus = document.getElementById('status_select').value;
   
-  if (newStatus === 'busy' && !auth.profile.active_order_id) {
-    alert('Cannot set Busy manually. System sets it when you accept a delivery.');
+  if (newStatus === 'busy' && activeOrders.length === 0) {
+    alert('Cannot set Busy manually. System sets it when you accept deliveries.');
     loadCurrentStatus();
     return;
   }
   
-  if ((newStatus === 'offline' || newStatus === 'available') && auth.profile.active_order_id) {
-    alert('Cannot change status while having an active delivery!');
+  if ((newStatus === 'offline' || newStatus === 'available') && activeOrders.length > 0) {
+    alert('Cannot change status while having active deliveries!');
     loadCurrentStatus();
     return;
   }
@@ -310,7 +520,6 @@ async function changeStatus() {
     if (res.ok) {
       log('✅ Status updated to:', newStatus);
       updateStatusInfo(newStatus);
-      
       isOnline = (newStatus === 'available');
       updateOnlineStatus();
     } else {
@@ -336,10 +545,7 @@ async function loadCurrentStatus() {
       const driver = data.data;
       document.getElementById('status_select').value = driver.status;
       updateStatusInfo(driver.status);
-      
       auth.profile.status = driver.status;
-      auth.profile.active_order_id = driver.active_order_id;
-      
       isOnline = (driver.status === 'available');
       updateOnlineStatus();
     }
@@ -350,14 +556,12 @@ async function loadCurrentStatus() {
 
 function updateStatusInfo(status) {
   const info = document.getElementById('status_info');
-  
   const messages = {
     available: '✅ You are available and will receive delivery requests',
-    busy: '⚠️ You are busy with an active delivery',
+    busy: '⚠️ You are busy with active deliveries',
     offline: '🔴 You are offline and will not receive requests',
     suspended: '⛔ Your account is suspended. Contact support.'
   };
-  
   info.textContent = messages[status] || '';
   info.style.color = status === 'suspended' ? '#dc2626' : '#666';
 }
@@ -469,6 +673,12 @@ async function acceptDelivery(orderId) {
     return;
   }
   
+  // Check capacity
+  if (activeOrders.length >= maxCapacity) {
+    alert(`⚠️ You are at maximum capacity (${maxCapacity} orders). Please complete some deliveries first.`);
+    return;
+  }
+  
   log('✅ Accepting order', orderId);
   
   try {
@@ -482,18 +692,19 @@ async function acceptDelivery(orderId) {
     if (r.ok) {
       log('✅ DELIVERY ACCEPTED!');
       
-      const cards = document.getElementById('d_deliveries').querySelectorAll('.card');
-      cards.forEach(card => {
-        if (card.textContent.includes('#' + orderId) || card.textContent.includes(orderId)) {
-          card.style.opacity = '0.5';
-          card.querySelector('button').disabled = true;
-          card.querySelector('button').textContent = '✓ Accepted';
-        }
-      });
+      // Remove from available list
+      const card = document.getElementById(`delivery_${orderId}`);
+      if (card) card.remove();
       
-      loadCurrentStatus();
+      // Update available count
+      const availableCount = document.getElementById('available_count');
+      const remaining = document.querySelectorAll('#d_deliveries .card').length;
+      availableCount.textContent = remaining;
       
-      alert('Delivery accepted!');
+      // Reload active orders
+      await loadActiveOrders();
+      
+      alert('Delivery accepted! Check your active orders.');
     } else {
       alert('Error: ' + (j.message || 'Could not accept'));
       log('❌ Failed:', j.message);
@@ -501,6 +712,100 @@ async function acceptDelivery(orderId) {
   } catch (e) {
     alert('Error: ' + e.message);
     log('❌ Error:', e.message);
+  }
+}
+
+async function startDelivery(orderId) {
+  log('🚀 Starting delivery:', orderId);
+  
+  try {
+    const res = await apiFetch(`/order/${orderId}/start-delivery`, {
+      method: 'POST'
+    });
+    
+    if (res.ok) {
+      log('✅ Delivery started');
+      await loadActiveOrders();
+    } else {
+      const data = await res.json();
+      alert('Error: ' + (data.message || 'Failed to start delivery'));
+    }
+  } catch (error) {
+    alert('Error: ' + error.message);
+    log('❌ Error:', error.message);
+  }
+}
+
+async function completeDelivery(orderId) {
+  log('✅ Completing delivery:', orderId);
+  
+  try {
+    const res = await apiFetch(`/order/${orderId}/complete-delivery`, {
+      method: 'POST'
+    });
+    
+    if (res.ok) {
+      log('✅ Delivery completed!');
+      await loadActiveOrders();
+      alert('Delivery completed successfully! 🎉');
+    } else {
+      const data = await res.json();
+      alert('Error: ' + (data.message || 'Failed to complete delivery'));
+    }
+  } catch (error) {
+    alert('Error: ' + error.message);
+    log('❌ Error:', error.message);
+  }
+}
+
+async function cancelOrder(orderId) {
+  const reason = prompt('⚠️ Why are you canceling this order?\n\nPlease provide a detailed reason (minimum 10 characters):');
+  
+  if (!reason || reason.trim().length < 10) {
+    alert('Cancellation reason must be at least 10 characters');
+    return;
+  }
+  
+  if (!confirm(`Are you sure you want to cancel this order?\n\nReason: ${reason}\n\nNote: Multiple cancellations may affect your account.`)) {
+    return;
+  }
+  
+  log('❌ Canceling order:', orderId);
+  
+  try {
+    const res = await apiFetch(`/order/${orderId}/driver-cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason.trim() })
+    });
+    
+    const data = await res.json();
+    
+    if (res.ok) {
+      log('✅ Order cancelled');
+      
+      if (data.warning) {
+        alert('⚠️ ' + data.warning);
+      }
+      
+      await loadActiveOrders();
+      alert('Order cancelled. The system will find another driver.');
+    } else {
+      alert('Error: ' + (data.message || 'Failed to cancel order'));
+      log('❌ Failed:', data.message);
+    }
+  } catch (error) {
+    alert('Error: ' + error.message);
+    log('❌ Error:', error.message);
+  }
+}
+
+function playNotificationSound() {
+  try {
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSqGzvLRfzMGH2S77eeXQAoRVq/n7bJiGgU+lNrywn0pBSh+zPDajEULFlqx6P+oUxMJS6Hh8LdgGgU7k9r0xnktBSV7zPDajUMLFlqx6PCkWBMKTaPi8LJeGgU6ktjzx3ktBSR6y+/fjEULFlqw5/CmWhMKTqPl8bhgGQU8k9j0x3ktBSR6y+/fjEQLFVqx6O+pWxMKT6Pm8rxfGgU9lNr0xnksBS17y+/fjEQKFVmw6PCmWhMKT6Pl8bdgGQU9lNn0xnktBSV7y+/gjEQLFVmw6PKlWhIKTqPl8bdgGQU9lNn0xnktBSV7yu/gjEQLFVmw6O+oWxMKTqPi8LZgGgU7k9n0xngtBSV8y+/gjEURFViv6PCmWhMKTaPh8LZhGgU7k9j0xnktBSZ8yu/fjEURFViv5/CmWhMKTqLi8LdeGgU7k9j0xnktBSZ7yu/fjEQRFVmv5+6nWRMKT6Lk8bdeGgU+k9j0xnktBSZ7yu/fjEQRFViv5+6mWhMKT6Lk8bdeGgU+k9j0xnktBSZ7yu/fjEQRFVmv5+6lWhMKTqHj8rdcGQU9k9j0xnktBSZ8y+/gjEQRFViv5+6lWhMKTqDk8bdeGgU9k9n0xngtBSZ7yu/fjEQRFVmw5+6nWhMKT6Hj8rdcGQU9k9j0xngtBSZ7yu/gjEQQFVmv5+6nWhMKT6Hj8rdcGQU9k9j0xnktBSZ7yu/gjEQRFVmv5+6mWhMKTqHi8bdcGgU9k9j0xnktBSZ7yu/fjEQRFViv6O6mWhMKTqHi8bdcGgU9k9j0xnktBSR7yu/fjEQRFVmv6O6nWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/f');
+    audio.volume = 0.5;
+    audio.play().catch(e => console.log('Audio play failed:', e));
+  } catch (e) {
+    console.log('Audio notification failed:', e);
   }
 }
 </script>

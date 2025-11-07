@@ -110,8 +110,8 @@ const addresses = [
 
 // Génère coordonnées aléatoires autour de Sidi Abdellah
 const getRandomLocation = () => {
-  const baseLat = 36.7129;
-  const baseLng = 2.8461;
+  const baseLat = 36.7471166;
+  const baseLng = 6.2740841;
   const offset = 0.01;
   return {
     type: 'Point',
