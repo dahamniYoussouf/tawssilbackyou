@@ -225,14 +225,21 @@ Driver.prototype.hasActiveOrders = function() {
 
 Driver.prototype.addActiveOrder = async function(orderId) {
   if (!this.active_orders.includes(orderId)) {
-    this.active_orders.push(orderId);
+    // ✅ Create a new array instead of mutating
+    this.active_orders = [...this.active_orders, orderId];
     this.status = 'busy';
+    
+    // ✅ Explicitly mark as changed for Sequelize
+    this.changed('active_orders', true);
+    
     await this.save();
+    console.log(`✅ Added order ${orderId} to driver ${this.id}. Active orders:`, this.active_orders);
   }
   return this.active_orders;
 };
 
 Driver.prototype.removeActiveOrder = async function(orderId) {
+  // ✅ Create a new array instead of mutating
   this.active_orders = this.active_orders.filter(id => id !== orderId);
   
   // Si plus de commandes, redevenir disponible
@@ -240,7 +247,12 @@ Driver.prototype.removeActiveOrder = async function(orderId) {
     this.status = 'available';
   }
   
+  // ✅ Explicitly mark as changed
+  this.changed('active_orders', true);
+  
   await this.save();
+  console.log(`✅ Removed order ${orderId} from driver ${this.id}. Remaining:`, this.active_orders);
+  
   return this.active_orders;
 };
 

@@ -190,7 +190,7 @@ export async function notifyNearbyDrivers(orderLat, orderLng, data, radius = 10)
   const nearbyDrivers = await Driver.findAll({
     where: sequelize.literal(`
       status = 'available'
-      AND active_order_id IS NULL
+AND (active_orders IS NULL OR array_length(active_orders, 1) = 0)
       AND current_location IS NOT NULL
       AND ST_DWithin(
         current_location,
