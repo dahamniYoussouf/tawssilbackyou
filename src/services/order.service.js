@@ -713,6 +713,21 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
     throw { status: 404, message: "Driver not found" };
   }
 
+  if (!driver.canAcceptMoreOrders()) {
+  return {
+    orders: [],
+    pagination: {
+      current_page: parseInt(page, 10),
+      total_pages: 0,
+      total_items: 0,
+      items_in_page: 0
+    },
+    driver_location: driver.getCurrentCoordinates(),
+    search_radius_km: (radius / 1000).toFixed(2),
+    message: `You have reached maximum capacity (${driver.active_orders.length}/${driver.max_orders_capacity} orders)`
+  };
+}
+
   if (!driver.current_location) {
     throw { status: 400, message: "Driver location not available. Please enable GPS." };
   }
@@ -920,6 +935,7 @@ export async function scheduleAdminNotificationDriver(orderId) {
 }
 
 export async function driverCancelOrder(orderId, driverId, reason) {
+  // Load data WITHOUT transaction first
   const order = await Order.findByPk(orderId, {
     include: [
       { model: Client, as: 'client' },
@@ -948,38 +964,56 @@ export async function driverCancelOrder(orderId, driverId, reason) {
     throw { status: 404, message: "Driver not found" };
   }
 
+  const previousStatus = order.status;
   const transaction = await sequelize.transaction();
 
   try {
-    const cancellationCount = await driver.incrementCancellations();
-    console.log(`🚫 Driver ${driver.driver_code} cancelled order ${order.order_number} (total: ${cancellationCount})`);
+    // ✅ Calculate new values BEFORE updates
+    const newCancellationCount = driver.cancellation_count + 1;
+    const newActiveOrders = driver.active_orders.filter(id => id !== orderId);
+    const newStatus = newActiveOrders.length === 0 ? 'available' : driver.status;
+    
+    console.log(`🚫 Driver ${driver.driver_code} cancelling order ${order.order_number} (total: ${newCancellationCount})`);
 
-    const previousStatus = order.status;
+    // ✅ FIX: Update driver with ALL changes in ONE call
+    await driver.update({
+      cancellation_count: newCancellationCount,
+      active_orders: newActiveOrders,
+      status: newStatus
+    }, { transaction });
+
+    // ✅ Update order status
     await order.update({
       status: 'preparing',
       livreur_id: null,
       decline_reason: `[DRIVER CANCELLED] ${reason}`
     }, { transaction });
 
-    await driver.removeActiveOrder(orderId);
-    await driver.save({ transaction });
-
+    // ✅ Commit transaction BEFORE notifications
     await transaction.commit();
+    
+    console.log(`✅ Transaction committed successfully for order ${orderId}`);
+    console.log(`📊 Driver now has ${newActiveOrders.length} active orders`);
 
+    // ✅ Reload driver to confirm changes
+    await driver.reload();
+
+    // ✅ Send notifications AFTER transaction commit
     notify('client', order.client_id, {
       type: 'delivery_cancelled',
       orderId: order.id,
       orderNumber: order.order_number,
-      message: `Votre livreur a annulé la livraison. Nous recherchons un nouveau livreur...`,
+      message: `Your driver has cancelled the delivery. We're finding a new driver...`,
       reason: reason
     });
 
+    // Find new driver if was delivering
     if (previousStatus === 'delivering' && order.delivery_location?.coordinates) {
       const [lng, lat] = order.delivery_location.coordinates;
       
-      console.log(`🔄 Recherche d'un nouveau livreur pour la commande ${order.order_number}...`);
+      console.log(`🔄 Finding new driver for order ${order.order_number}...`);
       
-      await notifyNearbyDrivers(lat, lng, {
+      notifyNearbyDrivers(lat, lng, {
         orderId: order.id,
         orderNumber: order.order_number,
         restaurant: order.restaurant.name,
@@ -989,11 +1023,13 @@ export async function driverCancelOrder(orderId, driverId, reason) {
         estimatedTime: order.estimated_delivery_time,
         totalAmount: parseFloat(order.total_amount || 0),
         urgent: true
-      }, 10);
+      }, 10).catch(err => console.error('Error notifying nearby drivers:', err));
     }
 
-    if (driver.shouldNotifyAdmin()) {
-      await createDriverCancellationNotification(driverId, cancellationCount);
+    // Check if admin notification needed
+    if (newCancellationCount >= 3) {
+      createDriverCancellationNotification(driverId, newCancellationCount)
+        .catch(err => console.error('Error creating admin notification:', err));
     }
     
     scheduleAdminNotificationDriver(orderId);
@@ -1003,15 +1039,20 @@ export async function driverCancelOrder(orderId, driverId, reason) {
       driver: {
         id: driver.id,
         name: driver.getFullName(),
-        cancellation_count: cancellationCount
+        cancellation_count: newCancellationCount,
+        active_orders_count: newActiveOrders.length
       }
     };
 
   } catch (error) {
     await transaction.rollback();
+    console.error('❌ Transaction rolled back for order', orderId, error);
     throw error;
   }
 }
+
+
+
 
 async function createDriverCancellationNotification(driverId, cancellationCount) {
   try {

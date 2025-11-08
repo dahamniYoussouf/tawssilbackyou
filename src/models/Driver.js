@@ -185,10 +185,10 @@ Driver.prototype.getCurrentCoordinates = function() {
 };
 
 Driver.prototype.isAvailable = function() {
-  return NOT(this.status === 'available' && 
+  return this.status === 'available' && 
          this.is_active && 
-         this.active_orders.length < this.max_orders_capacity)
-  };
+         this.active_orders.length < this.max_orders_capacity;
+};
 
 
 
@@ -204,7 +204,6 @@ Driver.prototype.updateRating = function(newRating) {
 
 Driver.prototype.incrementCancellations = async function() {
   this.cancellation_count += 1;
-  await this.save();
   return this.cancellation_count;
 };
 
@@ -225,11 +224,9 @@ Driver.prototype.hasActiveOrders = function() {
 
 Driver.prototype.addActiveOrder = async function(orderId) {
   if (!this.active_orders.includes(orderId)) {
-    // ✅ Create a new array instead of mutating
     this.active_orders = [...this.active_orders, orderId];
     this.status = 'busy';
     
-    // ✅ Explicitly mark as changed for Sequelize
     this.changed('active_orders', true);
     
     await this.save();
@@ -239,15 +236,12 @@ Driver.prototype.addActiveOrder = async function(orderId) {
 };
 
 Driver.prototype.removeActiveOrder = async function(orderId) {
-  // ✅ Create a new array instead of mutating
   this.active_orders = this.active_orders.filter(id => id !== orderId);
   
-  // Si plus de commandes, redevenir disponible
   if (this.active_orders.length === 0) {
     this.status = 'available';
   }
   
-  // ✅ Explicitly mark as changed
   this.changed('active_orders', true);
   
   await this.save();

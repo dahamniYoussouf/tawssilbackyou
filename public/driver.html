@@ -758,6 +758,9 @@ async function completeDelivery(orderId) {
   }
 }
 
+// ✅ FIXED: Updated cancelOrder function for driver.html
+// Replace the existing cancelOrder function with this one
+
 async function cancelOrder(orderId) {
   const reason = prompt('⚠️ Why are you canceling this order?\n\nPlease provide a detailed reason (minimum 10 characters):');
   
@@ -781,14 +784,23 @@ async function cancelOrder(orderId) {
     const data = await res.json();
     
     if (res.ok) {
-      log('✅ Order cancelled');
+      log('✅ Order cancelled successfully');
       
+      // Show warning if exists
       if (data.warning) {
         alert('⚠️ ' + data.warning);
       }
       
+      // ✅ FIX: Force reload active orders immediately
       await loadActiveOrders();
-      alert('Order cancelled. The system will find another driver.');
+      
+      // ✅ FIX: Update capacity display
+      updateCapacity();
+      
+      // Show success message
+      alert('Order cancelled successfully. The system will find another driver.');
+      
+      log(`📊 Updated active orders: ${activeOrders.length} remaining`);
     } else {
       alert('Error: ' + (data.message || 'Failed to cancel order'));
       log('❌ Failed:', data.message);
@@ -798,7 +810,6 @@ async function cancelOrder(orderId) {
     log('❌ Error:', error.message);
   }
 }
-
 function playNotificationSound() {
   try {
     const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSqGzvLRfzMGH2S77eeXQAoRVq/n7bJiGgU+lNrywn0pBSh+zPDajEULFlqx6P+oUxMJS6Hh8LdgGgU7k9r0xnktBSV7zPDajUMLFlqx6PCkWBMKTaPi8LJeGgU6ktjzx3ktBSR6y+/fjEULFlqw5/CmWhMKTqPl8bhgGQU8k9j0x3ktBSR6y+/fjEQLFVqx6O+pWxMKT6Pm8rxfGgU9lNr0xnksBS17y+/fjEQKFVmw6PCmWhMKT6Pl8bdgGQU9lNn0xnktBSV7y+/gjEQLFVmw6PKlWhIKTqPl8bdgGQU9lNn0xnktBSV7yu/gjEQLFVmw6O+oWxMKTqPi8LZgGgU7k9n0xngtBSV8y+/gjEURFViv6PCmWhMKTaPh8LZhGgU7k9j0xnktBSZ8yu/fjEURFViv5/CmWhMKTqLi8LdeGgU7k9j0xnktBSZ7yu/fjEQRFVmv5+6nWRMKT6Lk8bdeGgU+k9j0xnktBSZ7yu/fjEQRFViv5+6mWhMKT6Lk8bdeGgU+k9j0xnktBSZ7yu/fjEQRFVmv5+6lWhMKTqHj8rdcGQU9k9j0xnktBSZ8y+/gjEQRFViv5+6lWhMKTqDk8bdeGgU9k9n0xngtBSZ7yu/fjEQRFVmw5+6nWhMKT6Hj8rdcGQU9k9j0xngtBSZ7yu/gjEQQFVmv5+6nWhMKT6Hj8rdcGQU9k9j0xnktBSZ7yu/gjEQRFVmv5+6mWhMKTqHi8bdcGgU9k9j0xnktBSZ7yu/fjEQRFViv6O6mWhMKTqHi8bdcGgU9k9j0xnktBSR7yu/fjEQRFVmv6O6nWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/f');

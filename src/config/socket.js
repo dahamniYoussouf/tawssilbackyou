@@ -172,10 +172,10 @@ export function emit(room, event, data) {
 }
 
 // ========================================
-// NOTIFY NEARBY DRIVERS
+// NOTIFY NEARBY DRIVERS - FIXED VERSION
 // ========================================
 
-export async function notifyNearbyDrivers(orderLat, orderLng, data, radius = 10) {
+export async function notifyNearbyDrivers(orderLat, orderLng, data, radius = 5) {
   if (!io) {
     console.warn('⚠️ Socket.IO not initialized');
     return [];
@@ -185,13 +185,13 @@ export async function notifyNearbyDrivers(orderLat, orderLng, data, radius = 10)
 
   console.log(`🔍 Searching nearby drivers within ${radius} km`);
 
-
-  // 🔍 FIND NEARBY DRIVERS (PostGIS query)
+  // ✅ FIXED: Properly check capacity in SQL query
   const nearbyDrivers = await Driver.findAll({
     where: sequelize.literal(`
       status = 'available'
-AND (active_orders IS NULL OR array_length(active_orders, 1) = 0)
+      AND is_active = true
       AND current_location IS NOT NULL
+      AND (active_orders IS NULL OR array_length(active_orders, 1) < max_orders_capacity)
       AND ST_DWithin(
         current_location,
         ST_GeogFromText('POINT(${orderLng} ${orderLat})'),
@@ -214,10 +214,17 @@ AND (active_orders IS NULL OR array_length(active_orders, 1) = 0)
     order: [[sequelize.literal('distance_meters'), 'ASC']]
   });
 
-  console.log(`✅ Found ${nearbyDrivers.length} nearby drivers`);
+  console.log(`✅ Found ${nearbyDrivers.length} available drivers with capacity`);
 
-  // 🔔 SEND DETAILED NOTIFICATION TO NEARBY DRIVERS
+  // ✅ Send notifications with enhanced data
+  let notifiedCount = 0;
   for (const driver of nearbyDrivers) {
+    // ✅ Double-check capacity using method
+    if (!driver.canAcceptMoreOrders()) {
+      console.log(`⚠️ Skipping driver ${driver.id} - no capacity (${driver.active_orders.length}/${driver.max_orders_capacity})`);
+      continue;
+    }
+
     const distance = (driver.getDataValue('distance_meters') / 1000).toFixed(2);
     const driverRoom = `driver:${driver.id}`;
 
@@ -225,12 +232,17 @@ AND (active_orders IS NULL OR array_length(active_orders, 1) = 0)
       ...data,
       distance,
       distance_km: parseFloat(distance),
+      remaining_capacity: driver.max_orders_capacity - driver.active_orders.length,
+      driver_current_orders: driver.active_orders.length,
       timestamp: new Date().toISOString()
     };
 
     io.to(driverRoom).emit('new_delivery', notificationData);
-    console.log(`📢 Notified driver ${driver.id} (${distance} km)`);
+    notifiedCount++;
+    console.log(`📢 Notified driver ${driver.id} (${distance} km, ${driver.active_orders.length}/${driver.max_orders_capacity} orders)`);
   }
+
+  console.log(`✅ Successfully notified ${notifiedCount} drivers`);
 
   return nearbyDrivers;
 }
