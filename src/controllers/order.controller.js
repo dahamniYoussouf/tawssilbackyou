@@ -522,3 +522,29 @@ export const driverCancelOrder = async (req, res, next) => {
     next(err);
   }
 };
+
+// Driver marks arrival at restaurant
+export const driverArrived = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const order = await orderService.driverArrived(id);
+    res.json({ success: true, message: "Driver marked as arrived at restaurant", data: order });
+  } catch (err) {
+    if (err.status === 404) return res.status(404).json({ success: false, message: err.message });
+    if (err.status === 400) return res.status(400).json({ success: false, message: err.message });
+    next(err);
+  }
+};
+
+// Preview distances/ETAs for driver before accepting
+export const getRoutePreview = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { driver_lat, driver_lng } = req.query;
+    const result = await orderService.getRoutePreview(id, parseFloat(driver_lng), parseFloat(driver_lat));
+    res.json({ success: true, data: result });
+  } catch (err) {
+    if (err.status === 404) return res.status(404).json({ success: false, message: err.message });
+    next(err);
+  }
+};

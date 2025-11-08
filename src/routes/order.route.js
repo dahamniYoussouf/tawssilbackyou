@@ -45,6 +45,8 @@ router.post('/:id/preparing', protect, isRestaurant, getOrderByIdValidator, vali
 router.post('/:id/decline', protect, isRestaurant, declineOrderValidator, validate, orderController.declineOrder);
 router.post('/:id/assign-driver', protect, assignDriverValidator, validate, orderController.assignDriverOrComplete);
 router.post('/:id/start-delivery', protect, isDriver, getOrderByIdValidator, validate, orderController.startDelivering);
+router.post('/:id/arrived', protect, isDriver, getOrderByIdValidator, validate, orderController.driverArrived);
+router.get('/:id/route-preview', protect, isDriver, getOrderByIdValidator, validate, orderController.getRoutePreview);
 router.post('/:id/complete-delivery', protect, isDriver, getOrderByIdValidator, validate, orderController.completeDelivery);
 router.post('/:id/driver-cancel', protect, isDriver, driverCancelOrderValidator,validate, orderController.driverCancelOrder);
 // ==================== RATING ====================

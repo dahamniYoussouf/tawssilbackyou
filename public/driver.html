@@ -283,6 +283,12 @@ function handleNewDelivery(data) {
   const div = document.createElement('div');
   div.className = 'card highlight';
   div.id = `delivery_${data.orderId}`;
+  
+  // ✅ Check if driver can accept more orders
+  const canAccept = activeOrders.length < maxCapacity;
+  const buttonDisabled = canAccept ? '' : 'disabled style="opacity:0.5;cursor:not-allowed"';
+  const buttonText = canAccept ? '✅ Accept Delivery' : '⚠️ At Capacity';
+  
   div.innerHTML = `
     <div class="delivery-badge">NEW!</div>
     <strong class="order-number">Order #${data.orderNumber || data.orderId}</strong>
@@ -292,13 +298,13 @@ function handleNewDelivery(data) {
       <strong>📍 Address:</strong> ${data.deliveryAddress || 'Not specified'}<br>
       <strong>🍴 Restaurant:</strong> ${data.restaurant || 'Restaurant'}
     </div>
-    <button class="success" onclick="acceptDelivery('${data.orderId}')">✅ Accept Delivery</button>
+    <button class="success" onclick="acceptDelivery('${data.orderId}')" ${buttonDisabled}>${buttonText}</button>
   `;
   box.prepend(div);
   
   // Update available count
   const availableCount = document.getElementById('available_count');
-  availableCount.textContent = box.querySelectorAll('.card').length;
+  availableCount.textContent = box.querySelectorAll('.card:not(.capacity-warning)').length;
   
   if ('Notification' in window && Notification.permission === 'granted') {
     new Notification('New Delivery Available! 🚨', {
@@ -310,7 +316,6 @@ function handleNewDelivery(data) {
   
   playNotificationSound();
 }
-
 async function loadActiveOrders() {
   if (!auth.profile?.id) return;
   
@@ -352,6 +357,7 @@ function renderActiveOrders() {
   activeOrders.forEach((order, index) => {
     const div = document.createElement('div');
     div.className = 'card active-order';
+    div.setAttribute('data-order', order.id);
     div.innerHTML = `
       <strong class="order-number">#${order.order_number}</strong>
       <span class="status-badge ${order.status}">${order.status.toUpperCase()}</span>
@@ -380,6 +386,10 @@ function renderActiveOrders() {
       </div>
       
       <div class="order-actions">
+          <button onclick="showRoutePreview('${order.id}')">🔎 Distances</button>
+          ${order.status === 'assigned' ? `<button onclick="markArrived('${order.id}')">📍 Arrived</button>` : ''}
+        </div>
+        <div class='route-preview'></div>
         ${order.status === 'assigned' ? 
           `<button class="success" onclick="startDelivery('${order.id}')">🚀 Start Delivery</button>` : ''}
         ${order.status === 'delivering' ? 
@@ -666,7 +676,46 @@ function updateOnlineStatus() {
     status.innerHTML = '<span class="status-badge offline">🔴 OFFLINE</span>';
   }
 }
-
+// ✅ NEW: Update available delivery buttons based on capacity
+function updateAvailableDeliveryButtons() {
+  const canAcceptMore = activeOrders.length < maxCapacity;
+  
+  // Get all accept buttons in available deliveries
+  const acceptButtons = document.querySelectorAll('#d_deliveries .card button.success');
+  
+  acceptButtons.forEach(button => {
+    if (canAcceptMore) {
+      button.disabled = false;
+      button.style.opacity = '1';
+      button.style.cursor = 'pointer';
+    } else {
+      button.disabled = true;
+      button.style.opacity = '0.5';
+      button.style.cursor = 'not-allowed';
+      button.textContent = '⚠️ At Capacity';
+    }
+  });
+  
+  // Show/hide message
+  if (!canAcceptMore) {
+    const deliveriesBox = document.getElementById('d_deliveries');
+    if (!deliveriesBox.querySelector('.capacity-warning')) {
+      const warning = document.createElement('div');
+      warning.className = 'card capacity-warning';
+      warning.style.background = '#fef3c7';
+      warning.style.borderLeft = '4px solid #f59e0b';
+      warning.innerHTML = `
+        <strong>⚠️ Maximum Capacity Reached</strong><br>
+        <span style="font-size:13px">Complete some deliveries to accept more orders (${activeOrders.length}/${maxCapacity})</span>
+      `;
+      deliveriesBox.prepend(warning);
+    }
+  } else {
+    // Remove warning if it exists
+    const warning = document.querySelector('.capacity-warning');
+    if (warning) warning.remove();
+  }
+}
 async function acceptDelivery(orderId) {
   if (!auth.profile?.id) {
     alert('No driver profile!');
@@ -698,11 +747,14 @@ async function acceptDelivery(orderId) {
       
       // Update available count
       const availableCount = document.getElementById('available_count');
-      const remaining = document.querySelectorAll('#d_deliveries .card').length;
+      const remaining = document.querySelectorAll('#d_deliveries .card:not(.capacity-warning)').length;
       availableCount.textContent = remaining;
       
-      // Reload active orders
+      // ✅ Reload active orders
       await loadActiveOrders();
+      
+      // ✅ NEW: Update available delivery buttons based on new capacity
+      updateAvailableDeliveryButtons();
       
       alert('Delivery accepted! Check your active orders.');
     } else {
@@ -714,7 +766,6 @@ async function acceptDelivery(orderId) {
     log('❌ Error:', e.message);
   }
 }
-
 async function startDelivery(orderId) {
   log('🚀 Starting delivery:', orderId);
   
@@ -747,6 +798,10 @@ async function completeDelivery(orderId) {
     if (res.ok) {
       log('✅ Delivery completed!');
       await loadActiveOrders();
+      
+      // ✅ NEW: Re-enable available delivery buttons
+      updateAvailableDeliveryButtons();
+      
       alert('Delivery completed successfully! 🎉');
     } else {
       const data = await res.json();
@@ -757,7 +812,6 @@ async function completeDelivery(orderId) {
     log('❌ Error:', error.message);
   }
 }
-
 // ✅ FIXED: Updated cancelOrder function for driver.html
 // Replace the existing cancelOrder function with this one
 
@@ -796,7 +850,8 @@ async function cancelOrder(orderId) {
       
       // ✅ FIX: Update capacity display
       updateCapacity();
-      
+      updateAvailableDeliveryButtons();
+
       // Show success message
       alert('Order cancelled successfully. The system will find another driver.');
       
@@ -810,6 +865,23 @@ async function cancelOrder(orderId) {
     log('❌ Error:', error.message);
   }
 }
+// Listen for server warnings about cancellations
+socket.on('driver:cancellation_threshold', (payload) => {
+  const box = document.getElementById('driver_notifications');
+  if (box) {
+    const note = document.createElement('div');
+    note.className = 'order warning';
+    note.style.border = '1px solid #f59e0b';
+    note.style.background = '#fff7ed';
+    note.style.padding = '10px';
+    note.style.borderRadius = '8px';
+    note.style.margin = '6px 0';
+    note.innerHTML = `<strong>⚠️ Attention:</strong> ${payload.message} (annulations: ${payload.cancellation_count})`;
+    box.prepend(note);
+    playNotificationSound();
+  }
+});
+
 function playNotificationSound() {
   try {
     const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSqGzvLRfzMGH2S77eeXQAoRVq/n7bJiGgU+lNrywn0pBSh+zPDajEULFlqx6P+oUxMJS6Hh8LdgGgU7k9r0xnktBSV7zPDajUMLFlqx6PCkWBMKTaPi8LJeGgU6ktjzx3ktBSR6y+/fjEULFlqw5/CmWhMKTqPl8bhgGQU8k9j0x3ktBSR6y+/fjEQLFVqx6O+pWxMKT6Pm8rxfGgU9lNr0xnksBS17y+/fjEQKFVmw6PCmWhMKT6Pl8bdgGQU9lNn0xnktBSV7y+/gjEQLFVmw6PKlWhIKTqPl8bdgGQU9lNn0xnktBSV7yu/gjEQLFVmw6O+oWxMKTqPi8LZgGgU7k9n0xngtBSV8y+/gjEURFViv6PCmWhMKTaPh8LZhGgU7k9j0xnktBSZ8yu/fjEURFViv5/CmWhMKTqLi8LdeGgU7k9j0xnktBSZ7yu/fjEQRFVmv5+6nWRMKT6Lk8bdeGgU+k9j0xnktBSZ7yu/fjEQRFViv5+6mWhMKT6Lk8bdeGgU+k9j0xnktBSZ7yu/fjEQRFVmv5+6lWhMKTqHj8rdcGQU9k9j0xnktBSZ8y+/gjEQRFViv5+6lWhMKTqDk8bdeGgU9k9n0xngtBSZ7yu/fjEQRFVmw5+6nWhMKT6Hj8rdcGQU9k9j0xngtBSZ7yu/gjEQQFVmv5+6nWhMKT6Hj8rdcGQU9k9j0xnktBSZ7yu/gjEQRFVmv5+6mWhMKTqHi8bdcGgU9k9j0xnktBSZ7yu/fjEQRFViv6O6mWhMKTqHi8bdcGgU9k9j0xnktBSR7yu/fjEQRFVmv6O6nWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/fjEQRFVmv5+6mWhMKTqHi8bdeGgU9k9j0xnktBSZ7yu/f');

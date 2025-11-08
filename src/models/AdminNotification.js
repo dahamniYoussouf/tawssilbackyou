@@ -11,7 +11,7 @@ const AdminNotification = sequelize.define('AdminNotification', {
   },
   order_id: {
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true,
     references: {
       model: 'orders',
       key: 'id'
@@ -21,7 +21,7 @@ const AdminNotification = sequelize.define('AdminNotification', {
   },
   restaurant_id: {
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true,
     references: {
       model: 'restaurants',
       key: 'id'
@@ -104,6 +104,7 @@ const AdminNotification = sequelize.define('AdminNotification', {
   indexes: [
     { fields: ['order_id'] },
     { fields: ['restaurant_id'] },
+    { fields: ['driver_id'] }, 
     { fields: ['is_read'] },
     { fields: ['is_resolved'] },
     { fields: ['created_at'] }

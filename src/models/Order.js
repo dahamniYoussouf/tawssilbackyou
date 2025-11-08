@@ -44,6 +44,7 @@ const Order = sequelize.define('Order', {
       "accepted",   // Restaurant accepts
       "preparing",  // Restaurant preparing (auto after 1 min)
       "assigned",   // Driver assigned (for delivery only)
+      "arrived",    // Driver arrived at restaurant
       "delivering", // Driver en route (GPS tracked via driver.current_location)
       "delivered",  // Order completed
       "declined"    // Restaurant declined
@@ -183,7 +184,8 @@ Order.prototype.canTransitionTo = function(newStatus) {
     'pending': ['accepted', 'declined'],
     'accepted': ['preparing'],
     'preparing': ['assigned', 'delivered'], // assigned for delivery, delivered for pickup
-    'assigned': ['delivering'],
+    'assigned': ['arrived', 'delivering'],
+    'arrived': ['delivering'],
     'delivering': ['delivered'],
     'delivered': [],
     'declined': []
@@ -203,6 +205,7 @@ Order.prototype.getTimeInStatus = function() {
     'accepted': 'accepted_at',
     'preparing': 'preparing_started_at',
     'assigned': 'assigned_at',
+    'arrived': 'arrived_at',
     'delivering': 'delivering_started_at',
     'delivered': 'delivered_at'
   }[this.status];

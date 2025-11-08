@@ -96,6 +96,8 @@ button.success:hover{background:#059669}
 <option value="">All Types</option>
 <option value="pending_order_timeout">Pending Order Timeout</option>
 <option value="restaurant_unresponsive">Restaurant Unresponsive</option>
+<option value="driver_excessive_cancellations">Driver Excessive Cancellations</option>
+
 </select>
 </div>
 <button onclick="loadNotifications()">🔄 Apply Filters</button>
@@ -195,7 +197,27 @@ requireInteraction: true
 });
 }
 });
+socket.on('driver_alert', data => {
+  log('🚨 DRIVER ALERT RECEIVED!');
+  log('Data:', JSON.stringify(data));
 
+  showToast('Driver alert: Excessive cancellations!', 'error');
+
+  // Add to list
+  addNotificationToUI(data);
+
+  // Play sound
+  playNotificationSound();
+
+  // Browser notification
+  if (Notification.permission === 'granted') {
+    new Notification('Driver Alert! 🚨', {
+      body: data.message || 'Driver has excessive cancellations',
+      icon: '⚠️',
+      requireInteraction: true
+    });
+  }
+});
 socket.on('disconnect', () => {
 log('❌ Disconnected from server');
 });
@@ -298,61 +320,89 @@ log('❌ Error:', e.message);
 }
 
 function renderNotifications() {
-const box = document.getElementById('notifications_list');
-box.innerHTML = '';
+  const box = document.getElementById('notifications_list');
+  box.innerHTML = '';
 
-if (notifications.length === 0) {
-box.innerHTML = '<div class="empty">No notifications found</div>';
-return;
+  if (notifications.length === 0) {
+    box.innerHTML = '<div class="empty">No notifications found</div>';
+    return;
+  }
+
+  notifications.forEach(n => {
+    const div = document.createElement('div');
+    div.className = `card ${!n.is_read ? 'unread' : ''} ${!n.is_resolved ? 'pending' : ''}`;
+    div.id = `notif-${n.id}`;
+
+    const order = n.order_details || {};
+    const restaurant = n.restaurant_info || {};
+    const driver = n.driver_info || {};  // ✅ NEW
+
+    // ✅ Different rendering based on notification type
+    let detailsHtml = '';
+    
+    if (n.type === 'driver_excessive_cancellations') {
+      // ✅ Driver cancellation notification
+      detailsHtml = `
+        <div class="order-info">
+          <strong>👤 Driver:</strong> ${driver.name || 'N/A'} (${driver.driver_code || 'N/A'})<br>
+          <strong>📞 Phone:</strong> ${driver.phone || 'N/A'}<br>
+          <strong>📧 Email:</strong> ${driver.email || 'N/A'}<br>
+          <strong>🚫 Total Cancellations:</strong> ${driver.cancellation_count || 0}<br>
+          <strong>✅ Total Deliveries:</strong> ${driver.total_deliveries || 0}<br>
+          <strong>⭐ Rating:</strong> ${driver.rating || 'N/A'}<br>
+          <strong>📊 Status:</strong> ${driver.status || 'N/A'}
+        </div>
+      `;
+    } else {
+      // ✅ Order-related notification (existing code)
+      detailsHtml = `
+        <div class="order-info">
+          <strong>📦 Order:</strong> #${order.order_number || 'N/A'}<br>
+          <strong>💰 Amount:</strong> ${order.total_amount || 0} DA<br>
+          <strong>📍 Address:</strong> ${order.delivery_address || 'N/A'}<br>
+          <strong>🍴 Restaurant:</strong> ${restaurant.name || 'N/A'}<br>
+          <strong>📞 Contact:</strong> ${restaurant.phone || 'N/A'}
+        </div>
+      `;
+    }
+
+    div.innerHTML = `
+      <div class="notification-header">
+        <div>
+          <strong style="font-size:16px">${n.type.replace(/_/g, ' ').toUpperCase()}</strong><br>
+          <span class="status-badge ${!n.is_read ? 'unread' : ''}">${n.is_read ? 'Read' : 'Unread'}</span>
+          <span class="status-badge ${!n.is_resolved ? 'unread' : 'resolved'}">${n.is_resolved ? 'Resolved' : 'Pending'}</span>
+        </div>
+        <div style="text-align:right;font-size:12px;color:#666">
+          ${new Date(n.created_at).toLocaleString()}
+        </div>
+      </div>
+
+      <div class="notification-details">
+        <p style="white-space:pre-wrap;margin:0">${n.message}</p>
+      </div>
+
+      ${detailsHtml}
+
+      <div class="action-buttons">
+        ${!n.is_read ? `<button class="success" onclick="markAsRead('${n.id}')">✓ Mark Read</button>` : ''}
+        ${!n.is_resolved && n.type === 'driver_excessive_cancellations' ? `
+          <button class="danger" onclick="resolveNotification('${n.id}', 'suspend_driver')">🚫 Suspend Driver</button>
+          <button class="warning" onclick="resolveNotification('${n.id}', 'reset_cancellations')">🔄 Reset Count</button>
+          <button onclick="resolveNotification('${n.id}', 'warned_driver')">⚠️ Warning Sent</button>
+        ` : ''}
+        ${!n.is_resolved && n.type !== 'driver_excessive_cancellations' ? `
+          <button onclick="resolveNotification('${n.id}', 'force_accept')">✅ Force Accept</button>
+          <button class="danger" onclick="resolveNotification('${n.id}', 'cancel_order')">❌ Cancel Order</button>
+          <button onclick="resolveNotification('${n.id}', 'contacted_restaurant')">📞 Called Restaurant</button>
+        ` : ''}
+        ${n.is_resolved ? `<div style="color:#10b981;font-size:13px">✓ Resolved by admin</div>` : ''}
+      </div>
+    `;
+
+    box.appendChild(div);
+  });
 }
-
-notifications.forEach(n => {
-const div = document.createElement('div');
-div.className = `card ${!n.is_read ? 'unread' : ''} ${!n.is_resolved ? 'pending' : ''}`;
-div.id = `notif-${n.id}`;
-
-const order = n.order_details || {};
-const restaurant = n.restaurant_info || {};
-
-div.innerHTML = `
-<div class="notification-header">
-<div>
-<strong style="font-size:16px">${n.type.replace(/_/g, ' ').toUpperCase()}</strong><br>
-<span class="status-badge ${!n.is_read ? 'unread' : ''}">${n.is_read ? 'Read' : 'Unread'}</span>
-<span class="status-badge ${!n.is_resolved ? 'unread' : 'resolved'}">${n.is_resolved ? 'Resolved' : 'Pending'}</span>
-</div>
-<div style="text-align:right;font-size:12px;color:#666">
-${new Date(n.created_at).toLocaleString()}
-</div>
-</div>
-
-<div class="notification-details">
-<p style="white-space:pre-wrap;margin:0">${n.message}</p>
-</div>
-
-<div class="order-info">
-<strong>📦 Order:</strong> #${order.order_number || 'N/A'}<br>
-<strong>💰 Amount:</strong> ${order.total_amount || 0} DA<br>
-<strong>📍 Address:</strong> ${order.delivery_address || 'N/A'}<br>
-<strong>🍴 Restaurant:</strong> ${restaurant.name || 'N/A'}<br>
-<strong>📞 Contact:</strong> ${restaurant.phone || 'N/A'}
-</div>
-
-<div class="action-buttons">
-${!n.is_read ? `<button class="success" onclick="markAsRead('${n.id}')">✓ Mark Read</button>` : ''}
-${!n.is_resolved ? `
-<button onclick="resolveNotification('${n.id}', 'force_accept')">✅ Force Accept</button>
-<button class="danger" onclick="resolveNotification('${n.id}', 'cancel_order')">❌ Cancel Order</button>
-<button onclick="resolveNotification('${n.id}', 'contacted_restaurant')">📞 Called Restaurant</button>
-` : ''}
-${n.is_resolved ? `<div style="color:#10b981;font-size:13px">✓ Resolved by admin</div>` : ''}
-</div>
-`;
-
-box.appendChild(div);
-});
-}
-
 function addNotificationToUI(data) {
 // Add to array
 const notification = {
@@ -363,7 +413,8 @@ is_read: false,
 is_resolved: false,
 created_at: data.created_at || new Date().toISOString(),
 order_details: data.order || {},
-restaurant_info: data.restaurant || {}
+restaurant_info: data.restaurant || {},
+driver_info: data.driver || {}
 };
 
 notifications.unshift(notification);

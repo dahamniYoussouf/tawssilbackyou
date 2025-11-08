@@ -12,7 +12,17 @@ if (process.env.NODE_ENV === "test") {
     "postgresql://postgres.ruuirjmkvdjonkddxwfi:63bCnsvMf125qUXm@aws-1-eu-north-1.pooler.supabase.com:5432/postgres",
     {
       dialect: "postgres",
+      pool: {
+        max: 20,         // ← augmente si tu as du trafic
+        min: 2,
+        acquire: 20000,  // ← temps max pour obtenir une connexion (ms)
+        idle: 10000,     // ← ferme une connexion idle après 10s
+        evict: 1000      // ← vérifie toutes les 1s pour évictions
+  },
       dialectOptions: {
+            statement_timeout: 15000,   // PG tue les requêtes > 15s
+            idle_in_transaction_session_timeout: 10000,
+            keepAlive: true,
         ssl: {
           require: true,
           rejectUnauthorized: false,
