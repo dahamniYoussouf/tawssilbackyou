@@ -5,7 +5,7 @@ import Client from "../../models/Client.js";
 import Driver from "../../models/Driver.js";
 
 export const getNearbyOrders = async (driverId, filters = {}) => {
-  const { radius = 5000, status = ["preparing"], page = 1, pageSize = 20, min_fee, max_distance } = filters;
+  const { radius = 5000, status = ["preparing", "accepted"], page = 1, pageSize = 20, min_fee, max_distance } = filters;
 
   const driver = await Driver.findByPk(driverId);
   if (!driver) throw { status: 404, message: "Driver not found" };
