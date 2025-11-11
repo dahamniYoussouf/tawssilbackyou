@@ -98,13 +98,15 @@ export async function createOrderWithItems(data) {
     // Calculate estimated delivery time for delivery orders
     let calculatedEstimatedTime = estimated_delivery_time;
     let deliveryDurationMinutes = null;
-    
+                      // Preparation time (average of menu items or default 15 minutes)
+          const prepTime = 15;
+
     if (order_type === 'delivery' && lat && lng) {
       const restaurantCoords = restaurant.location?.coordinates || [];
       
       if (restaurantCoords.length === 2) {
         const [restaurantLng, restaurantLat] = restaurantCoords;
-        
+
         try {
           // Calculate route time (assuming average speed of 40 km/h)
           const route = await calculateRouteTime(
@@ -114,9 +116,6 @@ export async function createOrderWithItems(data) {
             parseFloat(lat), 
             40
           );
-          
-          // Preparation time (average of menu items or default 15 minutes)
-          const prepTime = 15;
           
           // Total delivery time in minutes: prep time + travel time (use max for safety)
           const totalMinutes = prepTime + route.timeMax;
@@ -131,6 +130,8 @@ export async function createOrderWithItems(data) {
           calculatedEstimatedTime = new Date(Date.now() + 45 * 60 * 1000);
         }
       }
+    }else{
+      calculatedEstimatedTime = new Date(Date.now() + prepTime * 60 * 1000);
     }
 
     // Create order
