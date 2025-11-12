@@ -17,7 +17,7 @@ const router = Router();
 router.get("/getall", restaurantCtrl.getAll);
 
 // Protected routes - require client authentication
-router.post("/nearbyfilter", protect, isClient, nearbyFilterValidator, validate, restaurantCtrl.nearbyFilter);
+router.post("/nearbyfilter", protect, nearbyFilterValidator, validate, restaurantCtrl.nearbyFilter);
 router.post("/getnearbynames", protect, isClient, nearbyFilterValidator, validate, restaurantCtrl.getNearbyNames);
 router.get('/details/:restaurantId', protect, isClient, restaurantCtrl.getRestaurantMenu);
 
