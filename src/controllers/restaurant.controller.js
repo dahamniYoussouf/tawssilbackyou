@@ -53,6 +53,36 @@ export const nearbyFilter = async (req, res, next) => {
 };
 
 /**
+ * Filter nearby restaurants with advanced options
+ * ✅ REQUIRES AUTHENTICATION - client_id from JWT
+ */
+export const filter = async (req, res, next) => {
+  try {
+    // Parse categories if it's a string
+    if (req.body.categories && typeof req.body.categories === 'string') {
+      req.body.categories = req.body.categories.split(',').map(c => c.trim());
+    }
+
+    // ✅ Get client_id from JWT token (guaranteed to exist because of isClient middleware)
+    const filters = {
+      ...req.body
+    };
+
+    const result = await restaurantService.filter(filters);
+    
+    res.json({
+      success: true,
+      count: result.count,
+      page: result.page,
+      pageSize: result.pageSize,
+      data: result.formatted,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Get nearby restaurant names only
  * ✅ REQUIRES AUTHENTICATION
  */

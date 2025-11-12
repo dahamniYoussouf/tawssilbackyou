@@ -174,6 +174,84 @@ const formatted = await Promise.all(result.map(async (r) => {
 };
 
 
+export const filter = async (filters = {}) => {
+  const {
+    q,
+    categories,            // string | string[]
+    page = 1,
+    pageSize = 20,
+    sort = "default"       // "default" | "rating" | "name"
+  } = filters;
+
+  const limit = Math.max(1, parseInt(pageSize, 10));
+  const pageNum = Math.max(1, parseInt(page, 10));
+  const offset = (pageNum - 1) * limit;
+
+  const whereConditions = { [Op.and]: [{ is_active: true }] };
+
+  if (q && q.trim()) {
+    whereConditions[Op.and].push({
+      name: { [Op.iLike]: `%${q.trim()}%` }
+    });
+  }
+
+  if (categories && categories.length) {
+    const categoryArray = Array.isArray(categories) ? categories : [categories];
+    whereConditions[Op.and].push({
+      categories: { [Op.overlap]: categoryArray }
+    });
+  }
+
+  let order;
+  switch (sort) {
+    case "rating":
+      order = [["rating", "DESC"], ["is_premium", "DESC"], ["name", "ASC"]];
+      break;
+    case "name":
+      order = [["name", "ASC"]];
+      break;
+    default:
+      order = [["is_premium", "DESC"], ["rating", "DESC"], ["name", "ASC"]];
+  }
+
+  const { rows, count } = await Restaurant.findAndCountAll({
+    where: whereConditions,
+    order,
+    limit,
+    offset
+  });
+
+  const formatted = rows.map((r) => {
+    const coords = r.location?.coordinates || []; // [lon, lat] if present
+    return {
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      address: r.address,
+      lat: coords[1] ?? null,
+      lng: coords[0] ?? null,
+      rating: r.rating,
+      delivery_time_min: null,   // no geo => no ETA
+      delivery_time_max: null,
+      image_url: r.image_url,
+      distance: null,            // no geo => no distance
+      is_premium: r.is_premium,
+      status: r.status,
+      is_open: r.isOpen(),
+      categories: r.categories
+    };
+  });
+
+  return {
+    formatted,
+    count,
+    page: pageNum,
+    pageSize: limit,
+    totalPages: Math.ceil(count / limit) || 1,
+    searchType: "no-location"
+  };
+};
+
 /**
  * Get nearby restaurant names only
  */

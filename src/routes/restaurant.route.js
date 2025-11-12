@@ -1,6 +1,6 @@
 // src/routes/restaurant.route.js
 import { Router } from "express";
-import { protect, isClient, isRestaurant, authorize } from "../middlewares/auth.js";
+import { protect, isClient, isRestaurant, authorize, isAdmin } from "../middlewares/auth.js";
 import * as restaurantCtrl from "../controllers/restaurant.controller.js";
 import { 
   nearbyRestaurantValidator, 
@@ -17,7 +17,8 @@ const router = Router();
 router.get("/getall", restaurantCtrl.getAll);
 
 // Protected routes - require client authentication
-router.post("/nearbyfilter", protect, nearbyFilterValidator, validate, restaurantCtrl.nearbyFilter);
+router.post("/nearbyfilter", protect, isClient, nearbyFilterValidator, validate, restaurantCtrl.nearbyFilter);
+router.post("/filter", protect, isAdmin, restaurantCtrl.filter);
 router.post("/getnearbynames", protect, isClient, nearbyFilterValidator, validate, restaurantCtrl.getNearbyNames);
 router.get('/details/:restaurantId', protect, isClient, restaurantCtrl.getRestaurantMenu);
 
