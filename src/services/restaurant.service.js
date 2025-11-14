@@ -178,6 +178,8 @@ export const filter = async (filters = {}) => {
   const {
     q,
     categories,            // string | string[]
+    status,                // NEW: filter by status
+    address,               // NEW: filter by address
     page = 1,
     pageSize = 20,
     sort = "default"       // "default" | "rating" | "name"
@@ -199,6 +201,20 @@ export const filter = async (filters = {}) => {
     const categoryArray = Array.isArray(categories) ? categories : [categories];
     whereConditions[Op.and].push({
       categories: { [Op.overlap]: categoryArray }
+    });
+  }
+
+  // NEW: Filter by status
+  if (status && status.trim()) {
+    whereConditions[Op.and].push({
+      status: status.trim()
+    });
+  }
+
+  // NEW: Filter by address
+  if (address && address.trim()) {
+    whereConditions[Op.and].push({
+      address: { [Op.iLike]: `%${address.trim()}%` }
     });
   }
 

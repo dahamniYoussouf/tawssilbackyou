@@ -242,7 +242,7 @@ const seedDatabase = async () => {
         last_name: d.last,
         phone: `+21366623${String(i).padStart(4, '0')}`,
         email: `driver${i + 1}@example.com`,
-        vehicle_type: ['motorcycle', 'car', 'scooter'][i % 3],
+        vehicle_type:'motorcycle',
         vehicle_plate: `16-${10000 + i}-22`,
         license_number: `LIC${100000 + i}`,
         status: 'available',

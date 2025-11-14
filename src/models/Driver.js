@@ -51,7 +51,7 @@ const Driver = sequelize.define('Driver', {
     comment: "Driver's email"
   },
   vehicle_type: {
-    type: DataTypes.ENUM('motorcycle', 'car', 'bicycle', 'scooter'),
+    type: DataTypes.ENUM('motorcycle', 'bicycle', 'scooter'),
     allowNull: false,
     comment: "Type of vehicle"
   },
