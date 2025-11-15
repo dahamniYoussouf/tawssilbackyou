@@ -177,47 +177,75 @@ const formatted = await Promise.all(result.map(async (r) => {
 export const filter = async (filters = {}) => {
   const {
     q,
-    categories,            // string | string[]
-    status,                // NEW: filter by status
-    address,               // NEW: filter by address
+    categories,
+    status,
+    address,
+    is_active,      // ✅ NOUVEAU: 'true', 'false', ou undefined
+    is_premium,     // ✅ NOUVEAU: 'true', 'false', ou undefined
+    is_open,        // ✅ NOUVEAU: 'true', 'false', ou undefined (filtré après requête)
     page = 1,
     pageSize = 20,
-    sort = "default"       // "default" | "rating" | "name"
+    sort = "default"
   } = filters;
 
   const limit = Math.max(1, parseInt(pageSize, 10));
   const pageNum = Math.max(1, parseInt(page, 10));
   const offset = (pageNum - 1) * limit;
 
-  const whereConditions = { [Op.and]: [{ is_active: true }] };
+  // Base WHERE conditions
+  const whereConditions = { [Op.and]: [] };
 
+  // Filter by restaurant name
   if (q && q.trim()) {
     whereConditions[Op.and].push({
       name: { [Op.iLike]: `%${q.trim()}%` }
     });
   }
 
-  if (categories && categories.length) {
+  // Filter by categories (using PostgreSQL array operators)
+  if (categories) {
     const categoryArray = Array.isArray(categories) ? categories : [categories];
     whereConditions[Op.and].push({
-      categories: { [Op.overlap]: categoryArray }
+      categories: {
+        [Op.overlap]: categoryArray // Matches restaurants that have ANY of the specified categories
+      }
     });
   }
 
-  // NEW: Filter by status
+  // Filter by status (pending, approved, suspended, archived)
   if (status && status.trim()) {
-    whereConditions[Op.and].push({
-      status: status.trim()
-    });
+    const validStatuses = ['pending', 'approved', 'suspended', 'archived'];
+    if (validStatuses.includes(status.trim())) {
+      whereConditions[Op.and].push({
+        status: status.trim()
+      });
+    }
   }
 
-  // NEW: Filter by address
+  // Filter by address
   if (address && address.trim()) {
     whereConditions[Op.and].push({
       address: { [Op.iLike]: `%${address.trim()}%` }
     });
   }
 
+  // ✅ NOUVEAU: Filter by is_active
+  if (is_active !== undefined && is_active !== null && is_active !== '') {
+    const isActiveValue = is_active === 'true' || is_active === true;
+    whereConditions[Op.and].push({
+      is_active: isActiveValue
+    });
+  }
+
+  // ✅ NOUVEAU: Filter by is_premium
+  if (is_premium !== undefined && is_premium !== null && is_premium !== '') {
+    const isPremiumValue = is_premium === 'true' || is_premium === true;
+    whereConditions[Op.and].push({
+      is_premium: isPremiumValue
+    });
+  }
+
+  // Sorting
   let order;
   switch (sort) {
     case "rating":
@@ -230,15 +258,23 @@ export const filter = async (filters = {}) => {
       order = [["is_premium", "DESC"], ["rating", "DESC"], ["name", "ASC"]];
   }
 
+  // Build WHERE clause
+  const whereClause = whereConditions[Op.and].length > 0 
+    ? whereConditions 
+    : {};
+
+  // Main query
   const { rows, count } = await Restaurant.findAndCountAll({
-    where: whereConditions,
+    where: whereClause,
     order,
     limit,
     offset
   });
 
-  const formatted = rows.map((r) => {
-    const coords = r.location?.coordinates || []; // [lon, lat] if present
+  // Format response
+  let formatted = rows.map((r) => {
+    const coords = r.location?.coordinates || []; // [longitude, latitude]
+
     return {
       id: r.id,
       name: r.name,
@@ -247,23 +283,35 @@ export const filter = async (filters = {}) => {
       lat: coords[1] ?? null,
       lng: coords[0] ?? null,
       rating: r.rating,
-      delivery_time_min: null,   // no geo => no ETA
+      delivery_time_min: null,   // No geo calculation for admin view
       delivery_time_max: null,
       image_url: r.image_url,
-      distance: null,            // no geo => no distance
+      distance: null,             // No distance for admin view
       is_premium: r.is_premium,
+      is_active: r.is_active,     // Include is_active for admin
       status: r.status,
       is_open: r.isOpen(),
-      categories: r.categories
+      categories: r.categories,
+      created_at: r.created_at,
+      updated_at: r.updated_at
     };
   });
 
+  // ✅ NOUVEAU: Filter by is_open (post-query filter since it's calculated)
+  if (is_open !== undefined && is_open !== null && is_open !== '') {
+    const isOpenValue = is_open === 'true' || is_open === true;
+    formatted = formatted.filter(r => r.is_open === isOpenValue);
+  }
+
+  // ✅ IMPORTANT: Recalculate count after is_open filter
+  const finalCount = formatted.length;
+
   return {
     formatted,
-    count,
+    count: finalCount,  // ✅ Use filtered count
     page: pageNum,
     pageSize: limit,
-    totalPages: Math.ceil(count / limit) || 1,
+    totalPages: Math.ceil(finalCount / limit) || 1,
     searchType: "no-location"
   };
 };
