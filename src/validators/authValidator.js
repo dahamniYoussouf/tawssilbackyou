@@ -213,6 +213,11 @@ export const loginValidator = [
   body('password')
     .notEmpty()
     .withMessage('Password is required'),
+  body('type')
+    .notEmpty()
+    .withMessage('Type is required')
+    .isIn(['driver', 'restaurant', 'admin'])
+    .withMessage('Type must be one of: driver, restaurant, admin'),
   body('device_id')
     .optional()
     .trim()

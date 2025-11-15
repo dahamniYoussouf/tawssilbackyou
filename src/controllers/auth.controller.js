@@ -402,10 +402,14 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { email, password, device_id } = req.body;
+    const { email, password, type, device_id } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    if (!type) {
+      return res.status(400).json({ message: 'Type is required' });
     }
 
     const user = await User.findOne({ where: { email } });
@@ -415,6 +419,13 @@ export const login = async (req, res) => {
 
     if (!user.is_active) {
       return res.status(403).json({ message: 'Account is deactivated' });
+    }
+
+    // ===== Check if type matches user's role =====
+    if (user.role !== type) {
+      return res.status(401).json({ 
+        message: `Invalid credentials. This account is registered as ${user.role}` 
+      });
     }
 
     const isValid = await user.comparePassword(password);
