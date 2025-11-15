@@ -180,9 +180,9 @@ export const filter = async (filters = {}) => {
     categories,
     status,
     address,
-    is_active,      // ✅ NOUVEAU: 'true', 'false', ou undefined
-    is_premium,     // ✅ NOUVEAU: 'true', 'false', ou undefined
-    is_open,        // ✅ NOUVEAU: 'true', 'false', ou undefined (filtré après requête)
+    is_active,
+    is_premium,
+    is_open,
     page = 1,
     pageSize = 20,
     sort = "default"
@@ -202,17 +202,17 @@ export const filter = async (filters = {}) => {
     });
   }
 
-  // Filter by categories (using PostgreSQL array operators)
+  // Filter by categories
   if (categories) {
     const categoryArray = Array.isArray(categories) ? categories : [categories];
     whereConditions[Op.and].push({
       categories: {
-        [Op.overlap]: categoryArray // Matches restaurants that have ANY of the specified categories
+        [Op.overlap]: categoryArray
       }
     });
   }
 
-  // Filter by status (pending, approved, suspended, archived)
+  // Filter by status
   if (status && status.trim()) {
     const validStatuses = ['pending', 'approved', 'suspended', 'archived'];
     if (validStatuses.includes(status.trim())) {
@@ -229,7 +229,7 @@ export const filter = async (filters = {}) => {
     });
   }
 
-  // ✅ NOUVEAU: Filter by is_active
+  // Filter by is_active
   if (is_active !== undefined && is_active !== null && is_active !== '') {
     const isActiveValue = is_active === 'true' || is_active === true;
     whereConditions[Op.and].push({
@@ -237,7 +237,7 @@ export const filter = async (filters = {}) => {
     });
   }
 
-  // ✅ NOUVEAU: Filter by is_premium
+  // Filter by is_premium
   if (is_premium !== undefined && is_premium !== null && is_premium !== '') {
     const isPremiumValue = is_premium === 'true' || is_premium === true;
     whereConditions[Op.and].push({
@@ -271,9 +271,12 @@ export const filter = async (filters = {}) => {
     offset
   });
 
+  // ✅ IMPORTANT: Sauvegarder le count AVANT filtrage is_open
+  const totalCount = count;
+
   // Format response
   let formatted = rows.map((r) => {
-    const coords = r.location?.coordinates || []; // [longitude, latitude]
+    const coords = r.location?.coordinates || [];
 
     return {
       id: r.id,
@@ -283,12 +286,12 @@ export const filter = async (filters = {}) => {
       lat: coords[1] ?? null,
       lng: coords[0] ?? null,
       rating: r.rating,
-      delivery_time_min: null,   // No geo calculation for admin view
+      delivery_time_min: null,
       delivery_time_max: null,
       image_url: r.image_url,
-      distance: null,             // No distance for admin view
+      distance: null,
       is_premium: r.is_premium,
-      is_active: r.is_active,     // Include is_active for admin
+      is_active: r.is_active,
       status: r.status,
       is_open: r.isOpen(),
       categories: r.categories,
@@ -297,21 +300,19 @@ export const filter = async (filters = {}) => {
     };
   });
 
-  // ✅ NOUVEAU: Filter by is_open (post-query filter since it's calculated)
+  // Filter by is_open (post-query filter)
   if (is_open !== undefined && is_open !== null && is_open !== '') {
     const isOpenValue = is_open === 'true' || is_open === true;
     formatted = formatted.filter(r => r.is_open === isOpenValue);
   }
 
-  // ✅ IMPORTANT: Recalculate count after is_open filter
-  const finalCount = formatted.length;
-
+  // ✅ CORRECTION: Utiliser totalCount (AVANT is_open filter) pour totalPages
   return {
     formatted,
-    count: finalCount,  // ✅ Use filtered count
+    count: totalCount,  // ✅ Count total (pour l'affichage)
     page: pageNum,
     pageSize: limit,
-    totalPages: Math.ceil(finalCount / limit) || 1,
+    totalPages: Math.ceil(totalCount / limit) || 1, // ✅ Basé sur le count total
     searchType: "no-location"
   };
 };

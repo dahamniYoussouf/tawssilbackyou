@@ -9,26 +9,31 @@ if (process.env.NODE_ENV === "test") {
   });
 } else {
   sequelize = new Sequelize(
-    "postgresql://postgres.ruuirjmkvdjonkddxwfi:63bCnsvMf125qUXm@aws-1-eu-north-1.pooler.supabase.com:5432/postgres",
+    "postgresql://postgres.ruuirjmkvdjonkddxwfi:63bCnsvMf125qUXm@aws-1-eu-north-1.pooler.supabase.com:6543/postgres",
     {
       dialect: "postgres",
       pool: {
-        max: 20,         // ← augmente si tu as du trafic
-        min: 2,
-        acquire: 20000,  // ← temps max pour obtenir une connexion (ms)
+        max: 5,          // ← Pour Transaction Mode (port 6543)
+        min: 0,          // ← Libère les connexions inutilisées
+        acquire: 30000,  // ← temps max pour obtenir une connexion (ms)
         idle: 10000,     // ← ferme une connexion idle après 10s
         evict: 1000      // ← vérifie toutes les 1s pour évictions
-  },
+      },
       dialectOptions: {
-            statement_timeout: 15000,   // PG tue les requêtes > 15s
-            idle_in_transaction_session_timeout: 10000,
-            keepAlive: true,
+        statement_timeout: 15000,   // PG tue les requêtes > 15s
+        idle_in_transaction_session_timeout: 10000,
+        keepAlive: true,
         ssl: {
           require: true,
           rejectUnauthorized: false,
         },
       },
       logging: false,
+      
+      // Retry logic pour gérer les connexions échouées
+      retry: {
+        max: 3  // Réessayer 3 fois en cas d'échec
+      }
     }
   );
 }
@@ -49,4 +54,3 @@ export default sequelize;
 
 // export default sequelize;
 // export { sequelize }
-

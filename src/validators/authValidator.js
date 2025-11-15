@@ -181,12 +181,6 @@ export const registerValidator = [
     .withMessage('is_premium must be a boolean')
     .toBoolean(),
   
-  body('image_url')
-    .if(body('type').equals('restaurant'))
-    .optional()
-    .trim()
-    .isURL()
-    .withMessage('Invalid image URL format'),
   
   body('opening_hours')
     .if(body('type').equals('restaurant'))
