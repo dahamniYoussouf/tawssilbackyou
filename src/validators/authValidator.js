@@ -47,17 +47,17 @@ export const registerValidator = [
     .withMessage('Password is required')
     .isLength({ min: 6 })
     .withMessage('Password must be at least 6 characters long'),
-  body('role')
+  body('type')
     .notEmpty()
-    .withMessage('Role is required')
+    .withMessage('Type is required')
     .isIn(['driver', 'restaurant'])
-    .withMessage('Role must be either driver or restaurant'),
+    .withMessage('Type must be either driver or restaurant'),
   
   // ============================================
   // DRIVER-SPECIFIC VALIDATIONS
   // ============================================
   body('first_name')
-    .if(body('role').equals('driver'))
+    .if(body('type').equals('driver'))
     .notEmpty()
     .withMessage('First name is required for drivers')
     .trim()
@@ -67,7 +67,7 @@ export const registerValidator = [
     .withMessage('First name must be between 2 and 50 characters'),
   
   body('last_name')
-    .if(body('role').equals('driver'))
+    .if(body('type').equals('driver'))
     .notEmpty()
     .withMessage('Last name is required for drivers')
     .trim()
@@ -77,7 +77,7 @@ export const registerValidator = [
     .withMessage('Last name must be between 2 and 50 characters'),
   
   body('phone')
-    .if(body('role').equals('driver'))
+    .if(body('type').equals('driver'))
     .notEmpty()
     .withMessage('Phone is required for drivers')
     .trim()
@@ -85,21 +85,21 @@ export const registerValidator = [
     .withMessage('Invalid phone format'),
   
   body('vehicle_type')
-    .if(body('role').equals('driver'))
+    .if(body('type').equals('driver'))
     .notEmpty()
     .withMessage('Vehicle type is required for drivers')
     .isIn(['motorcycle', 'bicycle', 'scooter'])
     .withMessage('Vehicle type must be one of: motorcycle, bicycle, scooter'),
   
   body('vehicle_plate')
-    .if(body('role').equals('driver'))
+    .if(body('type').equals('driver'))
     .optional()
     .trim()
     .isString()
     .withMessage('Vehicle plate must be a string'),
   
   body('license_number')
-    .if(body('role').equals('driver'))
+    .if(body('type').equals('driver'))
     .optional()
     .trim()
     .isString()
@@ -109,7 +109,7 @@ export const registerValidator = [
   // RESTAURANT-SPECIFIC VALIDATIONS
   // ============================================
   body('name')
-    .if(body('role').equals('restaurant'))
+    .if(body('type').equals('restaurant'))
     .notEmpty()
     .withMessage('Restaurant name is required')
     .trim()
@@ -117,21 +117,21 @@ export const registerValidator = [
     .withMessage('Restaurant name must be between 2 and 100 characters'),
   
   body('lat')
-    .if(body('role').equals('restaurant'))
+    .if(body('type').equals('restaurant'))
     .notEmpty()
     .withMessage('Latitude is required for restaurants')
     .isFloat({ min: -90, max: 90 })
     .withMessage('Latitude must be between -90 and 90'),
   
   body('lng')
-    .if(body('role').equals('restaurant'))
+    .if(body('type').equals('restaurant'))
     .notEmpty()
     .withMessage('Longitude is required for restaurants')
     .isFloat({ min: -180, max: 180 })
     .withMessage('Longitude must be between -180 and 180'),
   
   body('categories')
-    .if(body('role').equals('restaurant'))
+    .if(body('type').equals('restaurant'))
     .notEmpty()
     .withMessage('At least one category is required')
     .isArray({ min: 1 })
@@ -146,14 +146,14 @@ export const registerValidator = [
     }),
   
   body('address')
-    .if(body('role').equals('restaurant'))
+    .if(body('type').equals('restaurant'))
     .optional()
     .trim()
     .isString()
     .withMessage('Address must be a string'),
   
   body('description')
-    .if(body('role').equals('restaurant'))
+    .if(body('type').equals('restaurant'))
     .optional()
     .trim()
     .isString()
@@ -162,34 +162,34 @@ export const registerValidator = [
     .withMessage('Description must be less than 1000 characters'),
   
   body('rating')
-    .if(body('role').equals('restaurant'))
+    .if(body('type').equals('restaurant'))
     .optional()
     .isFloat({ min: 0, max: 5 })
     .withMessage('Rating must be between 0 and 5'),
   
   body('is_active')
-    .if(body('role').equals('restaurant'))
+    .if(body('type').equals('restaurant'))
     .optional()
     .isBoolean()
     .withMessage('is_active must be a boolean')
     .toBoolean(),
   
   body('is_premium')
-    .if(body('role').equals('restaurant'))
+    .if(body('type').equals('restaurant'))
     .optional()
     .isBoolean()
     .withMessage('is_premium must be a boolean')
     .toBoolean(),
   
   body('image_url')
-    .if(body('role').equals('restaurant'))
+    .if(body('type').equals('restaurant'))
     .optional()
     .trim()
     .isURL()
     .withMessage('Invalid image URL format'),
   
   body('opening_hours')
-    .if(body('role').equals('restaurant'))
+    .if(body('type').equals('restaurant'))
     .optional()
     .isObject()
     .withMessage('Opening hours must be a JSON object'),

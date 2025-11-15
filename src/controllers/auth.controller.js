@@ -280,11 +280,11 @@ export const logout = async (req, res) => {
 
 export const register = async (req, res) => {
   try {
-    const { email, password, role, ...profileData } = req.body;
+    const { email, password, type, ...profileData } = req.body;
 
-    if (!['driver', 'restaurant'].includes(role)) {
+    if (!['driver', 'restaurant'].includes(type)) {
       return res.status(400).json({
-        message: 'Invalid role. Must be driver or restaurant'
+        message: 'Invalid type. Must be driver or restaurant'
       });
     }
 
@@ -293,10 +293,12 @@ export const register = async (req, res) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
+    // Map type to role for User model
+    const role = type;
     const user = await User.create({ email, password, role });
 
     let profile;
-    switch (role) {
+    switch (type) {
       case 'driver':
         profile = await Driver.create({
           user_id: user.id,
