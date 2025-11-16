@@ -111,7 +111,7 @@ async function restaurantLogin() {
   try {
     const r = await apiFetch('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password, type:'admin' })
+      body: JSON.stringify({ email, password, type:'restaurant' })
     });
     const j = await r.json();
 

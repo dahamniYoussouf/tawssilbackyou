@@ -40,9 +40,9 @@ router.get('/:id/tracking', protect, getOrderByIdValidator, validate, orderContr
 
 // ==================== STATUS TRANSITIONS ====================
 
-router.post('/:id/accept', protect, isRestaurant, getOrderByIdValidator, validate, orderController.acceptOrder);
+router.post('/:id/accept', protect, getOrderByIdValidator, validate, orderController.acceptOrder);
 router.post('/:id/preparing', protect, isRestaurant, getOrderByIdValidator, validate, orderController.startPreparingOrder);
-router.post('/:id/decline', protect, isRestaurant, declineOrderValidator, validate, orderController.declineOrder);
+router.post('/:id/decline', protect, declineOrderValidator, validate, orderController.declineOrder);
 router.post('/:id/assign-driver', protect, assignDriverValidator, validate, orderController.assignDriverOrComplete);
 router.post('/:id/start-delivery', protect, isDriver, getOrderByIdValidator, validate, orderController.startDelivering);
 router.post('/:id/arrived', protect, isDriver, getOrderByIdValidator, validate, orderController.driverArrived);

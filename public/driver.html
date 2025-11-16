@@ -470,7 +470,7 @@ async function driverLogin() {
     const r = await fetch('/auth/login', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({email, password, type:'admin'})
+      body: JSON.stringify({email, password, type:'driver'})
     });
     
     const j = await r.json();
