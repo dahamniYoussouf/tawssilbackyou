@@ -117,6 +117,7 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
 
   const driver = await Driver.findByPk(driverId);
   if (!driver) throw { status: 400, message: "Driver not found" };
+  if (!driver.is_verified) throw { status: 400, message: "Driver account is not verified" };
 
   const canAccept = await canDriverAcceptOrder(driverId, orderId);
   if (!canAccept.canAccept) {

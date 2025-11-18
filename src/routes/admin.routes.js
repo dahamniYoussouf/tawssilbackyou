@@ -38,4 +38,18 @@ router.post('/drivers/:id/suspend', adminCtrl.suspendDriver);
 router.get('/config/delivery', getDeliveryConfig);
 router.put('/config/delivery/max-orders', updateMaxOrdersValidator, validate, updateMaxOrders);
 router.put('/config/delivery/max-distance', updateMaxDistanceValidator, validate, updateMaxDistance);
+
+// Add these routes to src/routes/admin.routes.js
+
+// Get all admins (super_admin only)
+router.get('/getall', protect, authorize('admin'), adminCtrl.getAllAdmins);
+
+// Update admin
+router.put('/update/:id', protect, authorize('admin'), adminCtrl.updateAdmin);
+
+// Delete admin
+router.delete('/delete/:id', protect, authorize('admin'), adminCtrl.deleteAdmin);
+
+// Add this route
+router.post('/create', protect, authorize('admin'), adminCtrl.createAdmin);
 export default router;

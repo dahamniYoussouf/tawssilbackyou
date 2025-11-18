@@ -187,6 +187,7 @@ Driver.prototype.getCurrentCoordinates = function() {
 Driver.prototype.isAvailable = function() {
   return this.status === 'available' && 
          this.is_active && 
+         this.is_verified &&
          this.active_orders.length < this.max_orders_capacity;
 };
 
@@ -214,7 +215,8 @@ Driver.prototype.shouldNotifyAdmin = function() {
 
 Driver.prototype.canAcceptMoreOrders = function() {
   return this.status === 'available' && 
-         this.is_active && 
+         this.is_active &&
+         this.is_verified && 
          this.active_orders.length < this.max_orders_capacity;
 };
 

@@ -77,6 +77,7 @@ export const filterNearbyRestaurants = async (filters) => {
   const whereConditions = {
     [Op.and]: [
       { is_active: true },
+      { status: 'approved' },
       literal(
         `ST_DWithin(location, ST_GeogFromText('POINT(${longitude} ${latitude})'), ${searchRadius})`
       )

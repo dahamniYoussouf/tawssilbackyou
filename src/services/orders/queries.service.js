@@ -2,9 +2,9 @@ import { Op } from "sequelize";
 import Order from "../../models/Order.js";
 import Restaurant from "../../models/Restaurant.js";
 import Client from "../../models/Client.js";
+import Driver from "../../models/Driver.js";
 import OrderItem from "../../models/OrderItem.js";
 import MenuItem from "../../models/MenuItem.js";
-import Driver from "../../models/Driver.js";
 
 export async function getAllOrdersService(filters = {}) {
   const {
@@ -37,9 +37,10 @@ export async function getAllOrdersService(filters = {}) {
   const { count, rows } = await Order.findAndCountAll({
     where,
     include: [
+            { model: OrderItem, as: "order_items", include: [{ model: MenuItem, as: "menu_item" }] },
       { model: Restaurant, as: "restaurant", attributes: ["id", "name", "image_url"] },
       { model: Client, as: "client", attributes: ["id", "first_name", "last_name", "email"] },
-      { model: Driver, as: "driver", attributes: ["id", "first_name", "last_name", "phone", "current_location"] },
+      { model: Driver, as: "driver", attributes: ["id", "first_name", "last_name", "phone", "current_location"] }
     ],
     order: [["created_at", "DESC"]],
     limit: +limit,
@@ -51,10 +52,11 @@ export async function getAllOrdersService(filters = {}) {
     pagination: {
       current_page: +page,
       total_pages: Math.ceil(count / limit),
-      total_items: count,
-    },
+      total_items: count
+    }
   };
 }
+
 
 export async function getOrderByIdService(id) {
   const order = await Order.findByPk(id, {

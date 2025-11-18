@@ -190,6 +190,7 @@ export async function notifyNearbyDrivers(orderLat, orderLng, data, radius = 5) 
     where: sequelize.literal(`
       status = 'available'
       AND is_active = true
+      AND is_verified = true
       AND current_location IS NOT NULL
       AND (active_orders IS NULL OR array_length(active_orders, 1) < max_orders_capacity)
       AND ST_DWithin(

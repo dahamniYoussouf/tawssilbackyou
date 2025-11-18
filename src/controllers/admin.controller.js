@@ -8,6 +8,9 @@ import {
 } from '../services/multiDeliveryService.js';
 import SystemConfig from '../models/SystemConfig.js';
 import { emit } from '../config/socket.js';
+import bcrypt from 'bcryptjs';
+import User from '../models/User.js';
+
 
 /**
  * GET /admin/notifications
@@ -518,6 +521,123 @@ export const updateMaxDistance = async (req, res, next) => {
         max_distance_between_restaurants: max_distance,
         updated_at: config.updated_at
       }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+// Add to src/controllers/admin.controller.js
+
+export const getAllAdmins = async (req, res, next) => {
+  try {
+    const admins = await Admin.findAll({
+      order: [['created_at', 'DESC']],
+      attributes: { exclude: [] }
+    });
+
+    res.json({
+      success: true,
+      data: admins
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateAdmin = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { first_name, last_name, email, phone, role_level, is_active } = req.body;
+
+    const admin = await Admin.findByPk(id);
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found"
+      });
+    }
+
+    await admin.update({
+      first_name,
+      last_name,
+      email,
+      phone,
+      role_level,
+      is_active
+    });
+
+    res.json({
+      success: true,
+      message: "Admin updated successfully",
+      data: admin
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deleteAdmin = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    const admin = await Admin.findByPk(id);
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found"
+      });
+    }
+
+    await admin.destroy();
+
+    res.json({
+      success: true,
+      message: "Admin deleted successfully"
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+export const createAdmin = async (req, res, next) => {
+  try {
+    const { first_name, last_name, email, phone, password, role_level, is_active } = req.body;
+
+    // Check if email already exists
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "Cet email est déjà utilisé"
+      });
+    }
+
+    // Create user account
+    const user = await User.create({
+      email,
+      password, // Will be hashed by the model hook
+      role: 'admin',
+      is_active: is_active ?? true
+    });
+
+    // Create admin profile
+    const admin = await Admin.create({
+      user_id: user.id,
+      first_name,
+      last_name,
+      email,
+      phone: phone || null,
+      role_level: role_level || 'admin',
+      is_active: is_active ?? true
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Administrateur créé avec succès",
+      data: admin
     });
   } catch (err) {
     next(err);
