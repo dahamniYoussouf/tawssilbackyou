@@ -257,3 +257,37 @@ export const getRestaurantStatistics = async (req, res, next) => {
     next(err);
   }
 };
+
+
+/**
+ * Get restaurant's own profile
+ * GET /api/restaurants/profile
+ */
+export const getProfile = async (req, res, next) => {
+  try {
+    // Get restaurant_id from JWT token
+    const restaurantId = req.user.restaurant_id;
+    
+    if (!restaurantId) {
+      return res.status(400).json({
+        success: false,
+        error: "Restaurant profile not found in token"
+      });
+    }
+
+    const profile = await restaurantService.getRestaurantProfile(restaurantId);
+
+    res.json({
+      success: true,
+      data: profile
+    });
+  } catch (err) {
+    if (err.message === 'Restaurant not found') {
+      return res.status(404).json({
+        success: false,
+        message: err.message
+      });
+    }
+    next(err);
+  }
+};

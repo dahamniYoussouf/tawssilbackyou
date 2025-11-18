@@ -665,3 +665,42 @@ export const getRestaurantStatistics = async (restaurantId, filters = {}) => {
     }
   };
 };
+
+/**
+ * Get restaurant's complete profile data
+ */
+export const getRestaurantProfile = async (id) => {
+  const restaurant = await Restaurant.findOne({ 
+    where: { id }
+  });
+
+  if (!restaurant) {
+    throw new Error("Restaurant not found");
+  }
+
+  const coords = restaurant.location?.coordinates || [];
+
+  return {
+    id: restaurant.id,
+    user_id: restaurant.user_id,
+    name: restaurant.name,
+    description: restaurant.description,
+    address: restaurant.address,
+    location: {
+      type: restaurant.location?.type || null,
+      coordinates: restaurant.location?.coordinates || null,
+      lat: coords[1] || null,
+      lng: coords[0] || null
+    },
+    rating: restaurant.rating ? parseFloat(restaurant.rating) : 0.0,
+    image_url: restaurant.image_url,
+    is_active: restaurant.is_active,
+    is_premium: restaurant.is_premium,
+    status: restaurant.status,
+    opening_hours: restaurant.opening_hours,
+    categories: restaurant.categories,
+    is_open: restaurant.isOpen(),
+    created_at: restaurant.created_at,
+    updated_at: restaurant.updated_at
+  };
+};

@@ -15,6 +15,8 @@ const router = Router();
 
 // Public routes (no auth needed for browsing basic info)
 router.get("/getall", restaurantCtrl.getAll);
+// Add this line with other restaurant management routes
+router.get("/profile/me", protect, isRestaurant, restaurantCtrl.getProfile);
 
 // Protected routes - require client authentication
 router.post("/nearbyfilter", protect, isClient, nearbyFilterValidator, validate, restaurantCtrl.nearbyFilter);
