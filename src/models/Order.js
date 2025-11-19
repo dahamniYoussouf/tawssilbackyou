@@ -66,6 +66,11 @@ const Order = sequelize.define('Order', {
     type: DataTypes.DECIMAL(10, 2),
     defaultValue: 0,
   },
+   delivery_distance: {
+    type: DataTypes.DECIMAL(10, 2), // en kilomètres
+    allowNull: true,
+    comment: 'Distance in kilometers between restaurant and delivery location'
+  },
   total_amount: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: true,

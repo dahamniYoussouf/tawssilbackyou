@@ -98,7 +98,8 @@ export async function createOrderWithItems(data) {
     // Calculate estimated delivery time for delivery orders
     let calculatedEstimatedTime = estimated_delivery_time;
     let deliveryDurationMinutes = null;
-                      // Preparation time (average of menu items or default 15 minutes)
+    let distanceKm = null;
+    // Preparation time (average of menu items or default 15 minutes)
           const prepTime = 15;
 
     if (order_type === 'delivery' && lat && lng) {
@@ -116,7 +117,7 @@ export async function createOrderWithItems(data) {
             parseFloat(lat), 
             40
           );
-          
+          const distanceKm = route.distanceKm; 
           // Total delivery time in minutes: prep time + travel time (use max for safety)
           const totalMinutes = prepTime + route.timeMax;
           deliveryDurationMinutes = totalMinutes;
@@ -141,6 +142,7 @@ export async function createOrderWithItems(data) {
       order_type,
       delivery_address: order_type === 'delivery' ? delivery_address : null,
       delivery_fee: order_type === 'delivery' ? delivery_fee : 0,
+      delivery_distance: order_type === 'delivery' ? distanceKm : null, 
       subtotal,
       payment_method,
       delivery_instructions,
@@ -197,7 +199,8 @@ export async function createOrderWithItems(data) {
     // Return complete order with delivery duration
     return {
       ...completeOrder.toJSON(),
-      delivery_duration_minutes: deliveryDurationMinutes
+      delivery_duration_minutes: deliveryDurationMinutes,
+      delivery_distance_km: distanceKm
     };
 
   } catch (error) {
