@@ -20,7 +20,7 @@ const generateAccessToken = (userId, role) => {
   return jwt.sign(
     { id: userId, role, type: 'access' },
     process.env.JWT_SECRET || 'your-secret-key',
-    { expiresIn: '30d' } // Short-lived for security
+    { expiresIn: '1d' } // Short-lived for security
   );
 };
 
@@ -472,7 +472,7 @@ export const login = async (req, res) => {
         type: 'access'
       },
       process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '15m' }
+      { expiresIn: '1d' }
     );
 
     const refreshToken = jwt.sign(
