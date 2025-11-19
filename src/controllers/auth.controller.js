@@ -354,6 +354,7 @@ export const register = async (req, res) => {
           name: profileData.name || 'New Restaurant',
           description: profileData.description || null,
           address: profileData.address || null,
+          phone_number: profileData.phone_number || profileData.phone || null,
           location: {
             type: 'Point',
             coordinates: [longitude, latitude]
