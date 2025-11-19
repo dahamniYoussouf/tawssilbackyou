@@ -94,6 +94,7 @@ export async function startPreparing(orderId) {
   });
 }
 
+
 export async function assignDriverOrComplete(orderId, driverId = null) {
   const order = await Order.findByPk(orderId, {
     include: [{ model: Client, as: "client" }, { model: Restaurant, as: "restaurant" }],
@@ -124,13 +125,52 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
     throw { status: 400, message: canAccept.reason || "Driver cannot accept this order" };
   }
 
+  // ✅ CALCULER LA DISTANCE ET LE TEMPS ENTRE RESTAURANT ET DRIVER
+  let routeInfo = null;
+  
+  try {
+    const restaurantCoords = order.restaurant.getCoordinates();
+    const driverCoords = driver.getCurrentCoordinates();
+    
+    if (restaurantCoords && driverCoords) {
+      const route = await calculateRouteTime(
+        driverCoords.longitude,
+        driverCoords.latitude,
+        restaurantCoords.longitude,
+        restaurantCoords.latitude,
+        40 // Vitesse moyenne: 40 km/h
+      );
+      
+      routeInfo = {
+        distance_Driver_to_restaurant_km: route.distanceKm,
+        estimated_Driver_to_restaurant_time_min: route.timeMin,
+        estimated_Driver_to_restaurant_time_max: route.timeMax
+      };
+      
+      console.log(`📍 Route Driver→Restaurant: ${route.distanceKm} km, ~${route.timeMax} min`);
+    } else {
+      console.warn('⚠️ Missing coordinates for driver or restaurant');
+    }
+  } catch (error) {
+    console.error('Route calculation failed:', error.message);
+    // Continue même si le calcul échoue
+  }
+
   await order.update({ status: "assigned", livreur_id: driverId });
   await driver.addActiveOrder(orderId);
 
   notify("client", order.client_id, {
     type: "driver_assigned",
     orderId: order.id,
-    driver: { name: driver.getFullName(), phone: driver.phone, vehicle: driver.vehicle_type },
+    driver: { 
+      name: driver.getFullName(), 
+      phone: driver.phone, 
+      vehicle: driver.vehicle_type,
+      ...(routeInfo && { 
+        distance_to_restaurant_km: routeInfo.distance_km,
+        estimated_arrival_min: routeInfo.estimated_time_max
+      })
+    },
   });
 
   notify("driver", driverId, {
@@ -140,9 +180,14 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
     restaurant: order.restaurant.name,
     deliveryAddress: order.delivery_address,
     active_orders_count: driver.getActiveOrdersCount(),
+    ...(routeInfo && { route_to_restaurant: routeInfo })
   });
 
-  return order;
+  // ✅ RETOURNER L'ORDER AVEC LES INFOS DE ROUTE
+  return {
+    ...order.toJSON(),
+    driver_to_restaurant_route: routeInfo
+  };
 }
 
 export async function startDelivering(orderId) {
