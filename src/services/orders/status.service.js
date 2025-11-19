@@ -94,7 +94,6 @@ export async function startPreparing(orderId) {
   });
 }
 
-
 export async function assignDriverOrComplete(orderId, driverId = null) {
   const order = await Order.findByPk(orderId, {
     include: [{ model: Client, as: "client" }, { model: Restaurant, as: "restaurant" }],
@@ -167,7 +166,7 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
       vehicle: driver.vehicle_type,
       ...(routeInfo && { 
         distance_to_restaurant_km: routeInfo.distance_km,
-        estimated_arrival_min: routeInfo.estimated_time_max
+        estimated_arrival_min: routeInfo.estimated_time  // ❌ FIX: était estimated_time_max
       })
     },
   });
@@ -185,8 +184,8 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
   // ✅ RETOURNER L'ORDER AVEC LES INFOS DE ROUTE
   return {
     ...order.toJSON(),
-    driver_to_restaurant_route: routeInfo
-  };
+  distance_driver_to_restaurant_km: routeInfo?.distance_km,          
+  estimated_time_driver_to_restaurant: routeInfo?.estimated_time  };
 }
 
 export async function startDelivering(orderId) {
