@@ -32,6 +32,11 @@ const Restaurant = sequelize.define('Restaurant', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+    phone_number: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    comment: 'Restaurant contact phone number'
+  },
   location:
   process.env.NODE_ENV === "test"
         ? {
