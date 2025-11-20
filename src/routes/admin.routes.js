@@ -52,4 +52,119 @@ router.delete('/delete/:id', protect, authorize('admin'), adminCtrl.deleteAdmin)
 
 // Add this route
 router.post('/create', protect, authorize('admin'), adminCtrl.createAdmin);
+
+// Dans src/routes/admin.routes.js
+
+// Get all favorite restaurants (admin view)
+router.get('/favorites/restaurants', protect, authorize('admin'), async (req, res, next) => {
+  try {
+    const { client_id, search, page = 1, limit = 20 } = req.query;
+    
+    const token = req.headers.authorization;
+    const where = client_id ? { client_id } : {};
+    
+    const FavoriteRestaurant = (await import('../models/FavoriteRestaurant.js')).default;
+    const Restaurant = (await import('../models/Restaurant.js')).default;
+    const Client = (await import('../models/Client.js')).default;
+    
+    const favorites = await FavoriteRestaurant.findAll({
+      where,
+      include: [
+        { 
+          model: Restaurant, 
+          as: 'restaurant',
+          attributes: ['id', 'name', 'description', 'address', 'rating', 'image_url', 'is_premium', 'status']
+        },
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'first_name', 'last_name', 'email', 'phone_number']
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit)
+    });
+    
+    res.json({
+      success: true,
+      count: favorites.length,
+      data: favorites
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Get all favorite meals (admin view)
+router.get('/favorites/meals', protect, authorize('admin'), async (req, res, next) => {
+  try {
+    const { client_id, search, page = 1, limit = 20 } = req.query;
+    
+    const where = client_id ? { client_id } : {};
+    
+    const FavoriteMeal = (await import('../models/FavoriteMeal.js')).default;
+    const MenuItem = (await import('../models/MenuItem.js')).default;
+    const Restaurant = (await import('../models/Restaurant.js')).default;
+    const Client = (await import('../models/Client.js')).default;
+    
+    const favorites = await FavoriteMeal.findAll({
+      where,
+      include: [
+        { 
+          model: MenuItem, 
+          as: 'meal',
+          attributes: ['id', 'nom', 'description', 'prix', 'photo_url', 'category_id'],
+          include: [
+            {
+              model: Restaurant,
+              as: 'restaurant',
+              attributes: ['id', 'name', 'address', 'rating', 'image_url']
+            }
+          ]
+        },
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'first_name', 'last_name', 'email', 'phone_number']
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit)
+    });
+    
+    res.json({
+      success: true,
+      count: favorites.length,
+      data: favorites
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Get favorites statistics
+router.get('/favorites/stats', protect, authorize('admin'), async (req, res, next) => {
+  try {
+    const FavoriteRestaurant = (await import('../models/FavoriteRestaurant.js')).default;
+    const FavoriteMeal = (await import('../models/FavoriteMeal.js')).default;
+    
+    const [restaurantCount, mealCount] = await Promise.all([
+      FavoriteRestaurant.count(),
+      FavoriteMeal.count()
+    ]);
+    
+    res.json({
+      success: true,
+      data: {
+        total_favorite_restaurants: restaurantCount,
+        total_favorite_meals: mealCount,
+        total_favorites: restaurantCount + mealCount
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 export default router;
