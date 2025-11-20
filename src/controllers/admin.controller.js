@@ -768,3 +768,66 @@ export const getFavoritesStats = async (req, res, next) => {
     next(err);
   }
 };
+
+
+
+// Add to src/controllers/admin.controller.js
+
+/**
+ * POST /admin/notify/drivers
+ * Broadcast a notification to ALL drivers
+ */
+export const notifyAllDrivers = async (req, res, next) => {
+  try {
+    const { message, title, type = 'info', data = {} } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        message: "Message is required"
+      });
+    }
+
+    // Get all active drivers
+    const Driver = (await import('../models/Driver.js')).default;
+    const drivers = await Driver.findAll({
+      where: {
+        is_active: true,
+        status: ['available', 'busy'] // Only notify active/working drivers
+      },
+      attributes: ['id', 'first_name', 'last_name', 'status']
+    });
+
+    // Broadcast notification via Socket.IO
+    const { emit } = await import('../config/socket.js');
+    
+    const notificationPayload = {
+      type: type,
+      title: title || 'Admin Notification',
+      message: message,
+      timestamp: new Date().toISOString(),
+      ...data
+    };
+
+    // Send to all drivers room
+    emit('drivers', 'admin_broadcast', notificationPayload);
+
+    // Also send to individual driver rooms for reliability
+    drivers.forEach(driver => {
+      emit(`driver:${driver.id}`, 'admin_broadcast', notificationPayload);
+    });
+
+    console.log(`✅ Broadcast notification sent to ${drivers.length} drivers`);
+
+    res.json({
+      success: true,
+      message: `Notification sent to ${drivers.length} drivers`,
+      data: {
+        recipients_count: drivers.length,
+        notification: notificationPayload
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};

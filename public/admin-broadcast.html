@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin - Broadcast Notifications</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{font-family:Arial,Helvetica,sans-serif;background:#f4f6fa;margin:0;padding:20px;min-height:100vh}
+.container{max-width:800px;margin:0 auto}
+h1{text-align:center;color:#0f62fe;margin-bottom:30px}
+.section{background:#fff;padding:20px;border-radius:10px;box-shadow:0 4px 10px rgba(0,0,0,.1);margin-bottom:20px}
+h2{margin-top:0;color:#0f62fe;font-size:18px;border-bottom:2px solid #e5e7eb;padding-bottom:10px}
+input,button,select,textarea{width:100%;padding:10px;margin:6px 0;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;font-size:14px}
+textarea{min-height:100px;resize:vertical;font-family:inherit}
+button{background:#0f62fe;color:#fff;font-weight:bold;cursor:pointer;border:none}
+button:hover{background:#084cd2}
+button:disabled{background:#ccc;cursor:not-allowed}
+.status-badge{display:inline-block;background:#eef2ff;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:bold;color:#0f62fe;margin:4px 0}
+.status-badge.success{background:#d1fae5;color:#065f46}
+.status-badge.error{background:#fee2e2;color:#991b1b}
+.log{background:#0b1020;color:#d1fae5;padding:15px;border-radius:6px;max-height:300px;overflow:auto;font-family:monospace;font-size:12px}
+.toast{position:fixed;top:20px;right:20px;background:#10b981;color:#fff;padding:15px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.2);animation:slideIn 0.3s;z-index:1000}
+.toast.error{background:#dc2626}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.info-box{background:#eef2ff;border-left:4px solid #0f62fe;padding:12px;border-radius:6px;margin:15px 0;font-size:14px}
+.example{background:#f9fafb;padding:10px;border-radius:6px;margin:10px 0;font-size:13px;border:1px solid #e5e7eb}
+.example strong{color:#0f62fe}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>📢 Broadcast Notifications to Drivers</h1>
+
+<!-- Login Section -->
+<div class="section">
+<h2>🔐 Admin Login</h2>
+<input id="admin_email" type="email" placeholder="Email" value="admin1@example.com">
+<input id="admin_password" type="password" placeholder="Password" value="password123">
+<button onclick="adminLogin()">Login as Admin</button>
+<div id="login_status" class="status-badge" style="display:none;margin-top:10px"></div>
+</div>
+
+<!-- Broadcast Form -->
+<div class="section" id="broadcast_section" style="display:none">
+<h2>📣 Send Notification to All Drivers</h2>
+
+<div class="info-box">
+<strong>ℹ️ Note:</strong> This will send a notification to ALL active drivers (available and busy).
+</div>
+
+<label><strong>Notification Type:</strong></label>
+<select id="notif_type">
+<option value="info">ℹ️ Info</option>
+<option value="warning">⚠️ Warning</option>
+<option value="urgent">🚨 Urgent</option>
+<option value="announcement">📢 Announcement</option>
+</select>
+
+<label><strong>Title:</strong></label>
+<input id="notif_title" placeholder="e.g., Important Update" value="Admin Announcement">
+
+<label><strong>Message:</strong></label>
+<textarea id="notif_message" placeholder="Enter your message here...">All drivers: Please ensure your GPS is enabled for accurate tracking.</textarea>
+
+<button onclick="sendBroadcast()" id="send_btn" disabled>📤 Send to All Drivers</button>
+
+<div class="example">
+<strong>Example Messages:</strong><br>
+• "System maintenance scheduled at 2 AM tonight"<br>
+• "New delivery policy: Maximum 5 orders per driver"<br>
+• "Urgent: Severe weather alert - Drive safely"
+</div>
+</div>
+
+<!-- Activity Log -->
+<div class="section" id="log_section" style="display:none">
+<h2>📊 Activity Log</h2>
+<pre id="activity_log" class="log">Waiting for connection...</pre>
+</div>
+</div>
+
+<script>
+let auth = {token: null};
+
+function log(...msg) {
+const e = document.getElementById('activity_log');
+if (e) {
+e.textContent = `[${new Date().toLocaleTimeString()}] ${msg.join(' ')}\n` + e.textContent;
+}
+}
+
+function showToast(message, type = 'success') {
+const toast = document.createElement('div');
+toast.className = `toast ${type}`;
+toast.textContent = message;
+document.body.appendChild(toast);
+setTimeout(() => toast.remove(), 3000);
+}
+
+async function adminLogin() {
+const email = document.getElementById('admin_email').value;
+const password = document.getElementById('admin_password').value;
+
+if (!email || !password) {
+alert('Please enter email and password');
+return;
+}
+
+log('🔐 Logging in as admin...');
+
+try {
+const r = await fetch('/auth/login', {
+method: 'POST',
+headers: {'Content-Type': 'application/json'},
+body: JSON.stringify({email, password, type:'admin'})
+});
+
+const j = await r.json();
+
+if (r.ok) {
+auth.token = j.access_token;
+
+document.getElementById('login_status').style.display = 'inline-block';
+document.getElementById('login_status').className = 'status-badge success';
+document.getElementById('login_status').textContent = '✅ Logged in as ' + j.user.email;
+
+// Show sections
+document.getElementById('broadcast_section').style.display = 'block';
+document.getElementById('log_section').style.display = 'block';
+document.getElementById('send_btn').disabled = false;
+
+log('✅ ADMIN LOGGED IN');
+log('Profile:', JSON.stringify(j.profile));
+
+showToast('Admin logged in successfully!');
+} else {
+alert('Login failed: ' + (j.message || 'Unknown'));
+log('❌ Failed:', j.message);
+document.getElementById('login_status').style.display = 'inline-block';
+document.getElementById('login_status').className = 'status-badge error';
+document.getElementById('login_status').textContent = '❌ Login failed';
+}
+} catch (e) {
+alert('Error: ' + e.message);
+log('❌ Error:', e.message);
+}
+}
+
+async function sendBroadcast() {
+const type = document.getElementById('notif_type').value;
+const title = document.getElementById('notif_title').value;
+const message = document.getElementById('notif_message').value;
+
+if (!message.trim()) {
+alert('Please enter a message');
+return;
+}
+
+if (!title.trim()) {
+alert('Please enter a title');
+return;
+}
+
+if (!confirm(`Send this notification to ALL drivers?\n\nType: ${type}\nTitle: ${title}\n\nMessage: ${message}`)) {
+return;
+}
+
+log('📤 Sending broadcast notification...');
+document.getElementById('send_btn').disabled = true;
+document.getElementById('send_btn').textContent = '⏳ Sending...';
+
+try {
+const r = await fetch('/admin/notify/drivers', {
+method: 'POST',
+headers: {
+'Content-Type': 'application/json',
+'Authorization': `Bearer ${auth.token}`
+},
+body: JSON.stringify({
+type,
+title,
+message
+})
+});
+
+const j = await r.json();
+
+document.getElementById('send_btn').disabled = false;
+document.getElementById('send_btn').textContent = '📤 Send to All Drivers';
+
+if (r.ok) {
+log(`✅ SUCCESS: Notification sent to ${j.data.recipients_count} drivers`);
+log('Payload:', JSON.stringify(j.data.notification));
+
+showToast(`Sent to ${j.data.recipients_count} drivers!`, 'success');
+
+// Clear form
+document.getElementById('notif_message').value = '';
+} else {
+alert('Error: ' + (j.message || 'Failed to send'));
+log('❌ Failed:', j.message);
+showToast('Failed to send notification', 'error');
+}
+} catch (e) {
+alert('Error: ' + e.message);
+log('❌ Error:', e.message);
+document.getElementById('send_btn').disabled = false;
+document.getElementById('send_btn').textContent = '📤 Send to All Drivers';
+showToast('Network error', 'error');
+}
+}
+</script>
+</body>
+</html>

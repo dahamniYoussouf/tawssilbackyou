@@ -11,6 +11,7 @@ import {
   updateMaxDistanceValidator 
 } from '../validators/configValidator.js';
 import { validate } from '../middlewares/validate.js';
+import { notifyAllDrivers } from '../controllers/admin.controller.js';
 
 
 
@@ -53,4 +54,7 @@ router.post('/create', protect, authorize('admin'), adminCtrl.createAdmin);
 router.get('/favorites/restaurants', adminCtrl.getAllFavoriteRestaurants);
 router.get('/favorites/meals', adminCtrl.getAllFavoriteMeals);
 router.get('/favorites/stats', adminCtrl.getFavoritesStats);
+
+
+router.post('/notify/drivers', protect, authorize('admin'), notifyAllDrivers);
 export default router;
