@@ -791,10 +791,6 @@ export const notifyAllDrivers = async (req, res, next) => {
     // Get all active drivers
     const Driver = (await import('../models/Driver.js')).default;
     const drivers = await Driver.findAll({
-      where: {
-        is_active: true,
-        status: ['available', 'busy'] // Only notify active/working drivers
-      },
       attributes: ['id', 'first_name', 'last_name', 'status']
     });
 
