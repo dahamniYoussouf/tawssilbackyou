@@ -547,3 +547,123 @@ export const getProfile = async (req, res) => {
     res.status(500).json({ message: 'Failed to get profile' });
   }
 };
+/**
+ * GET /admin/favorites/restaurants
+ * Récupérer tous les restaurants favoris (vue admin)
+ */
+export const getAllFavoriteRestaurants = async (req, res, next) => {
+  try {
+    const { client_id, search, page = 1, limit = 20 } = req.query;
+    
+    const where = client_id ? { client_id } : {};
+    
+    const FavoriteRestaurant = (await import('../models/FavoriteRestaurant.js')).default;
+    const Restaurant = (await import('../models/Restaurant.js')).default;
+    const Client = (await import('../models/Client.js')).default;
+    
+    const favorites = await FavoriteRestaurant.findAll({
+      where,
+      include: [
+        { 
+          model: Restaurant, 
+          as: 'restaurant',
+          attributes: ['id', 'name', 'description', 'address', 'rating', 'image_url', 'is_premium', 'status']
+        },
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'first_name', 'last_name', 'email', 'phone_number']
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit)
+    });
+    
+    res.json({
+      success: true,
+      count: favorites.length,
+      data: favorites
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /admin/favorites/meals
+ * Récupérer tous les plats favoris (vue admin)
+ */
+export const getAllFavoriteMeals = async (req, res, next) => {
+  try {
+    const { client_id, search, page = 1, limit = 20 } = req.query;
+    
+    const where = client_id ? { client_id } : {};
+    
+    const FavoriteMeal = (await import('../models/FavoriteMeal.js')).default;
+    const MenuItem = (await import('../models/MenuItem.js')).default;
+    const Restaurant = (await import('../models/Restaurant.js')).default;
+    const Client = (await import('../models/Client.js')).default;
+    
+    const favorites = await FavoriteMeal.findAll({
+      where,
+      include: [
+        { 
+          model: MenuItem, 
+          as: 'meal',
+          attributes: ['id', 'nom', 'description', 'prix', 'photo_url', 'category_id'],
+          include: [
+            {
+              model: Restaurant,
+              as: 'restaurant',
+              attributes: ['id', 'name', 'address', 'rating', 'image_url']
+            }
+          ]
+        },
+        {
+          model: Client,
+          as: 'client',
+          attributes: ['id', 'first_name', 'last_name', 'email', 'phone_number']
+        }
+      ],
+      order: [['created_at', 'DESC']],
+      limit: parseInt(limit),
+      offset: (parseInt(page) - 1) * parseInt(limit)
+    });
+    
+    res.json({
+      success: true,
+      count: favorites.length,
+      data: favorites
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /admin/favorites/stats
+ * Récupérer les statistiques des favoris
+ */
+export const getFavoritesStats = async (req, res, next) => {
+  try {
+    const FavoriteRestaurant = (await import('../models/FavoriteRestaurant.js')).default;
+    const FavoriteMeal = (await import('../models/FavoriteMeal.js')).default;
+    
+    const [restaurantCount, mealCount] = await Promise.all([
+      FavoriteRestaurant.count(),
+      FavoriteMeal.count()
+    ]);
+    
+    res.json({
+      success: true,
+      data: {
+        total_favorite_restaurants: restaurantCount,
+        total_favorite_meals: mealCount,
+        total_favorites: restaurantCount + mealCount
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
