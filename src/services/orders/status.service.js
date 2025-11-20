@@ -142,7 +142,8 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
       
       routeInfo = {
         distance_km: route.distanceKm,
-        estimated_time_min: route.timeMax  // ✅ Renommé pour cohérence
+        estimated_time_min: route.timeMin  // ✅ Renommé pour cohérence
+
       };
       
       console.log(`📍 Route Driver→Restaurant: ${route.distanceKm} km, ~${route.timeMax} min`);

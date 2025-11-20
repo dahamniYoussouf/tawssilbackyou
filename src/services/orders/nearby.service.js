@@ -73,12 +73,13 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
   const formatted = await Promise.all(rows.map(async (order) => {
     const restaurantCoords = order.restaurant.location?.coordinates || [];
     const deliveryCoords = order.delivery_location?.coordinates || [];
-    const distance = parseFloat(order.dataValues.distance);
+    const distanceDriverToDelivery = parseFloat(order.dataValues.distance);
 
-    if (max_distance && distance > max_distance) return null;
+    // Filtrer par distance maximale si spécifiée
+    if (max_distance && distanceDriverToDelivery > max_distance) return null;
 
-    // ✅ NOUVEAU: Calculer route Driver → Restaurant
-    let routeToRestaurant = null;
+    // ✅ 1. Calculer route Driver → Restaurant
+    let driverToRestaurant = null;
     if (restaurantCoords.length === 2) {
       try {
         const route = await calculateRouteTime(
@@ -89,14 +90,39 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
           40 // Vitesse moyenne: 40 km/h
         );
 
-        routeToRestaurant = {
-          distance_km: route.distanceKm,
+        driverToRestaurant = {
+          distance_km: parseFloat(route.distanceKm.toFixed(2)),
+          distance_meters: Math.round(route.distanceKm * 1000),
           estimated_time_min: route.timeMax
         };
 
-        console.log(`📍 Route Driver→Restaurant (Order ${order.order_number}): ${route.distanceKm} km, ~${route.timeMax} min`);
+        console.log(`📍 Route Driver→Restaurant (Order ${order.order_number}): ${route.distanceKm.toFixed(2)} km, ~${route.timeMax} min`);
       } catch (error) {
-        console.error(`⚠️ Route calculation failed for order ${order.id}:`, error.message);
+        console.error(`⚠️ Route calculation failed (Driver→Restaurant) for order ${order.id}:`, error.message);
+      }
+    }
+
+    // ✅ 2. Calculer route Restaurant → Delivery
+    let restaurantToDelivery = null;
+    if (restaurantCoords.length === 2 && deliveryCoords.length === 2) {
+      try {
+        const route = await calculateRouteTime(
+          restaurantCoords[0], // Restaurant longitude
+          restaurantCoords[1], // Restaurant latitude
+          deliveryCoords[0],   // Delivery longitude
+          deliveryCoords[1],   // Delivery latitude
+          40 // Vitesse moyenne: 40 km/h
+        );
+
+        restaurantToDelivery = {
+          distance_km: parseFloat(route.distanceKm.toFixed(2)),
+          distance_meters: Math.round(route.distanceKm * 1000),
+          estimated_time_min: route.timeMax
+        };
+
+        console.log(`📍 Route Restaurant→Delivery (Order ${order.order_number}): ${route.distanceKm.toFixed(2)} km, ~${route.timeMax} min`);
+      } catch (error) {
+        console.error(`⚠️ Route calculation failed (Restaurant→Delivery) for order ${order.id}:`, error.message);
       }
     }
 
@@ -111,10 +137,6 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
         lat: deliveryCoords[1] || null,
         lng: deliveryCoords[0] || null
       },
-      
-      // Distance du driver à la destination finale
-      distance_to_delivery_meters: Math.round(distance),
-      distance_to_delivery_km: (distance / 1000).toFixed(2),
 
       restaurant: {
         id: order.restaurant.id,
@@ -124,11 +146,7 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
           lat: restaurantCoords[1] || null,
           lng: restaurantCoords[0] || null
         },
-        image_url: order.restaurant.image_url,
-        
-        // ✅ NOUVEAU: Route vers le restaurant
-        distance_from_driver_km: routeToRestaurant?.distance_km || null,
-        estimated_time_from_driver_min: routeToRestaurant?.estimated_time_min || null
+        image_url: order.restaurant.image_url
       },
 
       client: {
@@ -141,13 +159,22 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
       estimated_delivery_time: order.estimated_delivery_time,
       created_at: order.created_at,
 
-      // ✅ RÉSUMÉ DE LA ROUTE COMPLÈTE
-      route_summary: routeToRestaurant ? {
-        driver_to_restaurant_km: routeToRestaurant.distance_km,
-        driver_to_restaurant_min: routeToRestaurant.estimated_time_min,
-        restaurant_to_delivery_km: order.delivery_distance ? parseFloat(order.delivery_distance) : null,
-        total_distance_estimate_km: routeToRestaurant.distance_km + (order.delivery_distance ? parseFloat(order.delivery_distance) : 0)
-      } : null
+      // ✅ STRUCTURE COHÉRENTE: Toutes les infos de route au même endroit
+      route_details: {
+        // Trajet 1: Driver → Restaurant
+        driver_to_restaurant: driverToRestaurant || {
+          distance_km: null,
+          distance_meters: null,
+          estimated_time_min: null
+        },
+        
+        // Trajet 2: Restaurant → Delivery (client)
+        restaurant_to_delivery: restaurantToDelivery || {
+          distance_km: null,
+          distance_meters: null,
+          estimated_time_min: null
+        }
+      }
     };
   }));
 
