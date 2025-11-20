@@ -142,7 +142,7 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
       
       routeInfo = {
         distance_km: route.distanceKm,
-        estimated_time: route.timeMax
+        estimated_time_min: route.timeMax  // ✅ Renommé pour cohérence
       };
       
       console.log(`📍 Route Driver→Restaurant: ${route.distanceKm} km, ~${route.timeMax} min`);
@@ -157,6 +157,7 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
   await order.update({ status: "assigned", livreur_id: driverId });
   await driver.addActiveOrder(orderId);
 
+  // ✅ Notification client avec noms cohérents
   notify("client", order.client_id, {
     type: "driver_assigned",
     orderId: order.id,
@@ -166,11 +167,12 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
       vehicle: driver.vehicle_type,
       ...(routeInfo && { 
         distance_to_restaurant_km: routeInfo.distance_km,
-        estimated_arrival_min: routeInfo.estimated_time  // ❌ FIX: était estimated_time_max
+        estimated_arrival_min: routeInfo.estimated_time_min  // ✅ Cohérent
       })
     },
   });
 
+  // ✅ Notification driver avec noms cohérents
   notify("driver", driverId, {
     type: "order_assigned",
     orderId: order.id,
@@ -178,14 +180,20 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
     restaurant: order.restaurant.name,
     deliveryAddress: order.delivery_address,
     active_orders_count: driver.getActiveOrdersCount(),
-    ...(routeInfo && { route_to_restaurant: routeInfo })
+    ...(routeInfo && { 
+      route_to_restaurant: {
+        distance_km: routeInfo.distance_km,
+        estimated_time_min: routeInfo.estimated_time_min
+      }
+    })
   });
 
-  // ✅ RETOURNER L'ORDER AVEC LES INFOS DE ROUTE
+  // ✅ RETOURNER L'ORDER AVEC LES INFOS DE ROUTE (noms cohérents)
   return {
     ...order.toJSON(),
-  distance_driver_to_restaurant_km: routeInfo?.distance_km,          
-  estimated_time_driver_to_restaurant: routeInfo?.estimated_time  };
+    driver_to_restaurant_distance_km: routeInfo?.distance_km,          
+    driver_to_restaurant_estimated_time_min: routeInfo?.estimated_time_min
+  };
 }
 
 export async function startDelivering(orderId) {
