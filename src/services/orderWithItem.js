@@ -36,106 +36,109 @@ export async function createOrderWithItems(data) {
     throw { status: 400, message: "Order must contain at least one item" };
   }
 
+  // OPTIMIZATION 1: Start transaction later (after validations)
+  // No need to hold a DB transaction during validation logic
+
+  // Validate basic requirements first (no DB needed)
+  if (order_type === 'delivery' && !delivery_address) {
+    throw { status: 400, message: "Delivery address is required for delivery orders" };
+  }
+
+  const menuItemIds = items.map(i => i.menu_item_id);
+
+  // OPTIMIZATION 2: Use lean queries - only select needed fields
+  const [restaurant, client, menuItems] = await Promise.all([
+    Restaurant.findByPk(restaurant_id, {
+      attributes: ['id', 'location'], // Only fetch what we need
+      raw: true // Skip model instantiation if possible
+    }),
+    Client.findByPk(client_id, {
+      attributes: ['id'],
+      raw: true
+    }),
+    MenuItem.findAll({
+      where: { id: menuItemIds },
+      attributes: ['id', 'nom', 'prix', 'is_available'] // Only needed fields
+    })
+  ]);
+
+  if (!restaurant) throw { status: 404, message: "Restaurant not found" };
+  if (!client) throw { status: 404, message: "Client not found" };
+
+  // Validate menu items
+  if (menuItems.length !== menuItemIds.length) {
+    throw { status: 404, message: "One or more menu items not found" };
+  }
+
+  const menuMap = new Map(menuItems.map(m => [m.id, m]));
+
+  // OPTIMIZATION 3: Calculate everything BEFORE starting transaction
+  let subtotal = 0;
+  const orderItemsData = items.map(item => {
+    const menuItem = menuMap.get(item.menu_item_id);
+    
+    const quantity = item.quantity || item.quantite;
+    const specialInstructions = item.special_instructions || item.instructions_speciales;
+    
+    if (!menuItem.is_available) {
+      throw { status: 400, message: `${menuItem.nom} is not available` };
+    }
+    if (!quantity || quantity < 1) {
+      throw { status: 400, message: "Quantity must be at least 1" };
+    }
+
+    const itemTotal = parseFloat(menuItem.prix) * quantity;
+    subtotal += itemTotal;
+
+    return {
+      order_id: null,
+      menu_item_id: item.menu_item_id,
+      quantite: quantity,
+      prix_unitaire: menuItem.prix,
+      prix_total: itemTotal,
+      instructions_speciales: specialInstructions || null
+    };
+  });
+
+  // OPTIMIZATION 4: Calculate delivery time BEFORE transaction
+  const prepTime = 15;
+  let calculatedEstimatedTime = estimated_delivery_time;
+  let deliveryDurationMinutes = null;
+  let distanceKm = null;
+
+  if (order_type === 'delivery' && lat && lng) {
+    const restaurantCoords = restaurant.location?.coordinates || [];
+    
+    if (restaurantCoords.length === 2) {
+      const [restaurantLng, restaurantLat] = restaurantCoords;
+
+      try {
+        const route = await calculateRouteTime(
+          restaurantLng, 
+          restaurantLat, 
+          parseFloat(lng), 
+          parseFloat(lat), 
+          40
+        );
+        distanceKm = route.distanceKm; 
+        const totalMinutes = prepTime + route.timeMax;
+        deliveryDurationMinutes = totalMinutes;
+        calculatedEstimatedTime = new Date(Date.now() + totalMinutes * 60 * 1000);
+      } catch (error) {
+        console.warn('Route calculation failed, using default estimate:', error.message);
+        deliveryDurationMinutes = 45;
+        calculatedEstimatedTime = new Date(Date.now() + 45 * 60 * 1000);
+      }
+    }
+  } else {
+    calculatedEstimatedTime = new Date(Date.now() + prepTime * 60 * 1000);
+  }
+
+  // OPTIMIZATION 5: NOW start transaction - only for actual DB writes
   const transaction = await sequelize.transaction();
 
   try {
-    // Verify restaurant and client exist
-    const [restaurant, client] = await Promise.all([
-      Restaurant.findByPk(restaurant_id, { transaction }),
-      Client.findByPk(client_id, { transaction })
-    ]);
-
-    if (!restaurant) throw { status: 404, message: "Restaurant not found" };
-    if (!client) throw { status: 404, message: "Client not found" };
-
-    if (order_type === 'delivery' && !delivery_address) {
-      throw { status: 400, message: "Delivery address is required for delivery orders" };
-    }
-
-    // Get all menu items
-    const menuItemIds = items.map(i => i.menu_item_id);
-    const menuItems = await MenuItem.findAll({
-      where: { id: menuItemIds },
-      transaction
-    });
-
-    if (menuItems.length !== menuItemIds.length) {
-      throw { status: 404, message: "One or more menu items not found" };
-    }
-
-    const menuMap = new Map(menuItems.map(m => [m.id, m]));
-
-    // Validate items and calculate subtotal
-    let subtotal = 0;
-    const orderItemsData = items.map(item => {
-      const menuItem = menuMap.get(item.menu_item_id);
-      
-      // Support both English (quantity) and French (quantite) property names
-      const quantity = item.quantity || item.quantite;
-      const specialInstructions = item.special_instructions || item.instructions_speciales;
-      
-      if (!menuItem.is_available) {
-        throw { status: 400, message: `${menuItem.nom} is not available` };
-      }
-      if (!quantity || quantity < 1) {
-        throw { status: 400, message: "Quantity must be at least 1" };
-      }
-
-      // Calculate item total
-      const itemTotal = parseFloat(menuItem.prix) * quantity;
-      subtotal += itemTotal;
-
-      return {
-        order_id: null, // Will be set after order creation
-        menu_item_id: item.menu_item_id,
-        quantite: quantity,
-        prix_unitaire: menuItem.prix,
-        prix_total: itemTotal,  // Calculate manually to ensure it's set
-        instructions_speciales: specialInstructions || null
-      };
-    });
-
-    // Calculate estimated delivery time for delivery orders
-    let calculatedEstimatedTime = estimated_delivery_time;
-    let deliveryDurationMinutes = null;
-    let distanceKm = null;
-    // Preparation time (average of menu items or default 15 minutes)
-          const prepTime = 15;
-
-    if (order_type === 'delivery' && lat && lng) {
-      const restaurantCoords = restaurant.location?.coordinates || [];
-      
-      if (restaurantCoords.length === 2) {
-        const [restaurantLng, restaurantLat] = restaurantCoords;
-
-        try {
-          // Calculate route time (assuming average speed of 40 km/h)
-          const route = await calculateRouteTime(
-            restaurantLng, 
-            restaurantLat, 
-            parseFloat(lng), 
-            parseFloat(lat), 
-            40
-          );
-          const distanceKm = route.distanceKm; 
-          // Total delivery time in minutes: prep time + travel time (use max for safety)
-          const totalMinutes = prepTime + route.timeMax;
-          deliveryDurationMinutes = totalMinutes;
-          
-          // Set estimated delivery time
-          calculatedEstimatedTime = new Date(Date.now() + totalMinutes * 60 * 1000);
-        } catch (error) {
-          console.warn('Route calculation failed, using default estimate:', error.message);
-          // Fallback: use a default 45 minutes if route calculation fails
-          deliveryDurationMinutes = 45;
-          calculatedEstimatedTime = new Date(Date.now() + 45 * 60 * 1000);
-        }
-      }
-    }else{
-      calculatedEstimatedTime = new Date(Date.now() + prepTime * 60 * 1000);
-    }
-
-    // Create order
+    // Create order with pre-calculated values
     const order = await Order.create({
       client_id,
       restaurant_id,
@@ -149,7 +152,7 @@ export async function createOrderWithItems(data) {
       estimated_delivery_time: calculatedEstimatedTime
     }, { transaction });
 
-    // Set coordinates if provided
+    // Set coordinates and calculate total
     if (order_type === 'delivery' && lat && lng) {
       order.setDeliveryCoordinates(parseFloat(lng), parseFloat(lat));
     }
@@ -157,46 +160,61 @@ export async function createOrderWithItems(data) {
     order.calculateTotal();
     await order.save({ transaction });
 
-    // Create order items - set order_id first
+    // Create order items
     orderItemsData.forEach(item => item.order_id = order.id);
     
-    // bulkCreate with individualHooks to trigger beforeValidate for each item
     await OrderItem.bulkCreate(orderItemsData, { 
       transaction,
       validate: true,
-      individualHooks: true  // This ensures beforeValidate runs for each record
+      individualHooks: true
     });
 
-    // Fetch complete order BEFORE committing transaction
+    // OPTIMIZATION 6: Fetch complete order with all fields
     const completeOrder = await Order.findByPk(order.id, {
       include: [
-        { model: Restaurant, as: 'restaurant' },
-        { model: Client, as: 'client' },
+        { 
+          model: Restaurant, 
+          as: 'restaurant'
+          // All fields included by default
+        },
+        { 
+          model: Client, 
+          as: 'client'
+          // All fields included by default
+        },
         { 
           model: OrderItem, 
           as: 'order_items',
-          include: [{ model: MenuItem, as: 'menu_item' }]
+          include: [{ 
+            model: MenuItem, 
+            as: 'menu_item'
+            // All fields included by default
+          }]
         }
       ],
       transaction
     });
 
+    // OPTIMIZATION 7: Commit BEFORE notifications (non-critical operations)
     await transaction.commit();
 
-   try {
-      scheduleAdminNotification(order.id);
+    // OPTIMIZATION 8: Run notifications asynchronously without blocking response
+    setImmediate(() => {
+      try {
+        scheduleAdminNotification(order.id);
+        notify('restaurant', data.restaurant_id, {
+          type: 'new_order',
+          orderId: order.id,
+          orderNumber: order.order_number,
+          total: order.total
+        });
+        console.log("emitting notification to admin");
+      } catch (notifyError) {
+        console.error("Post-commit notification failed:", notifyError.message);
+      }
+    });
 
-      notify('restaurant', data.restaurant_id, {
-        type: 'new_order',
-        orderId: order.id,
-        orderNumber: order.order_number,
-        total: order.total
-      });
-      console.log("emitting notification to admin");
-    } catch (notifyError) {
-      console.error("Post-commit notification failed:", notifyError.message);
-    }
-    // Return complete order with delivery duration
+    // Return immediately
     return {
       ...completeOrder.toJSON(),
       delivery_duration_minutes: deliveryDurationMinutes,

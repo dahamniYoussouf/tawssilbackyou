@@ -137,7 +137,16 @@ const Driver = sequelize.define('Driver', {
   defaultValue: 0,
   allowNull: false,
   comment: "Number of order cancellations by driver"
-}
+}, profile_image_url: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    validate: {
+      isUrl: {
+        msg: "Profile image URL is not valid"
+      }
+    },
+    comment: "Client's profile picture URL"
+  },
 }, {
   tableName: 'drivers',
   timestamps: true,

@@ -13,6 +13,7 @@ export async function acceptOrder(orderId, userId, data = {}) {
   const order = await Order.findByPk(orderId, {
     include: [{ model: Client, as: "client" }, { model: Restaurant, as: "restaurant" }],
   });
+  
   if (!order) throw { status: 404, message: "Order not found" };
   if (!order.canTransitionTo("accepted")) {
     throw { status: 400, message: `Cannot accept order in ${order.status} status` };
@@ -34,12 +35,18 @@ export async function acceptOrder(orderId, userId, data = {}) {
     message: `${order.restaurant.name} accepted your order. Estimated preparation time: ${preparationMinutes} min`,
   });
 
+  // ✅ FIX 4: Notification des drivers avec meilleure gestion d'erreurs
   if (order.order_type === "delivery") {
     const coords = order.delivery_location?.coordinates;
+    
     if (coords?.length === 2) {
       const [lng, lat] = coords;
+      
+      console.log(`🚀 Notifying drivers for order ${order.order_number}`);
+      console.log(`📍 Delivery location: [${lat}, ${lng}]`);
+      
       try {
-        await notifyNearbyDrivers(
+        const notifiedDrivers = await notifyNearbyDrivers(
           lat,
           lng,
           {
@@ -52,25 +59,31 @@ export async function acceptOrder(orderId, userId, data = {}) {
             estimatedTime: order.estimated_delivery_time,
             totalAmount: parseFloat(order.total_amount || 0),
           },
-          10 // km
+          5 // ✅ FIX 5: Radius en km (sera converti en mètres dans la fonction)
         );
+        
+        if (notifiedDrivers.length === 0) {
+          console.warn(`⚠️ No drivers notified for order ${order.order_number}`);
+        }
+        
       } catch (error) {
-        console.error("❌ Error notifying drivers:", error);
+        console.error(`❌ Error notifying drivers for order ${order.order_number}:`, error);
+        // Ne pas bloquer l'acceptation de la commande si la notification échoue
       }
+      
     } else {
-      console.warn("⚠️ No valid delivery coordinates for order", orderId);
+      console.warn(`⚠️ No valid delivery coordinates for order ${orderId}`);
     }
-  } else {
-    // pickup: no driver notification
   }
 
-  // Admin + timers
   scheduleAdminNotificationDriver(orderId);
   setTimeout(() => startPreparing(orderId), 60_000);
   setTimeout(() => addExtraPreparationTime(orderId), preparationMinutes * 60_000);
 
   return order;
 }
+
+
 
 export async function startPreparing(orderId) {
   const transaction = await sequelize.transaction();
@@ -99,7 +112,6 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
     include: [{ model: Client, as: "client" }, { model: Restaurant, as: "restaurant" }],
   });
   if (!order) throw { status: 404, message: "Order not found" };
-  if (order.status !== "preparing") throw { status: 400, message: "Order must be in preparing status" };
 
   // PICKUP => complete directly
   if (order.order_type === "pickup") {

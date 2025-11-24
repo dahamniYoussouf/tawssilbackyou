@@ -184,68 +184,94 @@ export async function notifyNearbyDrivers(orderLat, orderLng, data, radius = 5) 
   const radiusMeters = radius * 1000;
 
   console.log(`🔍 Searching nearby drivers within ${radius} km`);
+  console.log(`📍 Order location: [${orderLat}, ${orderLng}]`);
 
-  // ✅ FIXED: Properly check capacity in SQL query
-  const nearbyDrivers = await Driver.findAll({
-    where: sequelize.literal(`
-      status = 'available'
-      AND is_active = true
-      AND is_verified = true
-      AND current_location IS NOT NULL
-      AND (active_orders IS NULL OR array_length(active_orders, 1) < max_orders_capacity)
-      AND ST_DWithin(
-        current_location,
-        ST_GeogFromText('POINT(${orderLng} ${orderLat})'),
-        ${radiusMeters}
-      )
-    `),
-    attributes: {
-      include: [
-        [
-          sequelize.literal(`
-            ST_Distance(
-              current_location,
-              ST_GeogFromText('POINT(${orderLng} ${orderLat})')
-            )
-          `),
-          'distance_meters'
+  try {
+    // ✅ FIX 1: Correction de la requête SQL
+    const nearbyDrivers = await Driver.findAll({
+      where: sequelize.literal(`
+        status = 'available'
+        AND is_active = true
+        AND is_verified = true
+        AND current_location IS NOT NULL
+        AND (
+          active_orders = '{}'::uuid[] 
+          OR array_length(active_orders, 1) IS NULL 
+          OR array_length(active_orders, 1) < max_orders_capacity
+        )
+        AND ST_DWithin(
+          current_location,
+          ST_GeogFromText('POINT(${orderLng} ${orderLat})'),
+          ${radiusMeters}
+        )
+      `),
+      attributes: {
+        include: [
+          [
+            sequelize.literal(`
+              ST_Distance(
+                current_location,
+                ST_GeogFromText('POINT(${orderLng} ${orderLat})')
+              )
+            `),
+            'distance_meters'
+          ]
         ]
-      ]
-    },
-    order: [[sequelize.literal('distance_meters'), 'ASC']]
-  });
+      },
+      order: [[sequelize.literal('distance_meters'), 'ASC']]
+    });
 
-  console.log(`✅ Found ${nearbyDrivers.length} available drivers with capacity`);
+    console.log(`✅ SQL Query returned ${nearbyDrivers.length} drivers`);
 
-  // ✅ Send notifications with enhanced data
-  let notifiedCount = 0;
-  for (const driver of nearbyDrivers) {
-    // ✅ Double-check capacity using method
-    if (!driver.canAcceptMoreOrders()) {
-      console.log(`⚠️ Skipping driver ${driver.id} - no capacity (${driver.active_orders.length}/${driver.max_orders_capacity})`);
-      continue;
+    // ✅ FIX 2: Vérification simplifiée et logs détaillés
+    let notifiedCount = 0;
+    for (const driver of nearbyDrivers) {
+      const distance = (driver.getDataValue('distance_meters') / 1000).toFixed(2);
+      const driverRoom = `driver:${driver.id}`;
+
+      // Vérifier si le driver est vraiment connecté
+      const socketsInRoom = io.sockets.adapter.rooms.get(driverRoom);
+      const isConnected = socketsInRoom && socketsInRoom.size > 0;
+
+      if (!isConnected) {
+        console.log(`⚠️ Driver ${driver.id} not connected to Socket.IO (room: ${driverRoom})`);
+        continue;
+      }
+
+      // Vérifier la capacité (simplifiée)
+      const activeOrdersCount = driver.active_orders ? driver.active_orders.length : 0;
+      if (activeOrdersCount >= driver.max_orders_capacity) {
+        console.log(`⚠️ Driver ${driver.id} at max capacity (${activeOrdersCount}/${driver.max_orders_capacity})`);
+        continue;
+      }
+
+      const notificationData = {
+        ...data,
+        distance,
+        distance_km: parseFloat(distance),
+        remaining_capacity: driver.max_orders_capacity - activeOrdersCount,
+        driver_current_orders: activeOrdersCount,
+        timestamp: new Date().toISOString()
+      };
+
+      // ✅ FIX 3: Émission avec confirmation
+      io.to(driverRoom).emit('new_delivery', notificationData);
+      notifiedCount++;
+      
+      console.log(`📢 NOTIFIED driver ${driver.id}:`);
+      console.log(`   - Distance: ${distance} km`);
+      console.log(`   - Orders: ${activeOrdersCount}/${driver.max_orders_capacity}`);
+      console.log(`   - Room: ${driverRoom} (${socketsInRoom.size} socket(s))`);
     }
 
-    const distance = (driver.getDataValue('distance_meters') / 1000).toFixed(2);
-    const driverRoom = `driver:${driver.id}`;
+    console.log(`✅ Successfully notified ${notifiedCount}/${nearbyDrivers.length} drivers`);
 
-    const notificationData = {
-      ...data,
-      distance,
-      distance_km: parseFloat(distance),
-      remaining_capacity: driver.max_orders_capacity - driver.active_orders.length,
-      driver_current_orders: driver.active_orders.length,
-      timestamp: new Date().toISOString()
-    };
+    return nearbyDrivers;
 
-    io.to(driverRoom).emit('new_delivery', notificationData);
-    notifiedCount++;
-    console.log(`📢 Notified driver ${driver.id} (${distance} km, ${driver.active_orders.length}/${driver.max_orders_capacity} orders)`);
+  } catch (error) {
+    console.error('❌ Error in notifyNearbyDrivers:', error);
+    return [];
   }
-
-  console.log(`✅ Successfully notified ${notifiedCount} drivers`);
-
-  return nearbyDrivers;
 }
 
 // ========================================

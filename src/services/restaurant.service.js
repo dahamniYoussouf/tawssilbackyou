@@ -290,6 +290,7 @@ export const filter = async (filters = {}) => {
       delivery_time_min: null,
       delivery_time_max: null,
       image_url: r.image_url,
+      phone_number:r.phone_number,
       distance: null,
       is_premium: r.is_premium,
       is_active: r.is_active,
