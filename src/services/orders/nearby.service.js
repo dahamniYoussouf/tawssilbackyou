@@ -126,49 +126,104 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
       }
     }
 
+    // ✅ Format uniforme compatible avec getOrderById
     return {
+      // Tous les champs de l'ordre
       id: order.id,
       order_number: order.order_number,
+      client_id: order.client_id,
+      restaurant_id: order.restaurant_id,
+      order_type: order.order_type,
       status: order.status,
-      total_amount: parseFloat(order.total_amount),
-      delivery_fee: parseFloat(order.delivery_fee),
+      livreur_id: order.livreur_id,
+      
+      // Montants
+      subtotal: parseFloat(order.subtotal || 0),
+      delivery_fee: parseFloat(order.delivery_fee || 0),
+      total_amount: parseFloat(order.total_amount || 0),
+      delivery_distance: order.delivery_distance ? parseFloat(order.delivery_distance) : null,
+      
+      // Adresses et localisation
       delivery_address: order.delivery_address,
-      delivery_location: {
-        lat: deliveryCoords[1] || null,
-        lng: deliveryCoords[0] || null
-      },
-
+      delivery_location: deliveryCoords.length === 2 ? {
+        type: 'Point',
+        coordinates: deliveryCoords,
+        lat: deliveryCoords[1],
+        lng: deliveryCoords[0]
+      } : null,
+      
+      delivery_instructions: order.delivery_instructions,
+      payment_method: order.payment_method,
+      preparation_time: order.preparation_time,
+      
+      // Timestamps
+      estimated_delivery_time: order.estimated_delivery_time,
+      created_at: order.created_at,
+      updated_at: order.updated_at,
+      accepted_at: order.accepted_at,
+      preparing_started_at: order.preparing_started_at,
+      assigned_at: order.assigned_at,
+      delivering_started_at: order.delivering_started_at,
+      delivered_at: order.delivered_at,
+      
+      // Rating
+      rating: order.rating ? parseFloat(order.rating) : null,
+      review_comment: order.review_comment,
+      decline_reason: order.decline_reason,
+      
+      // Relations complètes (comme getOrderById)
       restaurant: {
         id: order.restaurant.id,
         name: order.restaurant.name,
         address: order.restaurant.address,
-        location: {
-          lat: restaurantCoords[1] || null,
-          lng: restaurantCoords[0] || null
-        },
-        image_url: order.restaurant.image_url
+        image_url: order.restaurant.image_url,
+        location: restaurantCoords.length === 2 ? {
+          type: 'Point',
+          coordinates: restaurantCoords,
+          lat: restaurantCoords[1],
+          lng: restaurantCoords[0]
+        } : null
       },
 
       client: {
-        name: `${order.client.first_name} ${order.client.last_name}`,
-        phone: order.client.phone_number
+        id: order.client.id,
+        first_name: order.client.first_name,
+        last_name: order.client.last_name,
+        phone_number: order.client.phone_number,
+        full_name: `${order.client.first_name} ${order.client.last_name}`
       },
 
-      items: order.order_items || [],
+      // Order items complets
+      order_items: order.order_items.map(item => ({
+        id: item.id,
+        order_id: item.order_id,
+        menu_item_id: item.menu_item_id,
+        quantite: item.quantite,
+        prix_unitaire: parseFloat(item.prix_unitaire),
+        prix_total: parseFloat(item.prix_total),
+        instructions_speciales: item.instructions_speciales,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        menu_item: item.menu_item ? {
+          id: item.menu_item.id,
+          nom: item.menu_item.nom,
+          description: item.menu_item.description,
+          prix: parseFloat(item.menu_item.prix),
+          photo_url: item.menu_item.photo_url,
+          temps_preparation: item.menu_item.temps_preparation,
+          is_available: item.menu_item.is_available,
+          category_id: item.menu_item.category_id
+        } : null
+      })),
 
-      estimated_delivery_time: order.estimated_delivery_time,
-      created_at: order.created_at,
-
-      // ✅ STRUCTURE COHÉRENTE: Toutes les infos de route au même endroit
+      // ✅ Informations spécifiques aux nearby orders (route calculée)
       route_details: {
-        // Trajet 1: Driver → Restaurant
         driver_to_restaurant: driverToRestaurant || {
           distance_km: null,
           distance_meters: null,
           estimated_time_min: null
         },
         
-        // Trajet 2: Restaurant → Delivery (client)
         restaurant_to_delivery: restaurantToDelivery || {
           distance_km: null,
           distance_meters: null,
