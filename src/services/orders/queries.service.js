@@ -76,6 +76,9 @@ export async function getOrderByIdService(id) {
 
   const result = order.toJSON();
 
+  // ✅ FIX: Add estimated delivery time remaining calculation (always non-negative)
+  result.estimated_delivery_minutes_remaining = order.getEstimatedDeliveryMinutesRemaining();
+
   if (order.status === "delivering" && order.driver) {
     result.tracking = {
       driver_location: order.driver.getCurrentCoordinates(),
@@ -84,6 +87,7 @@ export async function getOrderByIdService(id) {
         : null,
       time_in_transit: order.getTimeInStatus(),
       estimated_arrival: order.estimated_delivery_time,
+      estimated_arrival_minutes_remaining: order.getEstimatedDeliveryMinutesRemaining(),
     };
   }
 

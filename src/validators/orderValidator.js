@@ -101,7 +101,7 @@ export const getAllOrdersValidator = [
   
   query('limit')
     .optional()
-    .isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
+    .isInt().withMessage('Limit must be between 1 and 100'),
   
   query('status')
     .optional()
