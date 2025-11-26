@@ -221,29 +221,4 @@ Order.prototype.getTimeInStatus = function() {
   return Math.floor(elapsed / 60000); // minutes
 };
 
-// Get estimated delivery time remaining (always positive or 0)
-Order.prototype.getEstimatedDeliveryMinutesRemaining = function() {
-  if (!this.estimated_delivery_time) return null;
-  
-  const remaining = Math.ceil((new Date(this.estimated_delivery_time) - new Date()) / (1000 * 60));
-  return Math.max(0, remaining); // Never return negative values
-};
-
-// Update estimated delivery time based on current status and additional time
-Order.prototype.updateEstimatedDeliveryTime = function(additionalMinutes = 0) {
-  if (!this.estimated_delivery_time) return;
-  
-  // If the estimated time is in the past, recalculate from now
-  const currentTime = new Date();
-  const estimatedTime = new Date(this.estimated_delivery_time);
-  
-  if (estimatedTime < currentTime) {
-    // Recalculate based on current time + additional minutes
-    this.estimated_delivery_time = new Date(currentTime.getTime() + additionalMinutes * 60 * 1000);
-  } else if (additionalMinutes > 0) {
-    // Add additional time to existing estimate
-    this.estimated_delivery_time = new Date(estimatedTime.getTime() + additionalMinutes * 60 * 1000);
-  }
-};
-
 export default Order;

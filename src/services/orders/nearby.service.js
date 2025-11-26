@@ -158,8 +158,6 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
       
       // Timestamps
       estimated_delivery_time: order.estimated_delivery_time,
-      // ✅ FIX: Always return non-negative remaining time (0 if delivery time has passed)
-      estimated_delivery_minutes_remaining: order.getEstimatedDeliveryMinutesRemaining(),
       created_at: order.created_at,
       updated_at: order.updated_at,
       accepted_at: order.accepted_at,

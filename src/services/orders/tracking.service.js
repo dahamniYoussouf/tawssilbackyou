@@ -91,7 +91,6 @@ export async function getOrderTracking(orderId) {
     },
     destination: destinationCoords,
     estimated_arrival: order.estimated_delivery_time,
-    estimated_arrival_minutes_remaining: order.getEstimatedDeliveryMinutesRemaining(),
     time_in_transit: order.getTimeInStatus(),
   };
 }
