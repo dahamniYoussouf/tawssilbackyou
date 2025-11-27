@@ -1,5 +1,8 @@
 // src/controllers/restaurant.controller.js
 import * as restaurantService from "../services/restaurant.service.js";
+import cacheService from '../services/cache.service.js';
+import { cacheHelpers } from '../middlewares/cache.middleware.js';
+import crypto from 'crypto';
 
 
 /**
@@ -20,6 +23,7 @@ export const getAll = async (req, res, next) => {
 /**
  * Filter nearby restaurants with advanced options
  * ✅ REQUIRES AUTHENTICATION - client_id from JWT
+ * Cached for 3 minutes
  */
 export const nearbyFilter = async (req, res, next) => {
   try {
@@ -34,9 +38,34 @@ export const nearbyFilter = async (req, res, next) => {
       client_id: req.user.client_id
     };
 
+    // Generate cache key based on filters
+    const cacheKeyData = {
+      lat: filters.lat,
+      lng: filters.lng,
+      address: filters.address,
+      radius: filters.radius || 2000,
+      q: filters.q,
+      categories: filters.categories ? (Array.isArray(filters.categories) ? filters.categories.sort().join(',') : filters.categories) : null,
+      page: filters.page || 1,
+      pageSize: filters.pageSize || 20,
+      client_id: filters.client_id
+    };
+    
+    const cacheKeyString = JSON.stringify(cacheKeyData);
+    const cacheKey = `restaurant:nearby:${crypto.createHash('md5').update(cacheKeyString).digest('hex')}`;
+
+    // Try to get from cache
+    const cached = await cacheService.get(cacheKey);
+    if (cached !== null) {
+      return res.json({
+        ...cached,
+        cached: true
+      });
+    }
+
     const result = await restaurantService.filterNearbyRestaurants(filters);
     
-    res.json({
+    const response = {
       success: true,
       count: result.count,
       page: result.page,
@@ -46,6 +75,14 @@ export const nearbyFilter = async (req, res, next) => {
       data: result.formatted,
       searchType: result.searchType,
       client_id: result.client_id
+    };
+
+    // Cache for 3 minutes (180 seconds)
+    await cacheService.set(cacheKey, response, 180);
+    
+    res.json({
+      ...response,
+      cached: false
     });
   } catch (err) {
     next(err);
@@ -131,6 +168,10 @@ export const updateProfile = async (req, res, next) => {
 
     const updatedRestaurant = await restaurantService.updateRestaurant(restaurantId, req.body);
 
+    // Invalidate cache for this restaurant
+    await cacheService.delPattern(`restaurant:details:${restaurantId}:*`);
+    await cacheService.delPattern(`restaurant:nearby:*`);
+
     res.json({
       success: true,
       message: "Profile updated successfully",
@@ -160,6 +201,10 @@ export const update = async (req, res, next) => {
 
     const updatedRestaurant = await restaurantService.updateRestaurant(id, req.body);
 
+    // Invalidate cache for this restaurant
+    await cacheService.delPattern(`restaurant:details:${id}:*`);
+    await cacheService.delPattern(`restaurant:nearby:*`);
+
     res.json({
       success: true,
       data: updatedRestaurant
@@ -185,6 +230,10 @@ export const remove = async (req, res, next) => {
 
     await restaurantService.deleteRestaurant(id);
 
+    // Invalidate cache for this restaurant
+    await cacheService.delPattern(`restaurant:details:${id}:*`);
+    await cacheService.delPattern(`restaurant:nearby:*`);
+
     res.status(200).json({
       success: true,
       message: "Restaurant deleted successfully"
@@ -197,6 +246,7 @@ export const remove = async (req, res, next) => {
 /**
  * Get restaurant menu with categories and items
  * ✅ REQUIRES AUTHENTICATION - shows favorites
+ * Cached for 5 minutes
  */
 export const getRestaurantMenu = async (req, res) => {
   try {
@@ -205,11 +255,31 @@ export const getRestaurantMenu = async (req, res) => {
     // ✅ Get client_id from JWT token (guaranteed to exist)
     const client_id = req.user.client_id;
 
+    // Generate cache key
+    const cacheKey = `restaurant:details:${restaurantId}:client:${client_id}`;
+
+    // Try to get from cache
+    const cached = await cacheService.get(cacheKey);
+    if (cached !== null) {
+      return res.status(200).json({
+        ...cached,
+        cached: true
+      });
+    }
+
     const menu = await restaurantService.getCategoriesWithMenuItems(restaurantId, client_id);
 
-    res.status(200).json({
+    const response = {
       success: true,
       data: menu
+    };
+
+    // Cache for 5 minutes (300 seconds)
+    await cacheService.set(cacheKey, response, 300);
+
+    res.status(200).json({
+      ...response,
+      cached: false
     });
   } catch (error) {
     res.status(error.message === 'Restaurant not found' ? 404 : 500).json({

@@ -16,6 +16,8 @@ import User from '../models/User.js';
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 import { Op } from "sequelize";
 import * as topRatedService from "../services/topRated.service.js";
+import cacheService from '../services/cache.service.js';
+import { cacheHelpers } from '../middlewares/cache.middleware.js';
 
 
 /**
@@ -534,10 +536,22 @@ export const getDeliveryConfig = async (req, res, next) => {
 
 /**
  * GET /admin/config/all
- * Récupérer toutes les configurations système
+ * Récupérer toutes les configurations système (cached for 5 minutes)
  */
 export const getAllConfigs = async (req, res, next) => {
   try {
+    const cacheKey = 'admin:configs:all';
+    
+    // Try to get from cache
+    const cached = await cacheService.get(cacheKey);
+    if (cached !== null) {
+      return res.json({
+        success: true,
+        ...cached,
+        cached: true
+      });
+    }
+
     const allConfigs = await SystemConfig.findAll({
       order: [['config_key', 'ASC']]
     });
@@ -581,7 +595,7 @@ export const getAllConfigs = async (req, res, next) => {
       }
     });
 
-    res.json({
+    const response = {
       success: true,
       data: configsByCategory,
       all: allConfigs.map(c => ({
@@ -591,6 +605,14 @@ export const getAllConfigs = async (req, res, next) => {
         updated_at: c.updated_at,
         updated_by: c.updated_by
       }))
+    };
+
+    // Cache for 5 minutes (300 seconds)
+    await cacheService.set(cacheKey, response, 300);
+
+    res.json({
+      ...response,
+      cached: false
     });
   } catch (err) {
     next(err);
@@ -690,6 +712,10 @@ export const updateConfig = async (req, res, next) => {
       adminId,
       description
     );
+
+    // Invalidate config cache
+    await cacheService.del('admin:configs:all');
+    await cacheService.del(`admin:config:${key}`);
 
     console.log(`✅ Config ${key} updated to ${value} by admin ${adminId}`);
 
@@ -1059,10 +1085,22 @@ export const getFavoritesStats = async (req, res, next) => {
 
 /**
  * GET /admin/statistics
- * Get dashboard statistics for admin
+ * Get dashboard statistics for admin (cached for 2 minutes)
  */
 export const getStatistics = async (req, res, next) => {
   try {
+    const cacheKey = 'admin:statistics';
+    
+    // Try to get from cache
+    const cached = await cacheService.get(cacheKey);
+    if (cached !== null) {
+      return res.json({
+        success: true,
+        data: cached,
+        cached: true
+      });
+    }
+
     // Get all orders
     const orders = await Order.findAll({
       attributes: ['id', 'status', 'total_amount', 'created_at']
@@ -1126,46 +1164,52 @@ export const getStatistics = async (req, res, next) => {
     const orderGrowth = 12.5; // Mock value - should be calculated from historical data
     const revenueGrowth = 18.3; // Mock value - should be calculated from historical data
 
+    const statistics = {
+      orders: {
+        total: totalOrders,
+        pending: pendingOrders,
+        completed: completedOrders,
+        cancelled: cancelledOrders,
+        inProgress: inProgressOrders,
+        growth: orderGrowth
+      },
+      revenue: {
+        total: parseFloat(totalRevenue.toFixed(2)),
+        average: parseFloat(avgOrderValue.toFixed(2)),
+        growth: revenueGrowth
+      },
+      restaurants: {
+        total: totalRestaurants,
+        active: activeRestaurants,
+        premium: premiumRestaurants,
+        approved: approvedRestaurants
+      },
+      drivers: {
+        total: totalDrivers,
+        available: availableDrivers,
+        busy: busyDrivers,
+        offline: offlineDrivers
+      },
+      clients: {
+        total: totalClients,
+        active: activeClients,
+        verified: verifiedClients
+      },
+      notifications: {
+        total: totalNotifications,
+        unread: unreadNotifications,
+        unresolved: unresolvedNotifications,
+        resolved: resolvedNotifications
+      }
+    };
+
+    // Cache for 2 minutes (120 seconds)
+    await cacheService.set(cacheKey, statistics, 120);
+
     res.json({
       success: true,
-      data: {
-        orders: {
-          total: totalOrders,
-          pending: pendingOrders,
-          completed: completedOrders,
-          cancelled: cancelledOrders,
-          inProgress: inProgressOrders,
-          growth: orderGrowth
-        },
-        revenue: {
-          total: parseFloat(totalRevenue.toFixed(2)),
-          average: parseFloat(avgOrderValue.toFixed(2)),
-          growth: revenueGrowth
-        },
-        restaurants: {
-          total: totalRestaurants,
-          active: activeRestaurants,
-          premium: premiumRestaurants,
-          approved: approvedRestaurants
-        },
-        drivers: {
-          total: totalDrivers,
-          available: availableDrivers,
-          busy: busyDrivers,
-          offline: offlineDrivers
-        },
-        clients: {
-          total: totalClients,
-          active: activeClients,
-          verified: verifiedClients
-        },
-        notifications: {
-          total: totalNotifications,
-          unread: unreadNotifications,
-          unresolved: unresolvedNotifications,
-          resolved: resolvedNotifications
-        }
-      }
+      data: statistics,
+      cached: false
     });
   } catch (err) {
     next(err);
@@ -1231,15 +1275,23 @@ export const notifyAllDrivers = async (req, res, next) => {
 
 /**
  * GET /admin/top/meals
- * Get top 10 most liked meals
+ * Get top 10 most liked meals (cached for 10 minutes)
  */
 export const getTop10Meals = async (req, res, next) => {
   try {
-    const topMeals = await topRatedService.getTop10Meals();
+    const cacheKey = 'admin:top:meals';
+    
+    const topMeals = await cacheHelpers.cacheFunction(
+      cacheKey,
+      () => topRatedService.getTop10Meals(),
+      600 // 10 minutes
+    );
+
     res.json({
       success: true,
       count: topMeals.length,
-      data: topMeals
+      data: topMeals,
+      cached: await cacheService.has(cacheKey)
     });
   } catch (err) {
     next(err);
@@ -1248,15 +1300,23 @@ export const getTop10Meals = async (req, res, next) => {
 
 /**
  * GET /admin/top/restaurants
- * Get top 10 best restaurants
+ * Get top 10 best restaurants (cached for 10 minutes)
  */
 export const getTop10Restaurants = async (req, res, next) => {
   try {
-    const topRestaurants = await topRatedService.getTop10Restaurants();
+    const cacheKey = 'admin:top:restaurants';
+    
+    const topRestaurants = await cacheHelpers.cacheFunction(
+      cacheKey,
+      () => topRatedService.getTop10Restaurants(),
+      600 // 10 minutes
+    );
+
     res.json({
       success: true,
       count: topRestaurants.length,
-      data: topRestaurants
+      data: topRestaurants,
+      cached: await cacheService.has(cacheKey)
     });
   } catch (err) {
     next(err);
@@ -1265,15 +1325,23 @@ export const getTop10Restaurants = async (req, res, next) => {
 
 /**
  * GET /admin/top/drivers
- * Get top 10 best drivers
+ * Get top 10 best drivers (cached for 10 minutes)
  */
 export const getTop10Drivers = async (req, res, next) => {
   try {
-    const topDrivers = await topRatedService.getTop10Drivers();
+    const cacheKey = 'admin:top:drivers';
+    
+    const topDrivers = await cacheHelpers.cacheFunction(
+      cacheKey,
+      () => topRatedService.getTop10Drivers(),
+      600 // 10 minutes
+    );
+
     res.json({
       success: true,
       count: topDrivers.length,
-      data: topDrivers
+      data: topDrivers,
+      cached: await cacheService.has(cacheKey)
     });
   } catch (err) {
     next(err);
@@ -1377,6 +1445,61 @@ export const getMapDrivers = async (req, res, next) => {
       success: true,
       count: formatted.length,
       data: formatted
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ==================== CACHE MANAGEMENT ====================
+
+/**
+ * GET /admin/cache/stats
+ * Get cache statistics
+ */
+export const getCacheStats = async (req, res, next) => {
+  try {
+    const stats = cacheService.getStats();
+    
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /admin/cache/clear
+ * Clear all cache
+ */
+export const clearCache = async (req, res, next) => {
+  try {
+    await cacheService.flush();
+    
+    res.json({
+      success: true,
+      message: 'Cache cleared successfully'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * POST /admin/cache/invalidate/:pattern
+ * Invalidate cache by pattern
+ */
+export const invalidateCachePattern = async (req, res, next) => {
+  try {
+    const { pattern } = req.params;
+    const count = await cacheService.delPattern(`*${pattern}*`);
+    
+    res.json({
+      success: true,
+      message: `Cache invalidated for pattern: ${pattern}`,
+      keys_deleted: count
     });
   } catch (err) {
     next(err);

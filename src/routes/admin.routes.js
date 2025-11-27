@@ -73,4 +73,10 @@ router.get('/map/restaurants', adminCtrl.getMapRestaurants);
 router.get('/map/drivers', adminCtrl.getMapDrivers);
 
 router.post('/notify/drivers', protect, authorize('admin'), notifyAllDrivers);
+
+// ==================== CACHE MANAGEMENT ====================
+router.get('/cache/stats', adminCtrl.getCacheStats);
+router.post('/cache/clear', adminCtrl.clearCache);
+router.post('/cache/invalidate/:pattern', adminCtrl.invalidateCachePattern);
+
 export default router;
