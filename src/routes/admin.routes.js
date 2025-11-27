@@ -63,5 +63,14 @@ router.get('/statistics', adminCtrl.getStatistics);
 router.get('/config/all', adminCtrl.getAllConfigs);
 router.put('/config/:key', adminCtrl.updateConfig);
 
+// ==================== TOP RATED ====================
+router.get('/top/meals', adminCtrl.getTop10Meals);
+router.get('/top/restaurants', adminCtrl.getTop10Restaurants);
+router.get('/top/drivers', adminCtrl.getTop10Drivers);
+
+// ==================== MAP DATA ====================
+router.get('/map/restaurants', adminCtrl.getMapRestaurants);
+router.get('/map/drivers', adminCtrl.getMapDrivers);
+
 router.post('/notify/drivers', protect, authorize('admin'), notifyAllDrivers);
 export default router;

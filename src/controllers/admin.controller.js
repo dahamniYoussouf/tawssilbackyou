@@ -4,6 +4,7 @@ import Admin from "../models/Admin.js";
 import Driver from "../models/Driver.js";
 import Client from "../models/Client.js";
 import Restaurant from "../models/Restaurant.js";
+import AdminNotification from "../models/AdminNotification.js";
 import { 
   getMaxOrdersPerDriver, 
   updateMaxOrdersPerDriver 
@@ -14,6 +15,7 @@ import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 import { Op } from "sequelize";
+import * as topRatedService from "../services/topRated.service.js";
 
 
 /**
@@ -1110,6 +1112,15 @@ export const getStatistics = async (req, res, next) => {
     const activeClients = clients.filter(c => c.is_active).length;
     const verifiedClients = clients.filter(c => c.is_verified).length;
 
+    // Get notification statistics
+    const notifications = await AdminNotification.findAll({
+      attributes: ['id', 'is_read', 'is_resolved', 'type', 'created_at']
+    });
+    const totalNotifications = notifications.length;
+    const unreadNotifications = notifications.filter(n => !n.is_read).length;
+    const unresolvedNotifications = notifications.filter(n => !n.is_resolved).length;
+    const resolvedNotifications = notifications.filter(n => n.is_resolved).length;
+
     // Calculate growth (compare with previous month - simplified for now)
     // In a real implementation, you'd compare with previous period
     const orderGrowth = 12.5; // Mock value - should be calculated from historical data
@@ -1147,6 +1158,12 @@ export const getStatistics = async (req, res, next) => {
           total: totalClients,
           active: activeClients,
           verified: verifiedClients
+        },
+        notifications: {
+          total: totalNotifications,
+          unread: unreadNotifications,
+          unresolved: unresolvedNotifications,
+          resolved: resolvedNotifications
         }
       }
     });
@@ -1204,6 +1221,162 @@ export const notifyAllDrivers = async (req, res, next) => {
         recipients_count: drivers.length,
         notification: notificationPayload
       }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ==================== TOP RATED ====================
+
+/**
+ * GET /admin/top/meals
+ * Get top 10 most liked meals
+ */
+export const getTop10Meals = async (req, res, next) => {
+  try {
+    const topMeals = await topRatedService.getTop10Meals();
+    res.json({
+      success: true,
+      count: topMeals.length,
+      data: topMeals
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /admin/top/restaurants
+ * Get top 10 best restaurants
+ */
+export const getTop10Restaurants = async (req, res, next) => {
+  try {
+    const topRestaurants = await topRatedService.getTop10Restaurants();
+    res.json({
+      success: true,
+      count: topRestaurants.length,
+      data: topRestaurants
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /admin/top/drivers
+ * Get top 10 best drivers
+ */
+export const getTop10Drivers = async (req, res, next) => {
+  try {
+    const topDrivers = await topRatedService.getTop10Drivers();
+    res.json({
+      success: true,
+      count: topDrivers.length,
+      data: topDrivers
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ==================== MAP DATA ====================
+
+/**
+ * GET /admin/map/restaurants
+ * Get all restaurants with coordinates for map display
+ */
+export const getMapRestaurants = async (req, res, next) => {
+  try {
+    const restaurants = await Restaurant.findAll({
+      attributes: [
+        'id',
+        'name',
+        'address',
+        'image_url',
+        'rating',
+        'status',
+        'is_active',
+        'is_premium',
+        'location'
+      ],
+      where: {
+        status: 'approved',
+        is_active: true
+      }
+    });
+
+    const formatted = restaurants.map((r) => {
+      const coords = r.location?.coordinates || [];
+      return {
+        id: r.id,
+        name: r.name,
+        address: r.address,
+        image_url: r.image_url,
+        rating: r.rating ? parseFloat(r.rating) : null,
+        is_premium: r.is_premium,
+        lat: coords[1] || null,
+        lng: coords[0] || null
+      };
+    }).filter(r => r.lat && r.lng); // Only return restaurants with valid coordinates
+
+    res.json({
+      success: true,
+      count: formatted.length,
+      data: formatted
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /admin/map/drivers
+ * Get all drivers with coordinates for real-time map display
+ */
+export const getMapDrivers = async (req, res, next) => {
+  try {
+    const drivers = await Driver.findAll({
+      attributes: [
+        'id',
+        'driver_code',
+        'first_name',
+        'last_name',
+        'phone',
+        'status',
+        'current_location',
+        'vehicle_type',
+        'is_active',
+        'is_verified',
+        'rating',
+        'total_deliveries'
+      ],
+      where: {
+        is_active: true,
+        is_verified: true
+      }
+    });
+
+    const formatted = drivers.map((d) => {
+      const coords = d.current_location?.coordinates || [];
+      return {
+        id: d.id,
+        driver_code: d.driver_code,
+        name: `${d.first_name} ${d.last_name}`,
+        phone: d.phone,
+        status: d.status,
+        vehicle_type: d.vehicle_type,
+        rating: d.rating ? parseFloat(d.rating) : null,
+        total_deliveries: d.total_deliveries || 0,
+        lat: coords[1] || null,
+        lng: coords[0] || null
+      };
+    }).filter(d => d.lat && d.lng); // Only return drivers with valid coordinates
+
+    res.json({
+      success: true,
+      count: formatted.length,
+      data: formatted
     });
   } catch (err) {
     next(err);
