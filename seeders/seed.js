@@ -387,6 +387,7 @@ const seedDatabase = async () => {
         description: model.description,
         address: getRandomAddress(),
         phone_number: getUniquePhone("770", i), // ✅ CORRIGÉ
+        email: `restaurant${i + 1}@example.com`,
         location: location,
         rating: parseFloat((3.0 + Math.random() * 2.0).toFixed(1)),
         image_url: model.image,

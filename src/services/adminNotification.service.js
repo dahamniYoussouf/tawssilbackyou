@@ -17,7 +17,7 @@ export const createPendingOrderNotification = async (orderId) => {
         {
           model: Restaurant,
           as: 'restaurant',
-          attributes: ['id', 'name', 'address']
+          attributes: ['id', 'name', 'address', 'email', 'phone_number']
         },
         {
           model: Client,
@@ -71,7 +71,7 @@ export const createPendingOrderNotification = async (orderId) => {
       id: order.restaurant.id,
       name: order.restaurant.name,
       address: order.restaurant.address,
-      phone: order.restaurant.phone || 'Non renseigné',
+      phone: order.restaurant.phone_number || 'Non renseigné',
       email: order.restaurant.email || 'Non renseigné'
     };
 
@@ -122,7 +122,7 @@ export const createAcceptedOrderNotification = async (orderId) => {
         {
           model: Restaurant,
           as: 'restaurant',
-          attributes: ['id', 'name', 'address']
+          attributes: ['id', 'name', 'address', 'email', 'phone_number']
         },
         {
           model: Client,
@@ -176,7 +176,7 @@ export const createAcceptedOrderNotification = async (orderId) => {
       id: order.restaurant.id,
       name: order.restaurant.name,
       address: order.restaurant.address,
-      phone: order.restaurant.phone || 'Non renseigné',
+      phone: order.restaurant.phone_number || 'Non renseigné',
       email: order.restaurant.email || 'Non renseigné'
     };
 

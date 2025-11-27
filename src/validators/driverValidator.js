@@ -120,8 +120,23 @@ export const getDriverByIdValidator = [
     .withMessage("Invalid driver UUID")
 ];
 
-// ===== GET ALL DRIVERS (with filters) =====
+// ===== GET ALL DRIVERS (with filters and pagination) =====
 export const getAllDriversValidator = [
+  query("page")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Page must be a positive integer"),
+
+  query("limit")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("Limit must be between 1 and 100"),
+
+  query("pageSize")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("PageSize must be between 1 and 100"),
+
   query("status")
     .optional()
     .isIn(['available', 'busy', 'offline', 'suspended'])

@@ -62,7 +62,7 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
     where: whereConditions,
     include: [
       { model: OrderItem, as: "order_items", include: [{ model: MenuItem, as: "menu_item" }] },
-      { model: Restaurant, as: "restaurant", attributes: ["id", "name", "address", "location", "image_url"] },
+      { model: Restaurant, as: "restaurant", attributes: ["id", "name", "address", "location", "image_url", "email"] },
       { model: Client, as: "client", attributes: ["id", "first_name", "last_name", "phone_number"] }
     ],
     order: [[literal("distance"), "ASC"], ["created_at", "DESC"]],
@@ -191,6 +191,7 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
         name: order.restaurant.name,
         address: order.restaurant.address,
         image_url: order.restaurant.image_url,
+        email: order.restaurant.email || null,
         location: restaurantCoords.length === 2 ? {
           type: 'Point',
           coordinates: restaurantCoords,

@@ -3,35 +3,59 @@ import { Op } from "sequelize";
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 
-// Get all drivers
+// Get all drivers with pagination
 export const getAllDrivers = async (filters = {}) => {
+  const {
+    page = 1,
+    limit = 20,
+    status,
+    is_active,
+    is_verified,
+    search
+  } = filters;
+
+  const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
   const where = {};
   
-  if (filters.status) {
-    where.status = filters.status;
+  if (status) {
+    where.status = status;
   }
   
-  if (filters.is_active !== undefined) {
-    where.is_active = filters.is_active;
+  if (is_active !== undefined) {
+    where.is_active = is_active === 'true' || is_active === true;
   }
   
-  if (filters.is_verified !== undefined) {
-    where.is_verified = filters.is_verified;
+  if (is_verified !== undefined) {
+    where.is_verified = is_verified === 'true' || is_verified === true;
   }
   
-  if (filters.search) {
+  if (search) {
     where[Op.or] = [
-      { first_name: { [Op.iLike]: `%${filters.search}%` } },
-      { last_name: { [Op.iLike]: `%${filters.search}%` } },
-      { phone: { [Op.iLike]: `%${filters.search}%` } },
-      { driver_code: { [Op.iLike]: `%${filters.search}%` } }
+      { first_name: { [Op.iLike]: `%${search}%` } },
+      { last_name: { [Op.iLike]: `%${search}%` } },
+      { phone: { [Op.iLike]: `%${search}%` } },
+      { email: { [Op.iLike]: `%${search}%` } },
+      { driver_code: { [Op.iLike]: `%${search}%` } },
+      { license_number: { [Op.iLike]: `%${search}%` } }
     ];
   }
   
-  return Driver.findAll({
+  const { count, rows } = await Driver.findAndCountAll({
     where,
-    order: [['created_at', 'DESC']]
+    order: [['created_at', 'DESC']],
+    limit: parseInt(limit, 10),
+    offset
   });
+
+  return {
+    drivers: rows,
+    pagination: {
+      current_page: parseInt(page, 10),
+      total_pages: Math.ceil(count / parseInt(limit, 10)),
+      total_items: count,
+      items_per_page: parseInt(limit, 10)
+    }
+  };
 };
 
 // Get driver by ID

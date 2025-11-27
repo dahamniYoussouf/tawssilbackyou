@@ -165,6 +165,13 @@ export const registerValidator = [
     .isLength({ max: 1000 })
     .withMessage('Description must be less than 1000 characters'),
   
+  body('email')
+    .if(body('type').equals('restaurant'))
+    .optional()
+    .trim()
+    .isEmail()
+    .withMessage('Email must be a valid email address'),
+  
   body('rating')
     .if(body('type').equals('restaurant'))
     .optional()

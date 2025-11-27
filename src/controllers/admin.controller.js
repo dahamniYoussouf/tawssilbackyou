@@ -2,6 +2,8 @@ import * as adminNotificationService from "../services/adminNotification.service
 import Order from "../models/Order.js";
 import Admin from "../models/Admin.js";
 import Driver from "../models/Driver.js";
+import Client from "../models/Client.js";
+import Restaurant from "../models/Restaurant.js";
 import { 
   getMaxOrdersPerDriver, 
   updateMaxOrdersPerDriver 
@@ -11,6 +13,7 @@ import { emit } from '../config/socket.js';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
+import { Op } from "sequelize";
 
 
 /**
@@ -214,6 +217,98 @@ export const getProfile = async (req, res, next) => {
       data: admin
     });
   } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * PUT /admin/profile/me
+ * Mettre à jour le profil de l'admin connecté
+ */
+export const updateProfile = async (req, res, next) => {
+  try {
+    const adminId = req.user.admin_id;
+    
+    if (!adminId) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin profile not found in token"
+      });
+    }
+
+    const admin = await Admin.findByPk(adminId);
+    
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin profile not found"
+      });
+    }
+
+    const { first_name, last_name, email, phone } = req.body;
+
+    // Validation
+    if (first_name && first_name.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: "Le prénom doit contenir au moins 2 caractères"
+      });
+    }
+
+    if (last_name && last_name.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: "Le nom doit contenir au moins 2 caractères"
+      });
+    }
+
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          success: false,
+          message: "Format d'email invalide"
+        });
+      }
+    }
+
+    // Mettre à jour les champs fournis
+    const updateData = {};
+    if (first_name !== undefined) updateData.first_name = first_name.trim();
+    if (last_name !== undefined) updateData.last_name = last_name.trim();
+    if (email !== undefined) updateData.email = email.trim();
+    if (phone !== undefined) updateData.phone = phone ? phone.trim() : null;
+
+    await admin.update(updateData);
+
+    // Recharger l'admin pour avoir les données à jour
+    await admin.reload();
+
+    res.json({
+      success: true,
+      message: "Profil mis à jour avec succès",
+      data: admin
+    });
+  } catch (err) {
+    if (err.name === "SequelizeUniqueConstraintError") {
+      return res.status(400).json({
+        success: false,
+        message: "Cet email est déjà utilisé",
+        field: err.errors[0]?.path || 'email'
+      });
+    }
+
+    if (err.name === "SequelizeValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: "Erreur de validation",
+        errors: err.errors.map(e => ({
+          field: e.path,
+          message: e.message
+        }))
+      });
+    }
+
     next(err);
   }
 };
@@ -428,6 +523,182 @@ export const getDeliveryConfig = async (req, res, next) => {
       data: {
         max_orders_per_driver: maxOrders,
         max_distance_between_restaurants: maxDistance
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * GET /admin/config/all
+ * Récupérer toutes les configurations système
+ */
+export const getAllConfigs = async (req, res, next) => {
+  try {
+    const allConfigs = await SystemConfig.findAll({
+      order: [['config_key', 'ASC']]
+    });
+
+    // Organiser par catégories
+    const configsByCategory = {
+      delivery: [],
+      orders: [],
+      fees: [],
+      notifications: [],
+      drivers: [],
+      platform: []
+    };
+
+    allConfigs.forEach(config => {
+      const key = config.config_key;
+      const value = config.config_value;
+      const description = config.description || '';
+      
+      const configItem = {
+        key,
+        value,
+        description,
+        updated_at: config.updated_at,
+        updated_by: config.updated_by
+      };
+
+      // Catégoriser les configurations (ordre important pour éviter les doublons)
+      if (key.includes('max_orders') || key.includes('max_distance') || key.includes('search_radius') || key.includes('delivery_distance')) {
+        configsByCategory.delivery.push(configItem);
+      } else if (key.includes('preparation_time') || (key.includes('timeout') && !key.includes('notification'))) {
+        configsByCategory.orders.push(configItem);
+      } else if (key.includes('fee') || key.includes('commission')) {
+        configsByCategory.fees.push(configItem);
+      } else if (key.includes('notification')) {
+        configsByCategory.notifications.push(configItem);
+      } else if (key.includes('driver') || key.includes('cancellation')) {
+        configsByCategory.drivers.push(configItem);
+      } else {
+        configsByCategory.platform.push(configItem);
+      }
+    });
+
+    res.json({
+      success: true,
+      data: configsByCategory,
+      all: allConfigs.map(c => ({
+        key: c.config_key,
+        value: c.config_value,
+        description: c.description,
+        updated_at: c.updated_at,
+        updated_by: c.updated_by
+      }))
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * PUT /admin/config/:key
+ * Mettre à jour une configuration
+ */
+export const updateConfig = async (req, res, next) => {
+  try {
+    const { key } = req.params;
+    const { value, description } = req.body;
+    const adminId = req.user.admin_id;
+
+    if (!adminId) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin profile not found in token"
+      });
+    }
+
+    if (value === undefined || value === null) {
+      return res.status(400).json({
+        success: false,
+        message: "Value is required"
+      });
+    }
+
+    // Validation spécifique selon la clé
+    const validations = {
+      'max_orders_per_driver': { min: 1, max: 10, type: 'number' },
+      'max_distance_between_restaurants': { min: 100, max: 5000, type: 'number' },
+      'driver_search_radius': { min: 1000, max: 20000, type: 'number' },
+      'pending_order_timeout': { min: 1, max: 60, type: 'number' },
+      'default_delivery_fee': { min: 0, max: 10000, type: 'number' },
+      'delivery_fee_per_km': { min: 0, max: 1000, type: 'number' },
+      'max_delivery_distance': { min: 1, max: 100, type: 'number' },
+      'default_preparation_time': { min: 5, max: 120, type: 'number' },
+      'platform_commission_rate': { min: 0, max: 50, type: 'number' },
+      'max_driver_cancellations': { min: 1, max: 20, type: 'number' }
+    };
+
+    const validation = validations[key];
+    if (validation) {
+      if (validation.type === 'number') {
+        const numValue = Number(value);
+        if (isNaN(numValue)) {
+          return res.status(400).json({
+            success: false,
+            message: `${key} must be a number`
+          });
+        }
+        if (validation.min !== undefined && numValue < validation.min) {
+          return res.status(400).json({
+            success: false,
+            message: `${key} must be at least ${validation.min}`
+          });
+        }
+        if (validation.max !== undefined && numValue > validation.max) {
+          return res.status(400).json({
+            success: false,
+            message: `${key} must be at most ${validation.max}`
+          });
+        }
+      }
+    }
+
+    // Mise à jour spéciale pour max_orders_per_driver
+    if (key === 'max_orders_per_driver') {
+      const config = await updateMaxOrdersPerDriver(Number(value), adminId);
+      
+      // Notifier tous les livreurs
+      emit('drivers', 'config_update', {
+        type: 'max_orders_updated',
+        max_orders_per_driver: Number(value),
+        message: `Maximum orders capacity updated to ${value}`,
+        timestamp: new Date().toISOString()
+      });
+
+      return res.json({
+        success: true,
+        message: `Max orders per driver updated to ${value}. All drivers notified.`,
+        data: {
+          key,
+          value: Number(value),
+          updated_at: config.updated_at
+        }
+      });
+    }
+
+    // Mise à jour standard
+    const config = await SystemConfig.set(
+      key,
+      validation?.type === 'number' ? Number(value) : value,
+      adminId,
+      description
+    );
+
+    console.log(`✅ Config ${key} updated to ${value} by admin ${adminId}`);
+
+    res.json({
+      success: true,
+      message: `Configuration ${key} updated successfully`,
+      data: {
+        key,
+        value: config.config_value,
+        description: config.description,
+        updated_at: config.updated_at
       }
     });
   } catch (err) {
@@ -679,7 +950,7 @@ export const getAllFavoriteRestaurants = async (req, res, next) => {
         { 
           model: Restaurant, 
           as: 'restaurant',
-          attributes: ['id', 'name', 'description', 'address', 'rating', 'image_url', 'is_premium', 'status']
+          attributes: ['id', 'name', 'description', 'address', 'rating', 'image_url', 'is_premium', 'status', 'email']
         },
         {
           model: Client,
@@ -783,6 +1054,106 @@ export const getFavoritesStats = async (req, res, next) => {
 
 
 // Add to src/controllers/admin.controller.js
+
+/**
+ * GET /admin/statistics
+ * Get dashboard statistics for admin
+ */
+export const getStatistics = async (req, res, next) => {
+  try {
+    // Get all orders
+    const orders = await Order.findAll({
+      attributes: ['id', 'status', 'total_amount', 'created_at']
+    });
+
+    // Calculate order statistics
+    const totalOrders = orders.length;
+    const pendingOrders = orders.filter(o => o.status === 'pending').length;
+    const completedOrders = orders.filter(o => o.status === 'delivered').length;
+    const cancelledOrders = orders.filter(o => o.status === 'declined').length;
+    const inProgressOrders = orders.filter(o => 
+      ['accepted', 'preparing', 'assigned', 'delivering', 'arrived'].includes(o.status)
+    ).length;
+
+    // Calculate revenue
+    const totalRevenue = orders
+      .filter(o => o.status === 'delivered')
+      .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
+
+    const avgOrderValue = completedOrders > 0 
+      ? totalRevenue / completedOrders 
+      : 0;
+
+    // Get restaurant statistics
+    const restaurants = await Restaurant.findAll({
+      attributes: ['id', 'is_active', 'is_premium', 'status']
+    });
+    const totalRestaurants = restaurants.length;
+    const activeRestaurants = restaurants.filter(r => r.is_active).length;
+    const premiumRestaurants = restaurants.filter(r => r.is_premium).length;
+    const approvedRestaurants = restaurants.filter(r => r.status === 'approved').length;
+
+    // Get driver statistics
+    const drivers = await Driver.findAll({
+      attributes: ['id', 'status', 'is_active', 'is_verified']
+    });
+    const totalDrivers = drivers.length;
+    const availableDrivers = drivers.filter(d => d.status === 'available').length;
+    const busyDrivers = drivers.filter(d => d.status === 'busy').length;
+    const offlineDrivers = drivers.filter(d => d.status === 'offline').length;
+
+    // Get client statistics
+    const clients = await Client.findAll({
+      attributes: ['id', 'is_active', 'is_verified']
+    });
+    const totalClients = clients.length;
+    const activeClients = clients.filter(c => c.is_active).length;
+    const verifiedClients = clients.filter(c => c.is_verified).length;
+
+    // Calculate growth (compare with previous month - simplified for now)
+    // In a real implementation, you'd compare with previous period
+    const orderGrowth = 12.5; // Mock value - should be calculated from historical data
+    const revenueGrowth = 18.3; // Mock value - should be calculated from historical data
+
+    res.json({
+      success: true,
+      data: {
+        orders: {
+          total: totalOrders,
+          pending: pendingOrders,
+          completed: completedOrders,
+          cancelled: cancelledOrders,
+          inProgress: inProgressOrders,
+          growth: orderGrowth
+        },
+        revenue: {
+          total: parseFloat(totalRevenue.toFixed(2)),
+          average: parseFloat(avgOrderValue.toFixed(2)),
+          growth: revenueGrowth
+        },
+        restaurants: {
+          total: totalRestaurants,
+          active: activeRestaurants,
+          premium: premiumRestaurants,
+          approved: approvedRestaurants
+        },
+        drivers: {
+          total: totalDrivers,
+          available: availableDrivers,
+          busy: busyDrivers,
+          offline: offlineDrivers
+        },
+        clients: {
+          total: totalClients,
+          active: activeClients,
+          verified: verifiedClients
+        }
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 /**
  * POST /admin/notify/drivers

@@ -23,6 +23,12 @@ export const createRestaurantValidator = [
     .isLength({ max: 500 })
     .withMessage("Address must not exceed 500 characters"),
 
+  body("email")
+    .optional()
+    .trim()
+    .isEmail()
+    .withMessage("Email must be a valid email address"),
+
   body("lat")
     .notEmpty()
     .withMessage("Latitude is required")
@@ -135,6 +141,12 @@ export const updateRestaurantValidator = [
     .trim()
     .isLength({ max: 500 })
     .withMessage("Address must not exceed 500 characters"),
+
+  body("email")
+    .optional()
+    .trim()
+    .isEmail()
+    .withMessage("Email must be a valid email address"),
 
   body("lat")
     .optional()

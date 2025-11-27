@@ -75,6 +75,7 @@ export const filter = async (req, res, next) => {
       count: result.count,
       page: result.page,
       pageSize: result.pageSize,
+      totalPages: result.totalPages,
       data: result.formatted,
     });
   } catch (err) {

@@ -38,7 +38,7 @@ export async function getAllOrdersService(filters = {}) {
     where,
     include: [
             { model: OrderItem, as: "order_items", include: [{ model: MenuItem, as: "menu_item" }] },
-      { model: Restaurant, as: "restaurant", attributes: ["id", "name", "image_url"] },
+      { model: Restaurant, as: "restaurant", attributes: ["id", "name", "image_url", "email"] },
       { model: Client, as: "client", attributes: ["id", "first_name", "last_name", "email"] },
       { model: Driver, as: "driver", attributes: ["id", "first_name", "last_name", "phone", "current_location"] }
     ],
@@ -100,7 +100,7 @@ export async function getClientOrdersService(clientId, filters = {}) {
   const { count, rows } = await Order.findAndCountAll({
     where,
     include: [
-      { model: Restaurant, as: "restaurant", attributes: ["id", "name", "image_url", "rating"] },
+      { model: Restaurant, as: "restaurant", attributes: ["id", "name", "image_url", "rating", "email"] },
       { model: Driver, as: "driver", attributes: ["id", "first_name", "last_name", "phone"] },
     ],
     order: [["created_at", "DESC"]],
@@ -134,7 +134,7 @@ export async function getDriverActiveOrders(driverId) {
   const orders = await Order.findAll({
     where: { id: driver.active_orders },
     include: [
-      { model: Restaurant, as: "restaurant", attributes: ["id", "name", "address", "location"] },
+      { model: Restaurant, as: "restaurant", attributes: ["id", "name", "address", "location", "email"] },
       { model: Client, as: "client", attributes: ["id", "first_name", "last_name", "phone_number"] },
     ],
     order: [["assigned_at", "ASC"]],

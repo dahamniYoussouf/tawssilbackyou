@@ -213,7 +213,8 @@ export const filterNearbyRestaurants = async (filters) => {
       status: r.status,
       is_open: r.isOpen(),
       categories: r.categories, // Changed from category object
-      favorite_uuid: favoriteUuid
+      favorite_uuid: favoriteUuid,
+      email: r.email || null
     };
   })
 
@@ -346,6 +347,7 @@ export const filter = async (filters = {}) => {
       delivery_time_max: null,
       image_url: r.image_url,
       phone_number:r.phone_number,
+      email: r.email || null,
       distance: null,
       is_premium: r.is_premium,
       is_active: r.is_active,
@@ -512,7 +514,8 @@ export const updateRestaurant = async (id, data) => {
     is_premium,
     status,
     opening_hours,
-    categories // Added
+    categories, // Added
+    email
   } = data;
 
   // Validate categories if provided
@@ -533,7 +536,8 @@ export const updateRestaurant = async (id, data) => {
     is_premium,
     status,
     opening_hours,
-    ...(categories && { categories }) // Only update if provided
+    ...(categories && { categories }), // Only update if provided
+    ...(email !== undefined && { email }) // Only update if provided
   });
 
   return resto;
@@ -794,6 +798,8 @@ export const getRestaurantProfile = async (id) => {
     },
     rating: restaurant.rating ? parseFloat(restaurant.rating) : 0.0,
     image_url: restaurant.image_url,
+    phone_number: restaurant.phone_number,
+    email: restaurant.email || null,
     is_active: restaurant.is_active,
     is_premium: restaurant.is_premium,
     status: restaurant.status,

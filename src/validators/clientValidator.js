@@ -1,4 +1,4 @@
-import { body, param } from "express-validator";
+import { body, param, query } from "express-validator";
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 // ----------------------------
@@ -143,4 +143,31 @@ export const deleteClientValidator = [
   param("id")
     .isUUID()
     .withMessage("Invalid client UUID"),
+];
+
+// ----------------------------
+// Validator for getting all clients (with pagination)
+// ----------------------------
+export const getAllClientsValidator = [
+  query("page")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Page must be a positive integer"),
+
+  query("limit")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("Limit must be between 1 and 100"),
+
+  query("pageSize")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("PageSize must be between 1 and 100"),
+
+  query("search")
+    .optional()
+    .isString()
+    .withMessage("Search must be a string")
+    .isLength({ min: 2, max: 100 })
+    .withMessage("Search must be between 2 and 100 characters")
 ];

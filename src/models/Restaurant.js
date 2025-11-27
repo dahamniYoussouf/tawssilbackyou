@@ -38,6 +38,14 @@ const Restaurant = sequelize.define('Restaurant', {
     allowNull: true,
     comment: 'Restaurant contact phone number'
   },
+  email: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    validate: {
+      isEmail: true
+    },
+    comment: 'Restaurant contact email'
+  },
   location:
   process.env.NODE_ENV === "test"
         ? {

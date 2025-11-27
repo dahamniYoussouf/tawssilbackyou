@@ -10,21 +10,23 @@ import { getDriverActiveOrders } from '../services/order.service.js';
 
 
 
-// Get all drivers with filters
+// Get all drivers with filters and pagination
 export const getAll = async (req, res, next) => {
   try {
     const filters = {
+      page: req.query.page || 1,
+      limit: req.query.limit || req.query.pageSize || 20,
       status: req.query.status,
       is_active: req.query.is_active,
       is_verified: req.query.is_verified,
       search: req.query.search
     };
     
-    const drivers = await getAllDrivers(filters);
+    const result = await getAllDrivers(filters);
     res.json({ 
       success: true, 
-      data: drivers,
-      count: drivers.length 
+      data: result.drivers,
+      pagination: result.pagination
     });
   } catch (err) {
     next(err);

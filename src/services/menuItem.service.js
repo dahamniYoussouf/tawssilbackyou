@@ -52,7 +52,7 @@ export async function getAllMenuItems(filters = {}) {
     where,
     include: [
       { model: FoodCategory, as: 'category', attributes: ['id', 'nom'] },
-      { model: Restaurant, as: 'restaurant', attributes: ['id', 'name', 'image_url'] }
+      { model: Restaurant, as: 'restaurant', attributes: ['id', 'name', 'image_url', 'email'] }
     ],
     order: [['created_at', 'DESC']],
     limit: +limit,
@@ -95,7 +95,7 @@ export async function getMenuItemsByCategory(filters) {
     where,
     include: [
       { model: FoodCategory, as: "category", attributes: ["id", "nom"] },
-      { model: Restaurant, as: "restaurant", attributes: ["id", "name"] }
+      { model: Restaurant, as: "restaurant", attributes: ["id", "name", "email"] }
     ],
     order: [['nom', 'ASC']]
   });

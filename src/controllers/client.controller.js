@@ -6,11 +6,23 @@ import {
 import Client from "../models/Client.js"
 
 
-// Get all
+// Get all with pagination
 export const getAll = async (req, res, next) => {
   try {
-    const clients = await getAllClients();
-    res.json({ success: true, data: clients });
+    const filters = {
+      page: req.query.page || 1,
+      limit: req.query.limit || req.query.pageSize || 20,
+      search: req.query.search,
+      is_active: req.query.is_active,
+      is_verified: req.query.is_verified
+    };
+
+    const result = await getAllClients(filters);
+    res.json({ 
+      success: true, 
+      data: result.clients,
+      pagination: result.pagination
+    });
   } catch (err) {
     next(err);
   }

@@ -22,6 +22,7 @@ router.use(protect, authorize('admin'));
 
 // Profil
 router.get('/profile/me', adminCtrl.getProfile);
+router.put('/profile/me', adminCtrl.updateProfile);
 
 // Notifications
 router.get('/notifications', adminCtrl.getNotifications);
@@ -55,6 +56,12 @@ router.get('/favorites/restaurants', adminCtrl.getAllFavoriteRestaurants);
 router.get('/favorites/meals', adminCtrl.getAllFavoriteMeals);
 router.get('/favorites/stats', adminCtrl.getFavoritesStats);
 
+// ==================== STATISTICS ====================
+router.get('/statistics', adminCtrl.getStatistics);
+
+// ==================== CONFIGURATIONS ====================
+router.get('/config/all', adminCtrl.getAllConfigs);
+router.put('/config/:key', adminCtrl.updateConfig);
 
 router.post('/notify/drivers', protect, authorize('admin'), notifyAllDrivers);
 export default router;
