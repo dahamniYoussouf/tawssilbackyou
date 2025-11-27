@@ -106,8 +106,8 @@ const paymentMethods = ['baridi_mob', 'cash_on_delivery', 'bank_transfer'];
 
 // Génère coordonnées aléatoires autour de Sidi Abdellah
 const getRandomLocation = () => {
-  const baseLat = 36.7471166;
-  const baseLng = 2.8740841;
+  const baseLat = 36.747385;
+  const baseLng = 6.27404;
   const offset = 0.02;
   return {
     type: 'Point',

@@ -100,8 +100,10 @@ export async function createOrderWithItems(data) {
     };
   });
 
-  // OPTIMIZATION 4: Calculate delivery time BEFORE transaction
-  const prepTime = 15;
+  // OPTIMIZATION 4: Calculate initial delivery time estimate BEFORE transaction
+  // NOTE: This is an initial estimate. The definitive calculation with the restaurant's 
+  // actual preparation_time will be done in acceptOrder() when the restaurant accepts the order.
+  const prepTime = 15; // Default preparation time (will be replaced by restaurant's estimate)
   let calculatedEstimatedTime = estimated_delivery_time;
   let deliveryDurationMinutes = null;
   let distanceKm = null;

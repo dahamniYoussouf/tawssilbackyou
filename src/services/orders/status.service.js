@@ -21,18 +21,76 @@ export async function acceptOrder(orderId, userId, data = {}) {
 
   const preparationMinutes = data?.preparation_time || 15;
 
+  // Calcul du temps de livraison : preparation_time + temps de trajet restaurant -> client
+  let deliveryTimeMinutes = preparationMinutes;
+  let deliveryDistanceKm = order.delivery_distance;
+  let estimatedDeliveryTime = new Date(Date.now() + preparationMinutes * 60 * 1000);
+
+  // Si c'est une livraison, calculer le temps de trajet depuis le restaurant jusqu'au client
+  if (order.order_type === "delivery") {
+    const restaurantCoords = order.restaurant?.getCoordinates?.();
+    const deliveryCoords = order.delivery_location?.coordinates;
+
+    if (restaurantCoords && deliveryCoords && deliveryCoords.length === 2) {
+      const [deliveryLng, deliveryLat] = deliveryCoords;
+
+      try {
+        const route = await calculateRouteTime(
+          restaurantCoords.longitude,
+          restaurantCoords.latitude,
+          deliveryLng,
+          deliveryLat,
+          40 // Vitesse moyenne: 40 km/h
+        );
+
+        // Temps total = temps de préparation + temps de trajet
+        deliveryTimeMinutes = preparationMinutes + route.timeMax;
+        deliveryDistanceKm = route.distanceKm;
+        estimatedDeliveryTime = new Date(Date.now() + deliveryTimeMinutes * 60 * 1000);
+
+        console.log(`📍 Route Restaurant→Client: ${route.distanceKm} km, ~${route.timeMax} min`);
+        console.log(`⏱️ Temps total: ${preparationMinutes} min (préparation) + ${route.timeMax} min (trajet) = ${deliveryTimeMinutes} min`);
+      } catch (error) {
+        console.error('❌ Erreur calcul route restaurant→client:', error.message);
+        // En cas d'erreur, utiliser une estimation par défaut pour le trajet
+        const defaultDeliveryTime = 20; // 20 minutes par défaut pour le trajet
+        deliveryTimeMinutes = preparationMinutes + defaultDeliveryTime;
+        estimatedDeliveryTime = new Date(Date.now() + deliveryTimeMinutes * 60 * 1000);
+        console.warn(`⚠️ Utilisation estimation par défaut: ${defaultDeliveryTime} min pour le trajet`);
+      }
+    } else {
+      console.warn(`⚠️ Coordonnées manquantes pour calculer le trajet (order ${orderId})`);
+    }
+  }
+
   await order.update({
     status: "accepted",
     preparation_time: preparationMinutes,
     accepted_at: new Date(),
+    estimated_delivery_time: estimatedDeliveryTime,
+    ...(deliveryDistanceKm && { delivery_distance: deliveryDistanceKm }),
   });
+
+  // Préparer le message avec les temps calculés
+  let message = `${order.restaurant.name} accepted your order.`;
+  if (order.order_type === "delivery") {
+    message += ` Estimated delivery time: ${deliveryTimeMinutes} min (${preparationMinutes} min preparation + ${deliveryTimeMinutes - preparationMinutes} min delivery)`;
+  } else {
+    message += ` Estimated preparation time: ${preparationMinutes} min`;
+  }
 
   notify("client", order.client_id, {
     type: "order_accepted",
     orderId: order.id,
     orderNumber: order.order_number,
     restaurant: order.restaurant.name,
-    message: `${order.restaurant.name} accepted your order. Estimated preparation time: ${preparationMinutes} min`,
+    message: message,
+    preparation_time: preparationMinutes,
+    ...(order.order_type === "delivery" && {
+      delivery_time: deliveryTimeMinutes - preparationMinutes,
+      total_delivery_time: deliveryTimeMinutes,
+      estimated_delivery_time: estimatedDeliveryTime
+    })
   });
 
   // ✅ FIX 4: Notification des drivers avec meilleure gestion d'erreurs
@@ -56,7 +114,7 @@ export async function acceptOrder(orderId, userId, data = {}) {
             restaurantAddress: order.restaurant.address,
             deliveryAddress: order.delivery_address,
             fee: parseFloat(order.delivery_fee || 0),
-            estimatedTime: order.estimated_delivery_time,
+            estimatedTime: estimatedDeliveryTime, // ✅ Utiliser le temps calculé avec preparation_time + trajet
             totalAmount: parseFloat(order.total_amount || 0),
           },
           5 // ✅ FIX 5: Radius en km (sera converti en mètres dans la fonction)

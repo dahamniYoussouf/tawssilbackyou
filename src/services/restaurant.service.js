@@ -6,7 +6,6 @@ import Client from "../models/Client.js";
 import Order from "../models/Order.js";
 import { Op, literal } from "sequelize";
 import axios from "axios";
-import calculateRouteTime from "../services/routingService.js"
 import FavoriteMeal from "../models/FavoriteMeal.js";
 
 
@@ -45,17 +44,57 @@ export const filterNearbyRestaurants = async (filters) => {
 
   // Handle address-based search (geocoding)
   if (address && address.trim()) {
-    const response = await axios.get("https://nominatim.openstreetmap.org/search", {
-      params: { q: address, format: "json", limit: 1 },
-      headers: { "User-Agent": "food-delivery-app" }
-    });
+    try {
+      const response = await axios.get("https://nominatim.openstreetmap.org/search", {
+        params: { q: address, format: "json", limit: 1 },
+        headers: { "User-Agent": "food-delivery-app" },
+        timeout: 10000 // 10 secondes timeout
+      });
 
-    if (response.data.length === 0) {
-      throw new Error("Address not found");
+      if (response.data.length === 0) {
+        const error = new Error("Address not found");
+        error.status = 404;
+        throw error;
+      }
+
+      latitude = parseFloat(response.data[0].lat);
+      longitude = parseFloat(response.data[0].lon);
+
+      if (isNaN(latitude) || isNaN(longitude)) {
+        const error = new Error("Invalid coordinates returned from geocoding service");
+        error.status = 502;
+        throw error;
+      }
+    } catch (error) {
+      // Si c'est déjà une erreur avec un statut, la relancer
+      if (error.status) {
+        throw error;
+      }
+
+      // Gérer les erreurs axios
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        const timeoutError = new Error("Geocoding service timeout. Please try again or use coordinates.");
+        timeoutError.status = 503;
+        throw timeoutError;
+      }
+
+      if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.response?.status >= 500) {
+        const serviceError = new Error("Geocoding service unavailable. Please try again later or use coordinates.");
+        serviceError.status = 503;
+        throw serviceError;
+      }
+
+      if (error.response?.status === 429) {
+        const rateLimitError = new Error("Too many geocoding requests. Please try again later or use coordinates.");
+        rateLimitError.status = 429;
+        throw rateLimitError;
+      }
+
+      // Erreur générique de géocodage
+      const geocodeError = new Error("Unable to geocode address. Please check the address or use coordinates.");
+      geocodeError.status = 400;
+      throw geocodeError;
     }
-
-    latitude = parseFloat(response.data[0].lat);
-    longitude = parseFloat(response.data[0].lon);
   }
   // Handle coordinate-based search
   else if (lat && lng) {
@@ -63,12 +102,16 @@ export const filterNearbyRestaurants = async (filters) => {
     longitude = parseFloat(lng);
 
     if (isNaN(latitude) || isNaN(longitude)) {
-      throw new Error("Invalid coordinates");
+      const error = new Error("Invalid coordinates");
+      error.status = 400;
+      throw error;
     }
   }
   // Neither provided
   else {
-    throw new Error("Address or coordinates required");
+    const error = new Error("Address or coordinates required");
+    error.status = 400;
+    throw error;
   }
 
   const searchRadius = parseInt(radius, 10);
@@ -135,12 +178,24 @@ export const filterNearbyRestaurants = async (filters) => {
   }
 
   // Format response
-const formatted = await Promise.all(result.map(async (r) => {
+  // Utiliser la distance fournie par la BDD (en mètres) pour calculer le temps de livraison
+  const formatted = result.map((r) => {
     const coords = r.location?.coordinates || [];
-      const route = await calculateRouteTime(longitude, latitude, coords[0], coords[1], 40);
     const favoriteUuid = favoriteMap.get(r.id) || null;
 
     const prepTime = 15;
+    
+    // Distance en mètres depuis la BDD (ST_Distance retourne des mètres)
+    const distanceMeters = r.dataValues.distance || 0;
+    const distanceKm = distanceMeters / 1000;
+    
+    // Calculer le temps de livraison basé sur la distance (vitesse moyenne: 40 km/h)
+    const speedKmh = 40;
+    const deliveryTimeMinutes = (distanceKm / speedKmh) * 60;
+    
+    // Temps optimiste et pessimiste (comme calculateRouteTime)
+    const deliveryTimeMin = Math.floor(deliveryTimeMinutes * 0.9); // -10%
+    const deliveryTimeMax = Math.ceil(deliveryTimeMinutes * 1.2);  // +20%
 
     return {
       id: r.id,
@@ -150,17 +205,17 @@ const formatted = await Promise.all(result.map(async (r) => {
       lat: coords[1] || null,
       lng: coords[0] || null,
       rating: r.rating,
-      delivery_time_min: prepTime + route.timeMin,
-      delivery_time_max: prepTime + route.timeMax,
+      delivery_time_min: prepTime + deliveryTimeMin,
+      delivery_time_max: prepTime + deliveryTimeMax,
       image_url: r.image_url,
-      distance: r.dataValues.distance,
+      distance: distanceMeters, // Distance en mètres
       is_premium: r.is_premium,
       status: r.status,
       is_open: r.isOpen(),
       categories: r.categories, // Changed from category object
       favorite_uuid: favoriteUuid
     };
-  }))
+  })
 
   return {
     formatted,
@@ -329,17 +384,57 @@ export const getNearbyRestaurantNames = async (filters) => {
 
   // Geocode if address provided
   if (address && address.trim()) {
-    const response = await axios.get("https://nominatim.openstreetmap.org/search", {
-      params: { q: address, format: "json", limit: 1 },
-      headers: { "User-Agent": "food-delivery-app" }
-    });
+    try {
+      const response = await axios.get("https://nominatim.openstreetmap.org/search", {
+        params: { q: address, format: "json", limit: 1 },
+        headers: { "User-Agent": "food-delivery-app" },
+        timeout: 10000 // 10 secondes timeout
+      });
 
-    if (response.data.length === 0) {
-      throw new Error("Address not found");
+      if (response.data.length === 0) {
+        const error = new Error("Address not found");
+        error.status = 404;
+        throw error;
+      }
+
+      latitude = parseFloat(response.data[0].lat);
+      longitude = parseFloat(response.data[0].lon);
+
+      if (isNaN(latitude) || isNaN(longitude)) {
+        const error = new Error("Invalid coordinates returned from geocoding service");
+        error.status = 502;
+        throw error;
+      }
+    } catch (error) {
+      // Si c'est déjà une erreur avec un statut, la relancer
+      if (error.status) {
+        throw error;
+      }
+
+      // Gérer les erreurs axios
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        const timeoutError = new Error("Geocoding service timeout. Please try again or use coordinates.");
+        timeoutError.status = 503;
+        throw timeoutError;
+      }
+
+      if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.response?.status >= 500) {
+        const serviceError = new Error("Geocoding service unavailable. Please try again later or use coordinates.");
+        serviceError.status = 503;
+        throw serviceError;
+      }
+
+      if (error.response?.status === 429) {
+        const rateLimitError = new Error("Too many geocoding requests. Please try again later or use coordinates.");
+        rateLimitError.status = 429;
+        throw rateLimitError;
+      }
+
+      // Erreur générique de géocodage
+      const geocodeError = new Error("Unable to geocode address. Please check the address or use coordinates.");
+      geocodeError.status = 400;
+      throw geocodeError;
     }
-
-    latitude = parseFloat(response.data[0].lat);
-    longitude = parseFloat(response.data[0].lon);
   }
   // Use coordinates
   else if (lat && lng) {
@@ -347,12 +442,16 @@ export const getNearbyRestaurantNames = async (filters) => {
     longitude = parseFloat(lng);
 
     if (isNaN(latitude) || isNaN(longitude)) {
-      throw new Error("Invalid coordinates");
+      const error = new Error("Invalid coordinates");
+      error.status = 400;
+      throw error;
     }
   }
   // Neither provided
   else {
-    throw new Error("Address or coordinates required");
+    const error = new Error("Address or coordinates required");
+    error.status = 400;
+    throw error;
   }
 
   const searchRadius = parseInt(radius, 10);
