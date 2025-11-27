@@ -1,4 +1,5 @@
 import { body, param } from "express-validator";
+import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 // ----------------------------
 // Validator for creating a client
@@ -19,7 +20,10 @@ export const createClientValidator = [
 
   body("phone_number")
     .notEmpty()
-    .withMessage("Phone number is required"),
+    .withMessage("Phone number is required")
+    .customSanitizer((value) => normalizePhoneNumber(value))
+    .matches(/^213\d{9,}$/)
+    .withMessage("Invalid phone number format (must start with 213)"),
 
   body("address")
     .optional()
@@ -86,7 +90,10 @@ export const updateClientValidator = [
   body("phone_number")
     .optional()
     .notEmpty()
-    .withMessage("Phone number cannot be empty"),
+    .withMessage("Phone number cannot be empty")
+    .customSanitizer((value) => value ? normalizePhoneNumber(value) : value)
+    .matches(/^213\d{9,}$/)
+    .withMessage("Invalid phone number format (must start with 213)"),
 
   body("address")
     .optional()

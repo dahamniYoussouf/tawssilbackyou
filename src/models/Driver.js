@@ -1,5 +1,6 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../config/database.js";
+import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 const Driver = sequelize.define('Driver', {
   id: {
@@ -153,6 +154,18 @@ const Driver = sequelize.define('Driver', {
   underscored: true,
   createdAt: 'created_at',
   updatedAt: 'updated_at',
+  hooks: {
+    beforeCreate: async (driver) => {
+      if (driver.phone) {
+        driver.phone = normalizePhoneNumber(driver.phone);
+      }
+    },
+    beforeUpdate: async (driver) => {
+      if (driver.changed('phone') && driver.phone) {
+        driver.phone = normalizePhoneNumber(driver.phone);
+      }
+    }
+  },
   indexes: [
     {
       fields: ['status']

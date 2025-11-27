@@ -1,4 +1,5 @@
 import Client from "../models/Client.js";
+import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 
 // Get all
@@ -37,7 +38,7 @@ export const updateClient = async (id, data) => {
     first_name,
     last_name,
     email,
-    phone_number,
+    phone_number: phone_number ? normalizePhoneNumber(phone_number) : phone_number,
     address,
     location: lat && lng
       ? { type: "Point", coordinates: [parseFloat(lng), parseFloat(lat)] }

@@ -6,6 +6,7 @@ import Driver from "../../models/Driver.js";
 import OrderItem from "../../models/OrderItem.js";
 import MenuItem from "../../models/MenuItem.js";
 import calculateRouteTime from "../routingService.js";
+import { canDriverAcceptOrder } from "../multiDeliveryService.js";
 
 export const getNearbyOrders = async (driverId, filters = {}) => {
   const { radius = 5000, status = ["preparing", "accepted"], page = 1, pageSize = 20, min_fee, max_distance } = filters;
@@ -69,7 +70,7 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
     offset
   });
 
-  // ✅ CALCULER LES ROUTES POUR CHAQUE COMMANDE
+  // ✅ CALCULER LES ROUTES POUR CHAQUE COMMANDE ET FILTRER SELON LES CONDITIONS D'ASSIGNATION
   const formatted = await Promise.all(rows.map(async (order) => {
     const restaurantCoords = order.restaurant.location?.coordinates || [];
     const deliveryCoords = order.delivery_location?.coordinates || [];
@@ -77,6 +78,19 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
 
     // Filtrer par distance maximale si spécifiée
     if (max_distance && distanceDriverToDelivery > max_distance) return null;
+
+    // ✅ Vérifier si le driver peut accepter cette commande (mêmes conditions que assignDriverOrComplete)
+    try {
+      const canAccept = await canDriverAcceptOrder(driverId, order.id);
+      if (!canAccept.canAccept) {
+        // Ne pas inclure cette commande dans les résultats
+        return null;
+      }
+    } catch (error) {
+      console.error(`⚠️ Error checking if driver can accept order ${order.id}:`, error.message);
+      // En cas d'erreur, ne pas inclure la commande pour éviter d'afficher des commandes non acceptables
+      return null;
+    }
 
     // ✅ 1. Calculer route Driver → Restaurant
     let driverToRestaurant = null;

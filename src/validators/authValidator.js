@@ -1,4 +1,5 @@
 import { body } from 'express-validator';
+import { normalizePhoneNumber } from '../utils/phoneNormalizer.js';
 
 // Request OTP validator
 export const requestOTPValidator = [
@@ -6,10 +7,9 @@ export const requestOTPValidator = [
     .trim()
     .notEmpty()
     .withMessage('Phone number is required')
-    .matches(/^[0-9+\-\s()]+$/)
-    .withMessage('Invalid phone number format')
-    .isLength({ min: 10, max: 15 })
-    .withMessage('Phone number must be between 10 and 15 characters')
+    .customSanitizer((value) => normalizePhoneNumber(value))
+    .matches(/^213\d{9,}$/)
+    .withMessage('Invalid phone number format (must start with 213)')
 ];
 
 // Verify OTP validator
@@ -17,7 +17,10 @@ export const verifyOTPValidator = [
   body('phone_number')
     .trim()
     .notEmpty()
-    .withMessage('Phone number is required'),
+    .withMessage('Phone number is required')
+    .customSanitizer((value) => normalizePhoneNumber(value))
+    .matches(/^213\d{9,}$/)
+    .withMessage('Invalid phone number format (must start with 213)'),
   body('otp')
     .trim()
     .notEmpty()
@@ -81,8 +84,9 @@ export const registerValidator = [
     .notEmpty()
     .withMessage('Phone is required for drivers')
     .trim()
-    .matches(/^[0-9+\-\s()]+$/)
-    .withMessage('Invalid phone format'),
+    .customSanitizer((value) => normalizePhoneNumber(value))
+    .matches(/^213\d{9,}$/)
+    .withMessage('Invalid phone format (must start with 213)'),
   
   body('vehicle_type')
     .if(body('type').equals('driver'))

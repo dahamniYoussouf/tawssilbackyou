@@ -1,5 +1,6 @@
 import Driver from "../models/Driver.js";
 import { Op } from "sequelize";
+import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 
 // Get all drivers
@@ -47,6 +48,11 @@ export const getDriverByUserId = async (user_id) => {
 export const updateDriver = async (id, updateData) => {
   const driver = await Driver.findByPk(id);
   if (!driver) return null;
+  
+  // Normaliser le numéro de téléphone si présent
+  if (updateData.phone) {
+    updateData.phone = normalizePhoneNumber(updateData.phone);
+  }
   
   await driver.update(updateData);
   return driver;

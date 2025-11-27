@@ -1,5 +1,6 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../config/database.js";
+import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 const Client = sequelize.define("Client", {
   id: {
@@ -102,7 +103,19 @@ const Client = sequelize.define("Client", {
   timestamps: true,
   underscored: true,
   createdAt: "created_at",
-  updatedAt: "updated_at"
+  updatedAt: "updated_at",
+  hooks: {
+    beforeCreate: async (client) => {
+      if (client.phone_number) {
+        client.phone_number = normalizePhoneNumber(client.phone_number);
+      }
+    },
+    beforeUpdate: async (client) => {
+      if (client.changed('phone_number') && client.phone_number) {
+        client.phone_number = normalizePhoneNumber(client.phone_number);
+      }
+    }
+  }
 });
 
 // -------------------------

@@ -50,12 +50,20 @@ const sendOTP = async (phoneOrEmail, otp) => {
 // ============================================
 
 // STEP 1: Request OTP (First time or when token expired)
+import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
+
 export const requestOTP = async (req, res) => {
   try {
-    const { phone_number } = req.body;
+    let { phone_number } = req.body;
 
     if (!phone_number) {
       return res.status(400).json({ message: 'Phone number is required' });
+    }
+
+    // Normaliser le numéro de téléphone
+    phone_number = normalizePhoneNumber(phone_number);
+    if (!phone_number) {
+      return res.status(400).json({ message: 'Invalid phone number format' });
     }
 
     // Check if client exists
@@ -128,10 +136,16 @@ export const requestOTP = async (req, res) => {
 // STEP 2: Verify OTP and get LONG-LIVED tokens
 export const verifyOTP = async (req, res) => {
   try {
-    const { phone_number, otp, device_id } = req.body;
+    let { phone_number, otp, device_id } = req.body;
 
     if (!phone_number || !otp) {
       return res.status(400).json({ message: 'Phone number and OTP are required' });
+    }
+
+    // Normaliser le numéro de téléphone
+    phone_number = normalizePhoneNumber(phone_number);
+    if (!phone_number) {
+      return res.status(400).json({ message: 'Invalid phone number format' });
     }
 
     const storedData = otpStore.get(phone_number);
@@ -305,7 +319,7 @@ export const register = async (req, res) => {
           email: email,
           first_name: profileData.first_name || '',
           last_name: profileData.last_name || '',
-          phone: profileData.phone || '',
+          phone: normalizePhoneNumber(profileData.phone) || '',
           driver_code: `DRV-${String(Date.now()).slice(-6)}`,
           vehicle_type: profileData.vehicle_type || 'motorcycle',
           vehicle_plate: profileData.vehicle_plate || null,

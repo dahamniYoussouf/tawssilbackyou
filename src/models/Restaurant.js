@@ -1,5 +1,6 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../config/database.js";
+import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 const Restaurant = sequelize.define('Restaurant', {
   id: {
@@ -120,7 +121,19 @@ const Restaurant = sequelize.define('Restaurant', {
   timestamps: true,
   underscored: true, 
   createdAt: 'created_at',
-  updatedAt: 'updated_at', 
+  updatedAt: 'updated_at',
+  hooks: {
+    beforeCreate: async (restaurant) => {
+      if (restaurant.phone_number) {
+        restaurant.phone_number = normalizePhoneNumber(restaurant.phone_number);
+      }
+    },
+    beforeUpdate: async (restaurant) => {
+      if (restaurant.changed('phone_number') && restaurant.phone_number) {
+        restaurant.phone_number = normalizePhoneNumber(restaurant.phone_number);
+      }
+    }
+  },
   indexes: [
     {
       fields: ['status']

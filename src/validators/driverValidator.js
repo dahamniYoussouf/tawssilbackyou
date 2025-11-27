@@ -1,5 +1,6 @@
 // src/validators/driverValidator.js
 import { body, param , query} from "express-validator";
+import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 export const createDriverValidator = [
   body("first_name")
@@ -17,8 +18,9 @@ export const createDriverValidator = [
   body("phone")
     .notEmpty()
     .withMessage("Phone is required")
-    .matches(/^[0-9+\- ]*$/i)
-    .withMessage("Invalid phone number format"),
+    .customSanitizer((value) => normalizePhoneNumber(value))
+    .matches(/^213\d{9,}$/)
+    .withMessage("Invalid phone number format (must start with 213)"),
 
   body("email")
     .optional()
@@ -59,8 +61,9 @@ export const updateDriverValidator = [
 
   body("phone")
     .optional()
-    .matches(/^[0-9+\- ]*$/i)
-    .withMessage("Invalid phone number format"),
+    .customSanitizer((value) => value ? normalizePhoneNumber(value) : value)
+    .matches(/^213\d{9,}$/)
+    .withMessage("Invalid phone number format (must start with 213)"),
 
   body("email")
     .optional()

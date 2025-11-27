@@ -10,6 +10,7 @@ import SystemConfig from '../models/SystemConfig.js';
 import { emit } from '../config/socket.js';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
+import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 
 /**
@@ -549,7 +550,12 @@ export const getAllAdmins = async (req, res, next) => {
 export const updateAdmin = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { first_name, last_name, email, phone, role_level, is_active } = req.body;
+    let { first_name, last_name, email, phone, role_level, is_active } = req.body;
+
+    // Normaliser le numéro de téléphone
+    if (phone) {
+      phone = normalizePhoneNumber(phone);
+    }
 
     const admin = await Admin.findByPk(id);
     if (!admin) {
@@ -604,7 +610,12 @@ export const deleteAdmin = async (req, res, next) => {
 
 export const createAdmin = async (req, res, next) => {
   try {
-    const { first_name, last_name, email, phone, password, role_level, is_active } = req.body;
+    let { first_name, last_name, email, phone, password, role_level, is_active } = req.body;
+
+    // Normaliser le numéro de téléphone
+    if (phone) {
+      phone = normalizePhoneNumber(phone);
+    }
 
     // Check if email already exists
     const existingUser = await User.findOne({ where: { email } });

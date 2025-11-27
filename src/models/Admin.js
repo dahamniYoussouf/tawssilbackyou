@@ -1,5 +1,6 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../config/database.js";
+import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 const Admin = sequelize.define('Admin', {
   id: {
@@ -60,7 +61,19 @@ const Admin = sequelize.define('Admin', {
   timestamps: true,
   underscored: true,
   createdAt: 'created_at',
-  updatedAt: 'updated_at'
+  updatedAt: 'updated_at',
+  hooks: {
+    beforeCreate: async (admin) => {
+      if (admin.phone) {
+        admin.phone = normalizePhoneNumber(admin.phone);
+      }
+    },
+    beforeUpdate: async (admin) => {
+      if (admin.changed('phone') && admin.phone) {
+        admin.phone = normalizePhoneNumber(admin.phone);
+      }
+    }
+  }
 });
 
 // Instance methods
