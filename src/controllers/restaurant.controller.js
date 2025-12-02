@@ -3,6 +3,7 @@ import * as restaurantService from "../services/restaurant.service.js";
 import cacheService from '../services/cache.service.js';
 import { cacheHelpers } from '../middlewares/cache.middleware.js';
 import crypto from 'crypto';
+import { getRestaurantOrdersHistory } from "../services/restaurant.service.js";
 
 
 /**
@@ -399,3 +400,47 @@ export const getMyRestaurantMenu = async (req, res, next) => {
   }
 };
 
+export const getOrdersHistory = async (req, res, next) => {
+  try {
+    // Get restaurant_id from JWT token
+    const restaurantId = req.user.restaurant_id;
+    
+    if (!restaurantId) {
+      return res.status(400).json({
+        success: false,
+        message: "Restaurant profile not found in token"
+      });
+    }
+
+    const filters = {
+      status: req.query.status,
+      date_range: req.query.date_range,
+      date_from: req.query.date_from,
+      date_to: req.query.date_to,
+      min_price: req.query.min_price,
+      max_price: req.query.max_price,
+      search: req.query.search,
+      order_type: req.query.order_type,
+      page: req.query.page || 1,
+      limit: req.query.limit || 20
+    };
+
+    const result = await getRestaurantOrdersHistory(restaurantId, filters);
+
+    res.json({
+      success: true,
+      data: result.orders,
+      pagination: result.pagination,
+      summary: result.summary,
+      filters_applied: result.filters_applied
+    });
+  } catch (err) {
+    if (err.status === 404) {
+      return res.status(404).json({
+        success: false,
+        message: err.message
+      });
+    }
+    next(err);
+  }
+};

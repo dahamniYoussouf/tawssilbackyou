@@ -338,3 +338,99 @@ export const getRestaurantStatisticsValidator = [
       return true;
     })
 ];
+
+
+/**
+ * Validator for getting restaurant orders history
+ */
+export const getRestaurantOrdersHistoryValidator = [
+  query("page")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("Page must be a positive integer"),
+
+  query("limit")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("Limit must be between 1 and 100"),
+
+  query("status")
+    .optional()
+    .custom((value) => {
+      const validStatuses = ['pending', 'accepted', 'preparing', 'assigned', 'arrived', 'delivering', 'delivered', 'declined'];
+      
+      // Allow single status or comma-separated list
+      if (typeof value === 'string') {
+        const statuses = value.split(',').map(s => s.trim());
+        const allValid = statuses.every(s => validStatuses.includes(s));
+        if (!allValid) {
+          throw new Error('Invalid status value');
+        }
+      } else if (Array.isArray(value)) {
+        const allValid = value.every(s => validStatuses.includes(s));
+        if (!allValid) {
+          throw new Error('Invalid status value');
+        }
+      }
+      return true;
+    })
+    .withMessage("Status must be one of: pending, accepted, preparing, assigned, arrived, delivering, delivered, declined"),
+
+  query("order_type")
+    .optional()
+    .isIn(['delivery', 'pickup'])
+    .withMessage("Order type must be either 'delivery' or 'pickup'"),
+
+  query("date_range")
+    .optional()
+    .isIn(['today', 'week', 'month'])
+    .withMessage("Date range must be one of: today, week, month"),
+
+  query("date_from")
+    .optional()
+    .isISO8601()
+    .withMessage("date_from must be a valid ISO 8601 date"),
+
+  query("date_to")
+    .optional()
+    .isISO8601()
+    .withMessage("date_to must be a valid ISO 8601 date")
+    .custom((value, { req }) => {
+      if (req.query.date_from && value) {
+        const from = new Date(req.query.date_from);
+        const to = new Date(value);
+        if (to < from) {
+          throw new Error("date_to must be after date_from");
+        }
+      }
+      return true;
+    }),
+
+  query("min_price")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("min_price must be a positive number"),
+
+  query("max_price")
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage("max_price must be a positive number")
+    .custom((value, { req }) => {
+      if (req.query.min_price && value) {
+        const min = parseFloat(req.query.min_price);
+        const max = parseFloat(value);
+        if (max < min) {
+          throw new Error("max_price must be greater than min_price");
+        }
+      }
+      return true;
+    }),
+
+  query("search")
+    .optional()
+    .isString()
+    .withMessage("Search must be a string")
+    .isLength({ min: 1, max: 100 })
+    .withMessage("Search must be between 1 and 100 characters")
+    .trim()
+];

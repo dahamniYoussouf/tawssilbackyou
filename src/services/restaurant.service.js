@@ -7,6 +7,9 @@ import Order from "../models/Order.js";
 import { Op, literal } from "sequelize";
 import axios from "axios";
 import FavoriteMeal from "../models/FavoriteMeal.js";
+import OrderItem from "../models/OrderItem.js";
+import Driver from "../models/Driver.js";
+
 
 
 
@@ -808,5 +811,221 @@ export const getRestaurantProfile = async (id) => {
     is_open: restaurant.isOpen(),
     created_at: restaurant.created_at,
     updated_at: restaurant.updated_at
+  };
+};
+
+
+
+export const getRestaurantOrdersHistory = async (restaurantId, filters = {}) => {
+  const {
+    status,
+    date_range,
+    date_from,
+    date_to,
+    min_price,
+    max_price,
+    search,
+    page = 1,
+    limit = 20,
+    order_type
+  } = filters;
+
+  // Validate restaurant exists
+  const restaurant = await Restaurant.findByPk(restaurantId);
+  if (!restaurant) {
+    throw { status: 404, message: "Restaurant not found" };
+  }
+
+  const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+  const where = { restaurant_id: restaurantId };
+
+  // ==================== STATUS FILTER ====================
+  if (status) {
+    const statusArray = Array.isArray(status) ? status : [status];
+    // Validate status values
+    const validStatuses = ['pending', 'accepted', 'preparing', 'assigned', 'arrived', 'delivering', 'delivered', 'declined'];
+    const filteredStatuses = statusArray.filter(s => validStatuses.includes(s));
+    
+    if (filteredStatuses.length > 0) {
+      where.status = { [Op.in]: filteredStatuses };
+    }
+  }
+
+  // ==================== ORDER TYPE FILTER ====================
+  if (order_type) {
+    where.order_type = order_type;
+  }
+
+  // ==================== DATE RANGE FILTER ====================
+  const now = new Date();
+  let startDate, endDate;
+
+  if (date_range) {
+    switch (date_range) {
+      case 'today':
+        startDate = new Date(now.setHours(0, 0, 0, 0));
+        endDate = new Date(now.setHours(23, 59, 59, 999));
+        break;
+      
+      case 'week':
+        const firstDayOfWeek = new Date(now);
+        firstDayOfWeek.setDate(now.getDate() - now.getDay());
+        startDate = new Date(firstDayOfWeek.setHours(0, 0, 0, 0));
+        endDate = new Date(now.setHours(23, 59, 59, 999));
+        break;
+      
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        break;
+    }
+  }
+
+  // Custom date range
+  if (date_from) {
+    startDate = new Date(date_from);
+    startDate.setHours(0, 0, 0, 0);
+  }
+
+  if (date_to) {
+    endDate = new Date(date_to);
+    endDate.setHours(23, 59, 59, 999);
+  }
+
+  // Apply date filter
+  if (startDate || endDate) {
+    where.created_at = {};
+    if (startDate) where.created_at[Op.gte] = startDate;
+    if (endDate) where.created_at[Op.lte] = endDate;
+  }
+
+  // ==================== PRICE RANGE FILTER ====================
+  if (min_price || max_price) {
+    where.total_amount = {};
+    if (min_price) where.total_amount[Op.gte] = parseFloat(min_price);
+    if (max_price) where.total_amount[Op.lte] = parseFloat(max_price);
+  }
+
+  // ==================== SEARCH FILTER ====================
+  if (search && search.trim()) {
+    where[Op.or] = [
+      { order_number: { [Op.iLike]: `%${search.trim()}%` } },
+      { delivery_address: { [Op.iLike]: `%${search.trim()}%` } }
+    ];
+  }
+
+  // ==================== QUERY WITH INCLUDES ====================
+  const { count, rows } = await Order.findAndCountAll({
+    where,
+    include: [
+      {
+        model: Client,
+        as: 'client',
+        attributes: ['id', 'first_name', 'last_name', 'phone_number', 'email']
+      },
+      {
+        model: Driver,
+        as: 'driver',
+        attributes: ['id', 'first_name', 'last_name', 'phone', 'vehicle_type'],
+        required: false
+      },
+      {
+        model: OrderItem,
+        as: 'order_items',
+        include: [{
+          model: MenuItem,
+          as: 'menu_item',
+          attributes: ['id', 'nom', 'photo_url', 'prix']
+        }]
+      }
+    ],
+    order: [['created_at', 'DESC']],
+    limit: parseInt(limit, 10),
+    offset
+  });
+
+  // ==================== CALCULATE SUMMARY ====================
+  const allOrders = await Order.findAll({
+    where: { restaurant_id: restaurantId },
+    attributes: ['status', 'total_amount', 'order_type']
+  });
+
+  const summary = {
+    total_orders: allOrders.length,
+    total_revenue: allOrders
+      .filter(o => o.status === 'delivered')
+      .reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0),
+    pending_orders: allOrders.filter(o => o.status === 'pending').length,
+    accepted_orders: allOrders.filter(o => o.status === 'accepted').length,
+    preparing_orders: allOrders.filter(o => o.status === 'preparing').length,
+    delivering_orders: allOrders.filter(o => ['assigned', 'delivering'].includes(o.status)).length,
+    delivered_orders: allOrders.filter(o => o.status === 'delivered').length,
+    declined_orders: allOrders.filter(o => o.status === 'declined').length,
+    pickup_orders: allOrders.filter(o => o.order_type === 'pickup').length,
+    delivery_orders: allOrders.filter(o => o.order_type === 'delivery').length
+  };
+
+  // ==================== FORMAT RESPONSE ====================
+  const formattedOrders = rows.map(order => ({
+    id: order.id,
+    order_number: order.order_number,
+    status: order.status,
+    order_type: order.order_type,
+    client: {
+      id: order.client.id,
+      name: `${order.client.first_name} ${order.client.last_name}`,
+      phone: order.client.phone_number,
+      email: order.client.email
+    },
+    driver: order.driver ? {
+      id: order.driver.id,
+      name: `${order.driver.first_name} ${order.driver.last_name}`,
+      phone: order.driver.phone,
+      vehicle_type: order.driver.vehicle_type
+    } : null,
+    items_count: order.order_items.length,
+    items_preview: order.order_items.slice(0, 3).map(item => ({
+      name: item.menu_item.nom,
+      quantity: item.quantite,
+      photo_url: item.menu_item.photo_url,
+      price: parseFloat(item.prix_unitaire)
+    })),
+    subtotal: parseFloat(order.subtotal || 0),
+    delivery_fee: parseFloat(order.delivery_fee || 0),
+    total_amount: parseFloat(order.total_amount || 0),
+    delivery_address: order.delivery_address,
+    delivery_instructions: order.delivery_instructions,
+    payment_method: order.payment_method,
+    preparation_time: order.preparation_time,
+    rating: order.rating ? parseFloat(order.rating) : null,
+    review_comment: order.review_comment,
+    decline_reason: order.decline_reason,
+    created_at: order.created_at,
+    accepted_at: order.accepted_at,
+    preparing_started_at: order.preparing_started_at,
+    assigned_at: order.assigned_at,
+    delivered_at: order.delivered_at,
+    estimated_delivery_time: order.estimated_delivery_time
+  }));
+
+  return {
+    orders: formattedOrders,
+    pagination: {
+      current_page: parseInt(page, 10),
+      total_pages: Math.ceil(count / parseInt(limit, 10)),
+      total_items: count,
+      items_per_page: parseInt(limit, 10)
+    },
+    summary,
+    filters_applied: {
+      status: status || 'all',
+      date_range: date_range || 'all',
+      date_from: date_from || null,
+      date_to: date_to || null,
+      min_price: min_price || null,
+      max_price: max_price || null,
+      search: search || null,
+      order_type: order_type || 'all'
+    }
   };
 };

@@ -6,6 +6,7 @@ import {
   nearbyRestaurantValidator, 
   deleteRestaurantValidator, 
   updateRestaurantValidator, 
+  getRestaurantOrdersHistoryValidator,
   nearbyFilterValidator , 
   getRestaurantStatisticsValidator
 } from "../validators/restaurantValidator.js";
@@ -23,6 +24,15 @@ router.post("/nearbyfilter", protect, isClient, nearbyFilterValidator, validate,
 router.post("/filter", protect, isAdmin, restaurantCtrl.filter);
 router.post("/getnearbynames", protect, isClient, nearbyFilterValidator, validate, restaurantCtrl.getNearbyNames);
 router.get("/details", protect, isRestaurant, restaurantCtrl.getMyRestaurantMenu);
+// Add this route with other restaurant management routes
+router.get(
+  "/orders/history", 
+  protect, 
+  isRestaurant, 
+  getRestaurantOrdersHistoryValidator, 
+  validate, 
+  restaurantCtrl.getOrdersHistory
+);
 router.get('/details/:restaurantId', protect, isClient, restaurantCtrl.getRestaurantMenu);
 
 // Restaurant management routes
