@@ -5,7 +5,8 @@ import * as clientCtrl from "../controllers/client.controller.js";
 import {
   updateClientValidator,
   deleteClientValidator,
-  getAllClientsValidator
+  getAllClientsValidator, 
+  getMyOrdersValidator 
 } from "../validators/clientValidator.js";
 const router = Router();
 
@@ -13,6 +14,16 @@ const router = Router();
 // ✅ Protected routes - client's own profile
 router.get("/profile/me", protect, isClient, clientCtrl.getProfile);
 router.put("/profile", protect, isClient, updateClientValidator, validate, clientCtrl.updateProfile);
+import { getMyOrdersValidator } from "../validators/clientValidator.js";
+
+router.get(
+  "/orders", 
+  protect, 
+  isClient, 
+  getMyOrdersValidator, 
+  validate, 
+  clientCtrl.getMyOrders
+);
 
 // Admin routes
 router.get("/getall", protect, authorize('admin'), getAllClientsValidator, validate, clientCtrl.getAll);

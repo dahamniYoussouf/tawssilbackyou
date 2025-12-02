@@ -22,6 +22,7 @@ router.get("/profile/me", protect, isRestaurant, restaurantCtrl.getProfile);
 router.post("/nearbyfilter", protect, isClient, nearbyFilterValidator, validate, restaurantCtrl.nearbyFilter);
 router.post("/filter", protect, isAdmin, restaurantCtrl.filter);
 router.post("/getnearbynames", protect, isClient, nearbyFilterValidator, validate, restaurantCtrl.getNearbyNames);
+router.get("/details", protect, isRestaurant, restaurantCtrl.getMyRestaurantMenu);
 router.get('/details/:restaurantId', protect, isClient, restaurantCtrl.getRestaurantMenu);
 
 // Restaurant management routes

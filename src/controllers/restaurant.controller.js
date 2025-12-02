@@ -362,3 +362,40 @@ export const getProfile = async (req, res, next) => {
     next(err);
   }
 };
+
+
+
+/**
+ * GET /restaurant/details
+ * Get restaurant's own complete menu with all categories and items
+ */
+export const getMyRestaurantMenu = async (req, res, next) => {
+  try {
+    // Get restaurant_id from JWT token
+    const restaurantId = req.user.restaurant_id;
+    
+    if (!restaurantId) {
+      return res.status(400).json({
+        success: false,
+        message: "Restaurant profile not found in token"
+      });
+    }
+
+    // Get complete menu using existing service
+    const menu = await restaurantService.getCategoriesWithMenuItems(restaurantId);
+
+    res.json({
+      success: true,
+      data: menu
+    });
+  } catch (err) {
+    if (err.message === 'Restaurant not found') {
+      return res.status(404).json({
+        success: false,
+        message: err.message
+      });
+    }
+    next(err);
+  }
+};
+

@@ -156,3 +156,42 @@ export const updateProfile = async (req, res, next) => {
     next(err);
   }
 };
+
+
+
+export const getMyOrders = async (req, res, next) => {
+  try {
+    const clientId = req.user.client_id;
+    
+    if (!clientId) {
+      return res.status(400).json({
+        success: false,
+        message: "Client profile not found in token"
+      });
+    }
+
+    const filters = {
+      client_id: clientId,
+      status: req.query.status,
+      date_range: req.query.date_range,
+      date_from: req.query.date_from,
+      date_to: req.query.date_to,
+      min_price: req.query.min_price,
+      max_price: req.query.max_price,
+      search: req.query.search,
+      page: req.query.page || 1,
+      limit: req.query.limit || 20
+    };
+
+    const result = await getClientOrdersWithFilters(filters);
+
+    res.json({
+      success: true,
+      data: result.orders,
+      pagination: result.pagination,
+      summary: result.summary
+    });
+  } catch (err) {
+    next(err);
+  }
+};
