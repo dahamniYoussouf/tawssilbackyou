@@ -1,7 +1,8 @@
 import {
   getAllClients,
   updateClient,
-  deleteClient
+  deleteClient, 
+  getClientOrdersWithFilters
 } from "../services/client.service.js";
 import Client from "../models/Client.js"
 
