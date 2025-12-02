@@ -1,6 +1,12 @@
 import Client from "../models/Client.js";
 import { Op } from "sequelize";
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
+import Order from "../models/Order.js";
+import Restaurant from "../models/Restaurant.js";
+import Driver from "../models/Driver.js";
+import OrderItem from "../models/OrderItem.js";
+import MenuItem from "../models/MenuItem.js";
+
 
 
 // Get all with pagination
