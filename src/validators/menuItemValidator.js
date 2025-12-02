@@ -1,7 +1,9 @@
+// src/validators/menuItemValidator.js
 import { body, param, query } from "express-validator";
 
 // 🆕 CREATE MENU ITEM VALIDATOR
 export const createMenuItemValidator = [
+  // ❌ Supprimé : restaurant_id (déduit du token)
 
   body("category_id")
     .notEmpty().withMessage("category_id is required")
@@ -40,7 +42,6 @@ export const updateMenuItemValidator = [
   param("id")
     .notEmpty().withMessage("Menu item ID is required")
     .isUUID().withMessage("Menu item ID must be a valid UUID"),
-
 
   body("category_id")
     .optional()
@@ -81,8 +82,8 @@ export const getMenuItemByIdValidator = [
     .isUUID().withMessage("Menu item ID must be a valid UUID")
 ];
 
-// 📋 GET ALL MENU ITEMS VALIDATOR
-export const getAllMenuItemsValidator = [
+// 📋 GET MY MENU ITEMS VALIDATOR (authenticated restaurant)
+export const getMyMenuItemsValidator = [
   query("page")
     .optional()
     .isInt({ min: 1 }).withMessage("page must be a positive integer"),
@@ -91,6 +92,34 @@ export const getAllMenuItemsValidator = [
     .optional()
     .isInt({ min: 1, max: 100 }).withMessage("limit must be between 1 and 100"),
 
+  query("category_id")
+    .optional()
+    .isUUID().withMessage("category_id must be a valid UUID"),
+
+  query("is_available")
+    .optional()
+    .isBoolean().withMessage("is_available must be true or false"),
+
+  query("search")
+    .optional()
+    .isString().withMessage("search must be a string")
+    .isLength({ min: 2, max: 100 }).withMessage("search must be between 2 and 100 characters"),
+
+  query("sort")
+    .optional()
+    .isIn(['nom', 'prix', 'created_at'])
+    .withMessage("sort must be one of: nom, prix, created_at")
+];
+
+// 📋 GET ALL MENU ITEMS VALIDATOR (admin)
+export const getAllMenuItemsValidator = [
+  query("page")
+    .optional()
+    .isInt({ min: 1 }).withMessage("page must be a positive integer"),
+
+  query("limit")
+    .optional()
+    .isInt({ min: 1, max: 100 }).withMessage("limit must be between 1 and 100"),
 
   query("category_id")
     .optional()
@@ -106,7 +135,7 @@ export const getAllMenuItemsValidator = [
     .isLength({ min: 2, max: 100 }).withMessage("search must be between 2 and 100 characters")
 ];
 
-// 🔍 GET BY CATEGORY VALIDATOR
+// 🔍 GET BY CATEGORY VALIDATOR (client)
 export const getByCategoryValidator = [
   body("client_id")
     .optional()
@@ -115,7 +144,6 @@ export const getByCategoryValidator = [
   body("category_id")
     .optional()
     .isUUID().withMessage("category_id must be a valid UUID"),
-
 
   body("is_available")
     .optional()

@@ -1,20 +1,24 @@
-import {
-  createCategory,
-  getAllCategories,
-  getCategoryById,
+import { Op } from "sequelize";
+import FoodCategory from "../models/FoodCategory.js";
+import { 
+  createCategory, 
+  getAllCategories, 
+  getCategoriesByRestaurant,
   updateCategory,
-  deleteCategory,
+  deleteCategory 
 } from "../services/foodCategory.service.js";
-import Restaurant from '../models/Restaurant.js';
 
-//  Create
+// Create
 export const create = async (req, res, next) => {
   try {
     const restaurant_id = req.user.restaurant_id; // ✅ from JWT
     const { nom, description, icone_url, ordre_affichage } = req.body;
 
     if (!restaurant_id) {
-      return res.status(403).json({ success: false, message: "Restaurant ID not found in token" });
+      return res.status(403).json({ 
+        success: false, 
+        message: "Restaurant ID not found in token" 
+      });
     }
 
     const category = await createCategory({
@@ -31,8 +35,7 @@ export const create = async (req, res, next) => {
   }
 };
 
-
-//  Get All
+// Get All (public - toutes les catégories)
 export const getAll = async (req, res, next) => {
   try {
     const categories = await getAllCategories();
@@ -42,23 +45,112 @@ export const getAll = async (req, res, next) => {
   }
 };
 
-//  Get by Restaurant
-export const getByRestaurant = async (req, res, next) => {
+// ✅ NOUVELLE VERSION : Get categories for authenticated restaurant
+export const getMyCategories = async (req, res, next) => {
   try {
-    const { restaurantId } = req.params;
-    const categories = await getAllCategories();
-    const filtered = categories.filter(cat => cat.restaurant_id === restaurantId);
-    res.json({ success: true, data: filtered });
+    const restaurant_id = req.user.restaurant_id; // ✅ from JWT
+    
+    if (!restaurant_id) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Restaurant ID not found in token" 
+      });
+    }
+
+    // Pagination et filtres
+    const { 
+      page = 1, 
+      limit = 20, 
+      search,
+      sort = 'ordre_affichage' // 'ordre_affichage', 'nom', 'created_at'
+    } = req.query;
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    // Construction du where clause
+    const where = { restaurant_id };
+    
+    if (search && search.trim()) {
+      where.nom = { [Op.iLike]: `%${search.trim()}%` };
+    }
+
+    // Construction de l'ordre de tri
+    let order;
+    switch (sort) {
+      case 'nom':
+        order = [['nom', 'ASC']];
+        break;
+      case 'created_at':
+        order = [['created_at', 'DESC']];
+        break;
+      case 'ordre_affichage':
+      default:
+        order = [['ordre_affichage', 'ASC'], ['created_at', 'DESC']];
+    }
+
+    const { count, rows } = await FoodCategory.findAndCountAll({
+      where,
+      order,
+      limit: parseInt(limit),
+      offset
+    });
+
+    res.json({ 
+      success: true, 
+      data: rows,
+      pagination: {
+        current_page: parseInt(page),
+        total_pages: Math.ceil(count / parseInt(limit)),
+        total_items: count,
+        items_per_page: parseInt(limit)
+      }
+    });
   } catch (err) {
     next(err);
   }
 };
 
-//  Update
+// Get by Restaurant (ancien - pour admin ou public)
+export const getByRestaurant = async (req, res, next) => {
+  try {
+    const { restaurantId } = req.params;
+    const categories = await getCategoriesByRestaurant(restaurantId);
+    
+    res.json({ 
+      success: true, 
+      data: categories,
+      count: categories.length
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Update
 export const update = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const {  nom, description, icone_url, ordre_affichage } = req.body;
+    const restaurant_id = req.user.restaurant_id; // ✅ from JWT
+    const { nom, description, icone_url, ordre_affichage } = req.body;
+
+    if (!restaurant_id) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Restaurant ID not found in token" 
+      });
+    }
+
+    // ✅ Vérifier que la catégorie appartient au restaurant
+    const category = await FoodCategory.findOne({ 
+      where: { id, restaurant_id } 
+    });
+
+    if (!category) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Food category not found or you don't have permission to modify it" 
+      });
+    }
 
     const updated = await updateCategory(id, { 
       nom, 
@@ -66,10 +158,6 @@ export const update = async (req, res, next) => {
       icone_url, 
       ordre_affichage 
     });
-    
-    if (!updated) {
-      return res.status(404).json({ success: false, message: "Food category not found" });
-    }
 
     res.json({ success: true, data: updated });
   } catch (err) {
@@ -77,17 +165,37 @@ export const update = async (req, res, next) => {
   }
 };
 
-//  Delete
+// Delete
 export const remove = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const deleted = await deleteCategory(id);
+    const restaurant_id = req.user.restaurant_id; // ✅ from JWT
 
-    if (!deleted) {
-      return res.status(404).json({ success: false, message: "Food category not found" });
+    if (!restaurant_id) {
+      return res.status(403).json({ 
+        success: false, 
+        message: "Restaurant ID not found in token" 
+      });
     }
 
-    res.json({ success: true, message: "Food category deleted successfully" });
+    // ✅ Vérifier que la catégorie appartient au restaurant
+    const category = await FoodCategory.findOne({ 
+      where: { id, restaurant_id } 
+    });
+
+    if (!category) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Food category not found or you don't have permission to delete it" 
+      });
+    }
+
+    const deleted = await deleteCategory(id);
+
+    res.json({ 
+      success: true, 
+      message: "Food category deleted successfully" 
+    });
   } catch (err) {
     next(err);
   }

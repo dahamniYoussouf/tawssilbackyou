@@ -1,3 +1,4 @@
+// src/routes/menuItem.route.js
 import { Router } from "express";
 import {
   createMenuItemValidator,
@@ -7,75 +8,113 @@ import {
   getAllMenuItemsValidator,
   getByCategoryValidator,
   toggleAvailabilityValidator,
-  bulkUpdateAvailabilityValidator
+  bulkUpdateAvailabilityValidator,
+  getMyMenuItemsValidator
 } from "../validators/menuItemValidator.js";
 import { validate } from "../middlewares/validate.js";
 import * as menuItemCtrl from "../controllers/menuItem.controller.js";
+import { protect, isRestaurant, isClient, authorize } from "../middlewares/auth.js";
 
 const router = Router();
 
-// Create menu item
+// ==================== ROUTES PROTÉGÉES - RESTAURANT ====================
+
+// ✅ Create menu item - restaurant crée un item pour lui-même
 router.post(
   "/create",
+  protect,
+  isRestaurant,
   createMenuItemValidator,
   validate,
   menuItemCtrl.create
 );
 
-// Get all menu items with filters
+// ✅ Get MY menu items - restaurant récupère SES items (avec pagination)
 router.get(
-  "/getall",
-  getAllMenuItemsValidator,
+  "/me",
+  protect,
+  isRestaurant,
+  getMyMenuItemsValidator,
   validate,
-  menuItemCtrl.getAll
+  menuItemCtrl.getMyMenuItems
 );
 
-// Get menu items by category (with favorites)
-router.post(
-  "/filter",
-  getByCategoryValidator,
-  validate,
-  menuItemCtrl.getByCategory
-);
-
-// Get menu item by ID
+// ✅ Get MY statistics - statistiques des items du restaurant
 router.get(
-  "/:id",
-  getMenuItemByIdValidator,
-  validate,
-  menuItemCtrl.getById
+  "/me/statistics",
+  protect,
+  isRestaurant,
+  menuItemCtrl.getMyStatistics
 );
 
-// Update menu item
-router.put(
-  "/update/:id",
-  updateMenuItemValidator,
-  validate,
-  menuItemCtrl.update
-);
-
-// Toggle availability
+// ✅ Toggle availability - restaurant toggle SON item
 router.patch(
   "/toggle-availability/:id",
+  protect,
+  isRestaurant,
   toggleAvailabilityValidator,
   validate,
   menuItemCtrl.toggleAvailability
 );
 
-// Bulk update availability
+// ✅ Bulk update availability - restaurant met à jour SES items
 router.patch(
   "/bulk-availability",
+  protect,
+  isRestaurant,
   bulkUpdateAvailabilityValidator,
   validate,
   menuItemCtrl.bulkUpdateAvailability
 );
 
-// Delete menu item
+// ✅ Update menu item - restaurant met à jour SON item
+router.put(
+  "/update/:id",
+  protect,
+  isRestaurant,
+  updateMenuItemValidator,
+  validate,
+  menuItemCtrl.update
+);
+
+// ✅ Delete menu item - restaurant supprime SON item
 router.delete(
   "/delete/:id",
+  protect,
+  isRestaurant,
   deleteMenuItemValidator,
   validate,
   menuItemCtrl.remove
+);
+
+// ==================== ROUTES PUBLIQUES / CLIENT ====================
+
+// Get all menu items (admin)
+router.get(
+  "/getall",
+  protect,
+  authorize('admin'),
+  getAllMenuItemsValidator,
+  validate,
+  menuItemCtrl.getAll
+);
+
+// Get menu items by category (with favorites) - pour clients
+router.post(
+  "/filter",
+  protect,
+  isClient,
+  getByCategoryValidator,
+  validate,
+  menuItemCtrl.getByCategory
+);
+
+// Get menu item by ID (public) - DOIT ÊTRE EN DERNIER
+router.get(
+  "/:id",
+  getMenuItemByIdValidator,
+  validate,
+  menuItemCtrl.getById
 );
 
 export default router;
