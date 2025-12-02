@@ -14,7 +14,6 @@ const router = Router();
 // ✅ Protected routes - client's own profile
 router.get("/profile/me", protect, isClient, clientCtrl.getProfile);
 router.put("/profile", protect, isClient, updateClientValidator, validate, clientCtrl.updateProfile);
-import { getMyOrdersValidator } from "../validators/clientValidator.js";
 
 router.get(
   "/orders", 
