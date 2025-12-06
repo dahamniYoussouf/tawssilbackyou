@@ -21,6 +21,10 @@ const Order = sequelize.define('Order', {
     type: DataTypes.UUID,
     allowNull: true,
   },
+  created_by_cashier_id : {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
   restaurant_id: {
     type: DataTypes.UUID,
     allowNull: false,

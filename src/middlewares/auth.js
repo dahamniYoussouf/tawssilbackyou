@@ -114,3 +114,38 @@ export const isAdmin = (req, res, next) => {
   }
   next();
 };
+
+
+export const isCashier = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    if (req.user.role !== 'cashier') {
+      return res.status(403).json({
+        success: false,
+        message: 'This route is only accessible to cashiers'
+      });
+    }
+
+    // Verify cashier profile exists
+    if (!req.user.cashier_id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Cashier profile not found'
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('isCashier middleware error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};

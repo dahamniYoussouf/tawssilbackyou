@@ -14,6 +14,7 @@ import "./models/User.js";
 import "./models/Admin.js";
 import "./models/AdminNotification.js";
 import "./models/SystemConfig.js";
+import "./models/Cashier.js";
 
 
 

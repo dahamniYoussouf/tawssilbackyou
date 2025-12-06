@@ -12,7 +12,7 @@ import {
   driverCancelOrderValidator 
 } from "../validators/orderValidator.js";
 import { validate } from "../middlewares/validate.js";
-import { protect, isClient, isRestaurant, isDriver } from "../middlewares/auth.js";
+import { protect, isClient, isRestaurant, isDriver, isCashier  } from "../middlewares/auth.js";
 import * as orderController from "../controllers/order.controller.js";
 
 const router = Router();
@@ -21,7 +21,7 @@ const router = Router();
 
 // Create order - only authenticated clients
 router.post('/', protect, isClient, createOrderWithItemsValidator, validate, orderController.createOrder);
-router.post('/create-from-pos', createOrderWithItemsValidator, validate, orderController.createOrderFromPOS);
+router.post('/create-from-pos',protect, isCashier, createOrderWithItemsValidator, validate, orderController.createOrderFromPOS);
 router.post('/create', protect, isClient, createOrderValidator, validate, orderController.createOrder);
 
 // Get all orders - protected (admin/restaurant use)

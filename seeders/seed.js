@@ -14,6 +14,8 @@ import OrderItem from "../src/models/OrderItem.js";
 import FavoriteRestaurant from "../src/models/FavoriteRestaurant.js";
 import FavoriteMeal from "../src/models/FavoriteMeal.js";
 import * as associations from "../src/models/index.js";
+import Cashier from "../src/models/Cashier.js";
+
 import bcrypt from "bcryptjs";
 
 // ===============================
@@ -24,6 +26,17 @@ const firstNames = [
   "Nawal", "Omar", "Leila", "Sofiane", "Bilal", "Hichem", "Amine", "Farid",
   "Walid", "Kamel", "Sarah", "Riad", "Yasmine", "Hamza", "Imane", "Mehdi",
   "Salima", "Tarek", "Nadia", "Djamel", "Karima", "Malik"
+];
+
+const cashierNames = [
+  { first: "Nassim", last: "Boudiaf" },
+  { first: "Meriem", last: "Cherif" },
+  { first: "Karim", last: "Lahlou" },
+  { first: "Rania", last: "Zerrouki" },
+  { first: "Youcef", last: "Sadek" },
+  { first: "Amina", last: "Khelifi" },
+  { first: "Sofiane", last: "Touati" },
+  { first: "Leila", last: "Bouzid" }
 ];
 
 const lastNames = [
@@ -412,6 +425,80 @@ const seedDatabase = async () => {
     const restaurants = await Restaurant.bulkCreate(restaurantList, { returning: true });
     console.log(`✅ ${restaurants.length} restaurants created`);
 
+
+
+
+    // ----------------------------
+    // 4.5️⃣ Cashiers (200 caissiers pour les 100 premiers restaurants)
+    // ----------------------------
+    console.log("💰 Creating 200 cashiers (2 per restaurant for first 100 restaurants)...");
+    const cashierUsers = [];
+    
+    // Créer 200 users pour les caissiers
+    for (let i = 0; i < 200; i++) {
+      cashierUsers.push({
+        email: `cashier${i + 1}@example.com`,
+        password: hashedPassword,
+        role: "cashier",
+        is_active: true,
+        last_login: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000)
+      });
+      
+      if ((i + 1) % 50 === 0) console.log(`➡️  ${i + 1} cashier users created...`);
+    }
+    
+    const cashierUsersCreated = await User.bulkCreate(cashierUsers, { returning: true });
+    
+    const cashiers = [];
+    const cashierStatuses = ['active', 'on_break', 'offline'];
+    
+    // 2 caissiers par restaurant (pour les 100 premiers restaurants)
+    for (let i = 0; i < 200; i++) {
+      const restaurantIndex = Math.floor(i / 2); // 2 cashiers per restaurant
+      const restaurant = restaurants[restaurantIndex];
+      const name = cashierNames[i % cashierNames.length];
+      
+      const cashierStatus = cashierStatuses[Math.floor(Math.random() * cashierStatuses.length)];
+      const isOnShift = cashierStatus === 'active' || cashierStatus === 'on_break';
+      
+      cashiers.push({
+        user_id: cashierUsersCreated[i].id,
+        restaurant_id: restaurant.id,
+        cashier_code: `CSH-${String(i + 1).padStart(4, '0')}`,
+        first_name: name.first,
+        last_name: name.last,
+        phone: getUniquePhone("771", i), // ✅ Numéros uniques pour cashiers
+        email: `cashier${i + 1}@example.com`,
+        profile_image_url: `https://i.pravatar.cc/150?img=${i + 50}`,
+        is_active: Math.random() > 0.05,
+        status: cashierStatus,
+        shift_start: isOnShift ? new Date(Date.now() - Math.random() * 8 * 60 * 60 * 1000) : null,
+        shift_end: cashierStatus === 'offline' && Math.random() > 0.5 
+          ? new Date(Date.now() - Math.random() * 2 * 60 * 60 * 1000) 
+          : null,
+        total_orders_processed: Math.floor(Math.random() * 500) + 50,
+        total_sales_amount: parseFloat((50000 + Math.random() * 200000).toFixed(2)),
+        last_active_at: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000),
+        notes: i % 15 === 0 ? `Excellent cashier, very efficient` : null,
+        permissions: {
+          can_create_orders: true,
+          can_cancel_orders: i % 5 === 0, // 20% peuvent annuler
+          can_apply_discounts: i % 4 === 0, // 25% peuvent faire des réductions
+          can_process_refunds: i % 10 === 0, // 10% peuvent faire des remboursements
+          can_view_reports: i % 3 === 0 // 33% peuvent voir les rapports
+        }
+      });
+      
+      if ((i + 1) % 50 === 0) console.log(`➡️  ${i + 1} cashiers created...`);
+    }
+    
+    const createdCashiers = await Cashier.bulkCreate(cashiers, { returning: true });
+    console.log(`✅ ${createdCashiers.length} cashiers created (2 per restaurant for first 100 restaurants)`);
+
+
+
+
+
     // ----------------------------
     // 5️⃣ Catégories & Menus (pour les 100 premiers restaurants)
     // ----------------------------
@@ -452,6 +539,9 @@ const seedDatabase = async () => {
     // ----------------------------
     // 6️⃣ Orders (1000)
     // ----------------------------
+    // ----------------------------
+    // ✅ MODIFIER LA SECTION 6️⃣ Orders pour lier certaines commandes aux caissiers
+    // ----------------------------
     console.log("📦 Creating 1000 orders...");
     const orders = [];
     
@@ -460,7 +550,19 @@ const seedDatabase = async () => {
       const restaurant = restaurants[i % 100];
       const driver = i % 3 === 0 ? createdDrivers[i % createdDrivers.length] : null;
       const status = orderStatuses[Math.floor(Math.random() * orderStatuses.length)];
-      const orderType = Math.random() > 0.2 ? 'delivery' : 'pickup';
+      
+      // ✅ 30% des commandes sont créées via POS (pickup) par un caissier
+      const isFromPOS = Math.random() < 0.3;
+      const orderType = isFromPOS ? 'pickup' : (Math.random() > 0.2 ? 'delivery' : 'pickup');
+      
+      // ✅ Si c'est une commande POS, assigner un caissier du restaurant
+      let cashierId = null;
+      if (isFromPOS) {
+        const restaurantCashiers = createdCashiers.filter(c => c.restaurant_id === restaurant.id);
+        if (restaurantCashiers.length > 0) {
+          cashierId = restaurantCashiers[Math.floor(Math.random() * restaurantCashiers.length)].id;
+        }
+      }
       
       const subtotal = 800 + Math.floor(Math.random() * 2000);
       const deliveryFee = orderType === 'delivery' ? 150 + Math.floor(Math.random() * 150) : 0;
@@ -490,20 +592,21 @@ const seedDatabase = async () => {
       }
       
       const order = {
-        client_id: client.id,
+        client_id: isFromPOS ? null : client.id, // ✅ POS orders peuvent ne pas avoir de client
         restaurant_id: restaurant.id,
         livreur_id: driver ? driver.id : null,
+        created_by_cashier_id: cashierId, // ✅ NOUVEAU: Lier au caissier si POS
         order_type: orderType,
         order_number: `${orderType === 'pickup' ? 'PKP' : 'DEL'}-${createdAt.toISOString().slice(0, 10).replace(/-/g, '')}-${String(i + 1).padStart(4, '0')}`,
         status: status,
-        delivery_address: orderType === 'delivery' ? client.address : null,
-        delivery_location: orderType === 'delivery' ? client.location : null,
+        delivery_address: orderType === 'delivery' && !isFromPOS ? client.address : null,
+        delivery_location: orderType === 'delivery' && !isFromPOS ? client.location : null,
         delivery_distance: orderType === 'delivery' ? parseFloat((Math.random() * 10 + 1).toFixed(2)) : null,
         subtotal: subtotal,
         delivery_fee: deliveryFee,
         total_amount: totalAmount,
         payment_method: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
-        delivery_instructions: i % 5 === 0 ? "Please call when you arrive" : null,
+        delivery_instructions: !isFromPOS && i % 5 === 0 ? "Please call when you arrive" : null,
         preparation_time: 15 + Math.floor(Math.random() * 20),
         estimated_delivery_time: new Date(createdAt.getTime() + (30 + Math.random() * 30) * 60 * 1000),
         rating: status === 'delivered' && Math.random() > 0.3 ? parseFloat((3 + Math.random() * 2).toFixed(1)) : null,
@@ -524,7 +627,7 @@ const seedDatabase = async () => {
     }
     
     const createdOrders = await Order.bulkCreate(orders, { returning: true });
-    console.log(`✅ ${createdOrders.length} orders created`);
+    console.log(`✅ ${createdOrders.length} orders created (${orders.filter(o => o.created_by_cashier_id).length} from POS)`);
 
     // ----------------------------
     // 7️⃣ Order Items
@@ -675,8 +778,9 @@ const seedDatabase = async () => {
     console.log(`✅ ${createdClients.length} clients`);
     console.log(`✅ ${createdDrivers.length} drivers (capacity: 5 orders each)`);
     console.log(`✅ ${restaurants.length} restaurants`);
+    console.log(`✅ ${createdCashiers.length} cashiers (2 per restaurant for first 100)`); // ✅ NOUVEAU
     console.log(`✅ ${allMenuItems.length} menu items`);
-    console.log(`✅ ${createdOrders.length} orders`);
+    console.log(`✅ ${createdOrders.length} orders (${orders.filter(o => o.created_by_cashier_id).length} from POS)`); // ✅ MODIFIÉ
     console.log(`✅ ${orderItems.length} order items`);
     console.log(`✅ ${favoriteRestaurants.length} favorite restaurants`);
     console.log(`✅ ${favoriteMeals.length} favorite meals`);
@@ -709,10 +813,28 @@ const seedDatabase = async () => {
     console.log("  • driver1@example.com → driver1000@example.com / password123");
     console.log("\nRESTAURANTS:");
     console.log("  • restaurant1@example.com → restaurant1000@example.com / password123");
+    console.log("\n💰 CASHIERS:"); // ✅ NOUVEAU
+    console.log("  • cashier1@example.com → cashier200@example.com / password123");
+    console.log("  • 2 cashiers per restaurant (first 100 restaurants)");
+    console.log("  • Various permission levels for testing");
+    console.log("─".repeat(60));
+    
+    console.log("\n📊 CASHIER STATISTICS:");
+    console.log("─".repeat(60));
+    const activeCashiers = createdCashiers.filter(c => c.status === 'active').length;
+    const onBreakCashiers = createdCashiers.filter(c => c.status === 'on_break').length;
+    const offlineCashiers = createdCashiers.filter(c => c.status === 'offline').length;
+    const posOrders = orders.filter(o => o.created_by_cashier_id).length;
+    
+    console.log(`✓ Active cashiers: ${activeCashiers}`);
+    console.log(`✓ On break: ${onBreakCashiers}`);
+    console.log(`✓ Offline: ${offlineCashiers}`);
+    console.log(`✓ POS orders created: ${posOrders} (~30% of total)`);
     console.log("─".repeat(60));
     
     console.log("\n✅ System ready for testing!");
     console.log("🚀 Multi-delivery features enabled");
+    console.log("💰 POS system with cashiers ready"); // ✅ NOUVEAU
     console.log("📱 Ready for production load testing");
     console.log("🔧 Admins can modify all configs via API endpoints");
 

@@ -6,7 +6,8 @@ import {
   requestOTP,
   verifyOTP,
   refreshAccessToken,  
-  logout            
+  logout, 
+      registerCashier        
 } from '../controllers/auth.controller.js';
 import { protect } from '../middlewares/auth.js';
 import { validate } from '../middlewares/validate.js';
@@ -61,5 +62,15 @@ router.post('/logout', logoutValidator, validate, logout);
  * Requires a valid bearer token.
  */
 router.get('/profile', protect, getProfile);
+
+/**
+ * Register a new cashier account.
+ * Can only be done by admins or restaurant owners.
+ */
+router.post(
+  '/register/cashier', 
+  protect, 
+  registerCashier
+);
 
 export default router;

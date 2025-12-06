@@ -11,6 +11,7 @@ import User from "./User.js";
 import Admin from "./Admin.js";
 import AdminNotification from "./AdminNotification.js";
 import SystemConfig from "./SystemConfig.js";
+import Cashier from "./Cashier.js";
 
 
 
@@ -310,7 +311,41 @@ Admin.hasMany(SystemConfig, {
   foreignKey: 'updated_by',
   as: 'config_updates'
 });
+// ✅ User <-> Cashier
+User.hasOne(Cashier, {
+  foreignKey: 'user_id',
+  as: 'cashierProfile',
+  onDelete: 'CASCADE'
+});
 
+Cashier.belongsTo(User, {
+  foreignKey: 'user_id',
+  as: 'user'
+});
+
+// ✅ Restaurant <-> Cashier
+Restaurant.hasMany(Cashier, {
+  foreignKey: 'restaurant_id',
+  as: 'cashiers',
+  onDelete: 'CASCADE'
+});
+
+Cashier.belongsTo(Restaurant, {
+  foreignKey: 'restaurant_id',
+  as: 'restaurant'
+});
+
+// ✅ Cashier <-> Order (track who created the order)
+Order.belongsTo(Cashier, {
+  foreignKey: 'created_by_cashier_id',
+  as: 'cashier',
+  required: false
+});
+
+Cashier.hasMany(Order, {
+  foreignKey: 'created_by_cashier_id',
+  as: 'orders'
+});``
 
 export { 
   Restaurant, 
@@ -325,6 +360,7 @@ export {
   User,
    Admin, 
   AdminNotification, 
-  SystemConfig  
+  SystemConfig,
+  Cashier
 };
 

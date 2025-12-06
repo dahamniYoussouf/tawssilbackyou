@@ -28,6 +28,8 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import geocodeRoutes from "./routes/geocode.js";
 import auth from "./routes/auth.route.js";
 import admin from "./routes/admin.routes.js"; 
+import cashier from "./routes/cashier.routes.js";
+
 
 
 const app = express();
@@ -69,6 +71,8 @@ app.use("/driver", driver);
 app.use("/admin", admin);
 app.use("/api", uploadRoutes);
 app.use("/api", geocodeRoutes);
+app.use("/cashier", cashier);
+
 
 
 app.use("/api/v1/auth", auth);
@@ -85,6 +89,7 @@ app.use("/api/v1/drivers", driver);
 app.use("/api/v1/admin", admin);
 app.use("/api/v1/uploads", uploadRoutes);
 app.use("/api/v1/geocode", geocodeRoutes);
+app.use("/api/v1/cashiers", cashier);
 
 
 app.use(errorHandler);

@@ -52,22 +52,59 @@ export const createOrder = async (req, res, next) => {
 };
 
 
-// ✅ Create order with items - client_id from JWT
+// ✅ Create order from POS - requires cashier authentication
 export const createOrderFromPOS = async (req, res, next) => {
   try {
-   
+    // ✅ Get cashier_id from JWT token (must be authenticated)
+    const cashier_id = req.user?.cashier_id;
+    
+    if (!cashier_id) {
+      return res.status(401).json({
+        success: false,
+        message: "Cashier authentication required for POS orders"
+      });
+    }
 
-    // Merge client_id with request body
+    // ✅ Verify cashier has permission to create orders
+    const cashier = await Cashier.findByPk(cashier_id);
+    if (!cashier) {
+      return res.status(404).json({
+        success: false,
+        message: "Cashier profile not found"
+      });
+    }
+
+    if (!cashier.hasPermission('can_create_orders')) {
+      return res.status(403).json({
+        success: false,
+        message: "You don't have permission to create orders"
+      });
+    }
+
+    // ✅ Merge order data with cashier info
     const orderData = {
       ...req.body,
+      created_by_cashier_id: cashier_id, // Track who created the order
+      restaurant_id: cashier.restaurant_id, // Use cashier's restaurant
+      order_type: req.body.order_type || 'pickup' // Default to pickup for POS
     };
 
     const order = await createOrderWithItems(orderData);
     
+    // ✅ Increment cashier's order count
+    await cashier.incrementOrderCount(order.total_amount);
+    
     res.status(201).json({
       success: true,
-      message: "Order created successfully",
-      data: order
+      message: "Order created successfully via POS",
+      data: {
+        ...order,
+        cashier: {
+          id: cashier.id,
+          name: cashier.getFullName(),
+          cashier_code: cashier.cashier_code
+        }
+      }
     });
   } catch (err) {
     if (err.name === "SequelizeValidationError") {
@@ -89,6 +126,8 @@ export const createOrderFromPOS = async (req, res, next) => {
     });
   }
 };
+
+
 // Get all orders with filters
 export const getAllOrders = async (req, res, next) => {
   try {

@@ -25,7 +25,7 @@ const User = sequelize.define('User', {
     comment: "Hashed password"
   },
   role: {
-    type: DataTypes.ENUM('client', 'driver', 'restaurant', 'admin'),
+    type: DataTypes.ENUM('client', 'driver', 'restaurant', 'admin', 'cashier'),
     allowNull: false,
     comment: "User role type"
   },

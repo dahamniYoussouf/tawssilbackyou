@@ -4,6 +4,8 @@ import Client from '../models/Client.js';
 import Driver from '../models/Driver.js';
 import Restaurant from '../models/Restaurant.js';
 import Admin from '../models/Admin.js';
+import Cashier from '../models/Cashier.js';
+
 
 // OTP Store (use Redis in production)
 const otpStore = new Map();
@@ -437,7 +439,7 @@ export const login = async (req, res) => {
       return res.status(403).json({ message: 'Account is deactivated' });
     }
 
-    // ===== Check if type matches user's role =====
+    // ✅ Check if type matches user's role
     if (user.role !== type) {
       return res.status(401).json({ 
         message: `Invalid credentials. This account is registered as ${user.role}` 
@@ -449,11 +451,12 @@ export const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    // ===== Load the profile =====
+    // ✅ Load the profile
     let profile;
     let driver_id = null;
     let restaurant_id = null;
     let admin_id = null;
+    let cashier_id = null; // ✅ NEW
 
     switch (user.role) {
       case 'driver':
@@ -470,12 +473,25 @@ export const login = async (req, res) => {
         profile = await Admin.findOne({ where: { user_id: user.id } });
         admin_id = profile?.id || null;
         break;
+
+      case 'cashier': // ✅ NEW
+        profile = await Cashier.findOne({ 
+          where: { user_id: user.id },
+          include: [{
+            model: Restaurant,
+            as: 'restaurant',
+            attributes: ['id', 'name']
+          }]
+        });
+        cashier_id = profile?.id || null;
+        restaurant_id = profile?.restaurant_id || null; // ✅ Cashier has access to restaurant
+        break;
     }
 
     user.last_login = new Date();
     await user.save();
 
-    // ===== Generate tokens with driver_id / restaurant_id =====
+    // ✅ Generate tokens with cashier_id
     const deviceIdentifier = device_id || `device-${Date.now()}`;
 
     const accessToken = jwt.sign(
@@ -485,6 +501,7 @@ export const login = async (req, res) => {
         driver_id,
         restaurant_id,
         admin_id,
+        cashier_id, // ✅ NEW
         type: 'access'
       },
       process.env.JWT_SECRET || 'your-secret-key',
@@ -498,6 +515,7 @@ export const login = async (req, res) => {
         driver_id,
         restaurant_id,
         admin_id,
+        cashier_id, // ✅ NEW
         type: 'refresh',
         deviceId: deviceIdentifier
       },
@@ -505,14 +523,14 @@ export const login = async (req, res) => {
       { expiresIn: '30d' }
     );
 
-    // ===== Store refresh token =====
+    // ✅ Store refresh token
     deviceTokens.set(refreshToken, {
       userId: user.id,
       deviceId: deviceIdentifier,
       createdAt: Date.now()
     });
 
-    // ===== Response =====
+    // ✅ Response
     res.json({
       message: 'Login successful',
       access_token: accessToken,
@@ -529,6 +547,89 @@ export const login = async (req, res) => {
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Login failed', error: error.message });
+  }
+};
+
+// ✅ Nouvelle fonction pour créer un compte cashier (par admin ou restaurant)
+export const registerCashier = async (req, res) => {
+  try {
+    const { 
+      email, 
+      password, 
+      first_name, 
+      last_name, 
+      phone, 
+      restaurant_id,
+      permissions 
+    } = req.body;
+
+    // Validate required fields
+    if (!email || !password || !first_name || !last_name || !phone || !restaurant_id) {
+      return res.status(400).json({
+        message: 'Missing required fields'
+      });
+    }
+
+    // Check if email already exists
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
+
+    // Verify restaurant exists
+    const restaurant = await Restaurant.findByPk(restaurant_id);
+    if (!restaurant) {
+      return res.status(404).json({ message: 'Restaurant not found' });
+    }
+
+    // Create user account
+    const user = await User.create({ 
+      email, 
+      password, 
+      role: 'cashier' 
+    });
+
+    // Generate cashier code
+    const cashierCode = await Cashier.generateCashierCode();
+
+    // Create cashier profile
+    const cashier = await Cashier.create({
+      user_id: user.id,
+      restaurant_id,
+      cashier_code: cashierCode,
+      first_name,
+      last_name,
+      phone: normalizePhoneNumber(phone),
+      email,
+      permissions: permissions || {
+        can_create_orders: true,
+        can_cancel_orders: false,
+        can_apply_discounts: false,
+        can_process_refunds: false,
+        can_view_reports: false
+      }
+    });
+
+    res.status(201).json({
+      message: 'Cashier registered successfully',
+      data: {
+        user_id: user.id,
+        cashier_id: cashier.id,
+        cashier_code: cashier.cashier_code,
+        email: user.email,
+        restaurant: {
+          id: restaurant.id,
+          name: restaurant.name
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Register cashier error:', error);
+    res.status(500).json({ 
+      message: 'Registration failed', 
+      error: error.message 
+    });
   }
 };
 
