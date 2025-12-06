@@ -51,6 +51,44 @@ export const createOrder = async (req, res, next) => {
   }
 };
 
+
+// ✅ Create order with items - client_id from JWT
+export const createOrderFromPOS = async (req, res, next) => {
+  try {
+   
+
+    // Merge client_id with request body
+    const orderData = {
+      ...req.body,
+    };
+
+    const order = await createOrderWithItems(orderData);
+    
+    res.status(201).json({
+      success: true,
+      message: "Order created successfully",
+      data: order
+    });
+  } catch (err) {
+    if (err.name === "SequelizeValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: err.errors.map(e => ({
+          field: e.path,
+          message: e.message
+        }))
+      });
+    }
+    
+    const status = err.status || 500;
+    return res.status(status).json({
+      success: false,
+      message: err.message || "Failed to create order",
+      ...(process.env.NODE_ENV === 'development' && { error: err.stack })
+    });
+  }
+};
 // Get all orders with filters
 export const getAllOrders = async (req, res, next) => {
   try {

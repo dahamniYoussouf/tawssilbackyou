@@ -21,6 +21,7 @@ const router = Router();
 
 // Create order - only authenticated clients
 router.post('/', protect, isClient, createOrderWithItemsValidator, validate, orderController.createOrder);
+router.post('/create-from-pos', createOrderWithItemsValidator, validate, orderController.createOrderFromPOS);
 router.post('/create', protect, isClient, createOrderValidator, validate, orderController.createOrder);
 
 // Get all orders - protected (admin/restaurant use)

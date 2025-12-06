@@ -6,22 +6,22 @@ import Restaurant from "../models/Restaurant.js";
 import Client from "../models/Client.js";
 import calculateRouteTime from "../services/routingService.js";
 import { emit } from "../config/socket.js";
-import {scheduleAdminNotification} from "../services/order.service.js"
-
+import { scheduleAdminNotification } from "../services/order.service.js";
 
 // Helper to notify
 function notify(type, id, data) {
   emit(`${type}:${id}`, "notification", data);
 }
+
 /**
  * CREATE ORDER WITH ITEMS IN A SINGLE TRANSACTION
- * Auto-calculates estimated_delivery_time based on restaurant and delivery location
+ * ✅ NOW SUPPORTS NULL client_id FOR PICKUP ORDERS (POS)
  */
 export async function createOrderWithItems(data) {
   const {
-    client_id,
+    client_id, // ✅ CAN BE NULL FOR POS PICKUP ORDERS
     restaurant_id,
-    order_type = 'delivery',
+    order_type = 'pickup', // Default to pickup for POS
     delivery_address,
     lat,
     lng,
@@ -36,34 +36,41 @@ export async function createOrderWithItems(data) {
     throw { status: 400, message: "Order must contain at least one item" };
   }
 
-  // OPTIMIZATION 1: Start transaction later (after validations)
-  // No need to hold a DB transaction during validation logic
-
-  // Validate basic requirements first (no DB needed)
-  if (order_type === 'delivery' && !delivery_address) {
-    throw { status: 400, message: "Delivery address is required for delivery orders" };
+  // ✅ Validate: client_id required ONLY for delivery orders
+  if (order_type === 'delivery') {
+    if (!client_id) {
+      throw { status: 400, message: "client_id is required for delivery orders" };
+    }
+    if (!delivery_address) {
+      throw { status: 400, message: "Delivery address is required for delivery orders" };
+    }
   }
 
   const menuItemIds = items.map(i => i.menu_item_id);
 
-  // OPTIMIZATION 2: Use lean queries - only select needed fields
-  const [restaurant, client, menuItems] = await Promise.all([
+  // ✅ Restaurant validation (always required)
+  const [restaurant, menuItems] = await Promise.all([
     Restaurant.findByPk(restaurant_id, {
-      attributes: ['id', 'location'], // Only fetch what we need
-      raw: true // Skip model instantiation if possible
-    }),
-    Client.findByPk(client_id, {
-      attributes: ['id'],
+      attributes: ['id', 'location'],
       raw: true
     }),
     MenuItem.findAll({
       where: { id: menuItemIds },
-      attributes: ['id', 'nom', 'prix', 'is_available'] // Only needed fields
+      attributes: ['id', 'nom', 'prix', 'is_available']
     })
   ]);
 
   if (!restaurant) throw { status: 404, message: "Restaurant not found" };
-  if (!client) throw { status: 404, message: "Client not found" };
+
+  // ✅ Client validation (only if client_id provided)
+  let client = null;
+  if (client_id) {
+    client = await Client.findByPk(client_id, {
+      attributes: ['id'],
+      raw: true
+    });
+    if (!client) throw { status: 404, message: "Client not found" };
+  }
 
   // Validate menu items
   if (menuItems.length !== menuItemIds.length) {
@@ -72,7 +79,7 @@ export async function createOrderWithItems(data) {
 
   const menuMap = new Map(menuItems.map(m => [m.id, m]));
 
-  // OPTIMIZATION 3: Calculate everything BEFORE starting transaction
+  // Calculate subtotal and prepare order items
   let subtotal = 0;
   const orderItemsData = items.map(item => {
     const menuItem = menuMap.get(item.menu_item_id);
@@ -100,10 +107,8 @@ export async function createOrderWithItems(data) {
     };
   });
 
-  // OPTIMIZATION 4: Calculate initial delivery time estimate BEFORE transaction
-  // NOTE: This is an initial estimate. The definitive calculation with the restaurant's 
-  // actual preparation_time will be done in acceptOrder() when the restaurant accepts the order.
-  const prepTime = 15; // Default preparation time (will be replaced by restaurant's estimate)
+  // Calculate delivery time estimate
+  const prepTime = 15;
   let calculatedEstimatedTime = estimated_delivery_time;
   let deliveryDurationMinutes = null;
   let distanceKm = null;
@@ -133,16 +138,17 @@ export async function createOrderWithItems(data) {
       }
     }
   } else {
+    // For pickup orders, just use prep time
     calculatedEstimatedTime = new Date(Date.now() + prepTime * 60 * 1000);
   }
 
-  // OPTIMIZATION 5: NOW start transaction - only for actual DB writes
+  // Start transaction
   const transaction = await sequelize.transaction();
 
   try {
-    // Create order with pre-calculated values
+    // ✅ Create order (client_id can be null for pickup)
     const order = await Order.create({
-      client_id,
+      client_id: client_id || null, // ✅ NULL for POS pickup orders
       restaurant_id,
       order_type,
       delivery_address: order_type === 'delivery' ? delivery_address : null,
@@ -154,7 +160,7 @@ export async function createOrderWithItems(data) {
       estimated_delivery_time: calculatedEstimatedTime
     }, { transaction });
 
-    // Set coordinates and calculate total
+    // Set coordinates for delivery orders
     if (order_type === 'delivery' && lat && lng) {
       order.setDeliveryCoordinates(parseFloat(lng), parseFloat(lat));
     }
@@ -171,18 +177,17 @@ export async function createOrderWithItems(data) {
       individualHooks: true
     });
 
-    // OPTIMIZATION 6: Fetch complete order with all fields
+    // Fetch complete order with relations
     const completeOrder = await Order.findByPk(order.id, {
       include: [
         { 
           model: Restaurant, 
           as: 'restaurant'
-          // All fields included by default
         },
         { 
           model: Client, 
-          as: 'client'
-          // All fields included by default
+          as: 'client',
+          required: false // ✅ Client is optional now
         },
         { 
           model: OrderItem, 
@@ -190,37 +195,54 @@ export async function createOrderWithItems(data) {
           include: [{ 
             model: MenuItem, 
             as: 'menu_item'
-            // All fields included by default
           }]
         }
       ],
       transaction
     });
 
-    // OPTIMIZATION 7: Commit BEFORE notifications (non-critical operations)
+    // Commit transaction
     await transaction.commit();
 
-    // OPTIMIZATION 8: Run notifications asynchronously without blocking response
+    // Notifications (async, non-blocking)
     setImmediate(() => {
       try {
-        scheduleAdminNotification(order.id);
+        // Only schedule admin notification for delivery orders with clients
+        if (order_type === 'delivery' && client_id) {
+          scheduleAdminNotification(order.id);
+        }
+        
+        // Notify restaurant
         notify('restaurant', data.restaurant_id, {
           type: 'new_order',
           orderId: order.id,
           orderNumber: order.order_number,
-          total: order.total
+          orderType: order_type,
+          total: order.total_amount,
+          source: client_id ? 'customer' : 'pos' // ✅ Indicate POS orders
         });
-        console.log("emitting notification to admin");
+
+        // Notify client (only if exists)
+        if (client_id) {
+          notify('client', client_id, {
+            type: 'order_created',
+            orderId: order.id,
+            orderNumber: order.order_number,
+            status: 'pending'
+          });
+        }
+        
+        console.log("✅ Notifications sent for order:", order.order_number);
       } catch (notifyError) {
-        console.error("Post-commit notification failed:", notifyError.message);
+        console.error("❌ Post-commit notification failed:", notifyError.message);
       }
     });
 
-    // Return immediately
     return {
       ...completeOrder.toJSON(),
       delivery_duration_minutes: deliveryDurationMinutes,
-      delivery_distance_km: distanceKm
+      delivery_distance_km: distanceKm,
+      source: client_id ? 'customer' : 'pos' // ✅ Indicate source
     };
 
   } catch (error) {
@@ -228,8 +250,6 @@ export async function createOrderWithItems(data) {
     throw error;
   }
 }
-
-
 
 /**
  * GET ORDERS BY RESTAURANT ID
@@ -239,9 +259,8 @@ export async function getOrdersByRestaurant(restaurantId, filters = {}) {
   try {
     const where = { restaurant_id: restaurantId };
     
-    // Add optional filters
     if (filters.status) {
-      where.statut = filters.status;
+      where.status = filters.status;
     }
     
     if (filters.order_type) {
@@ -254,6 +273,7 @@ export async function getOrdersByRestaurant(restaurantId, filters = {}) {
         { 
           model: Client, 
           as: 'client',
+          required: false, // ✅ Client is optional
           attributes: ['id', 'first_name', 'last_name', 'phone_number', 'email']
         },
         { 
