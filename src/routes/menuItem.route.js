@@ -13,7 +13,7 @@ import {
 } from "../validators/menuItemValidator.js";
 import { validate } from "../middlewares/validate.js";
 import * as menuItemCtrl from "../controllers/menuItem.controller.js";
-import { protect, isRestaurant, isClient, authorize } from "../middlewares/auth.js";
+import { protect, isRestaurant, isClient, authorize, isCashier  } from "../middlewares/auth.js";
 
 const router = Router();
 
@@ -37,6 +37,15 @@ router.get(
   getMyMenuItemsValidator,
   validate,
   menuItemCtrl.getMyMenuItems
+);
+
+router.get(
+  "/cashier/menu",
+  protect,
+  isCashier,
+  getMyMenuItemsValidator,
+  validate,
+  menuItemCtrl.getCashierMenuItems
 );
 
 // ✅ Get MY statistics - statistiques des items du restaurant

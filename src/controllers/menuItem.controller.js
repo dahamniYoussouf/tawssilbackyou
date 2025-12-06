@@ -2,6 +2,7 @@
 import * as menuItemService from "../services/menuItem.service.js";
 import MenuItem from "../models/MenuItem.js";
 import FoodCategory from "../models/FoodCategory.js";
+import Cashier from "../models/Cashier.js"; 
 import { Op } from "sequelize";
 
 /**
@@ -468,6 +469,119 @@ export const getMyStatistics = async (req, res, next) => {
         unavailable_items: unavailableItems,
         average_price: parseFloat(averagePrice.toFixed(2)),
         items_by_category: categoryCounts
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+export const getCashierMenuItems = async (req, res, next) => {
+  try {
+    const cashier_id = req.user.cashier_id;
+    
+    if (!cashier_id) {
+      return res.status(403).json({
+        success: false,
+        message: "Cashier profile not found in token"
+      });
+    }
+
+    // Récupérer le restaurant_id depuis le profil du caissier
+    const cashier = await Cashier.findByPk(cashier_id, {
+      attributes: ['restaurant_id']
+    });
+
+    if (!cashier || !cashier.restaurant_id) {
+      return res.status(404).json({
+        success: false,
+        message: "Restaurant not found for this cashier"
+      });
+    }
+
+    const restaurant_id = cashier.restaurant_id;
+
+    // Utiliser la même logique que getMyMenuItems
+    const { 
+      page = 1, 
+      limit = 20,
+      category_id,
+      is_available,
+      search,
+      sort = 'created_at'
+    } = req.query;
+
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    const where = {};
+
+    // Filtrer par catégories du restaurant
+    const restaurantCategories = await FoodCategory.findAll({
+      where: { restaurant_id },
+      attributes: ['id']
+    });
+    
+    const categoryIds = restaurantCategories.map(cat => cat.id);
+    where.category_id = { [Op.in]: categoryIds };
+
+    // Filtre par catégorie spécifique
+    if (category_id) {
+      if (!categoryIds.includes(category_id)) {
+        return res.status(403).json({
+          success: false,
+          message: "Category doesn't belong to your restaurant"
+        });
+      }
+      where.category_id = category_id;
+    }
+
+    // Filtre par disponibilité
+    if (is_available !== undefined) {
+      where.is_available = is_available === 'true';
+    }
+
+    // Recherche par nom
+    if (search && search.trim()) {
+      where.nom = { [Op.iLike]: `%${search.trim()}%` };
+    }
+
+    // Construction de l'ordre de tri
+    let order;
+    switch (sort) {
+      case 'nom':
+        order = [['nom', 'ASC']];
+        break;
+      case 'prix':
+        order = [['prix', 'ASC']];
+        break;
+      case 'created_at':
+      default:
+        order = [['created_at', 'DESC']];
+    }
+
+    const { count, rows } = await MenuItem.findAndCountAll({
+      where,
+      include: [
+        { 
+          model: FoodCategory, 
+          as: 'category', 
+          attributes: ['id', 'nom'] 
+        }
+      ],
+      order,
+      limit: parseInt(limit),
+      offset
+    });
+
+    res.json({
+      success: true,
+      data: rows,
+      pagination: {
+        current_page: parseInt(page),
+        total_pages: Math.ceil(count / parseInt(limit)),
+        total_items: count,
+        items_per_page: parseInt(limit)
       }
     });
   } catch (err) {

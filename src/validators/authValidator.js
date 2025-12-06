@@ -221,7 +221,7 @@ export const loginValidator = [
   body('type')
     .notEmpty()
     .withMessage('Type is required')
-    .isIn(['driver', 'restaurant', 'admin'])
+    .isIn(['driver', 'restaurant', 'admin', "cashier"])
     .withMessage('Type must be one of: driver, restaurant, admin'),
   body('device_id')
     .optional()
