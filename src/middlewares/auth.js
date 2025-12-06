@@ -22,10 +22,10 @@ export const protect = async (req, res, next) => {
     } catch (error) {
       // Token expired or invalid
       if (error.name === 'TokenExpiredError') {
-        return res.status(401).json({ 
+        return res.status(401).json({
           message: 'Token expired',
           code: 'TOKEN_EXPIRED',
-          expired: true 
+          expired: true
         });
       }
       return res.status(401).json({ message: 'Invalid token' });
@@ -53,11 +53,11 @@ export const protect = async (req, res, next) => {
     if (decoded.client_id) {
       req.user.client_id = decoded.client_id;
     }
-    
+
     if (decoded.driver_id) {
       req.user.driver_id = decoded.driver_id;
     }
-    
+
     if (decoded.restaurant_id) {
       req.user.restaurant_id = decoded.restaurant_id;
     }
@@ -66,8 +66,13 @@ export const protect = async (req, res, next) => {
       req.user.admin_id = decoded.admin_id;
     }
 
+    // ✅ FIX: Add cashier_id from token
+    if (decoded.cashier_id) {
+      req.user.cashier_id = decoded.cashier_id;
+    }
+
     next();
-    
+
   } catch (error) {
     console.error('Auth middleware error:', error);
     return res.status(401).json({ message: 'Not authorized' });
@@ -78,8 +83,8 @@ export const protect = async (req, res, next) => {
 export const authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ 
-        message: `Role ${req.user.role} not authorized for this action` 
+      return res.status(403).json({
+        message: `Role ${req.user.role} not authorized for this action`
       });
     }
     next();
