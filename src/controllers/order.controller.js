@@ -1,5 +1,7 @@
 import * as orderService from "../services/order.service.js";
 import { createOrderWithItems, getOrdersByRestaurant } from "../services/orderWithItem.js";
+import Cashier from '../models/Cashier.js';
+
 
 // ==================== ORDER CRUD ====================
 // src/controllers/order.controller.js
