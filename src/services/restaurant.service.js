@@ -906,41 +906,65 @@ export const getRestaurantOrdersHistory = async (restaurantId, filters = {}) => 
     if (max_price) where.total_amount[Op.lte] = parseFloat(max_price);
   }
 
-  // ==================== SEARCH FILTER ====================
+  // ==================== SEARCH FILTER (avec nom du client) ====================
   if (search && search.trim()) {
+    const searchTerm = search.trim();
+    
+    // Trouver les clients qui correspondent à la recherche
+    const matchingClients = await Client.findAll({
+      where: {
+        [Op.or]: [
+          { first_name: { [Op.iLike]: `%${searchTerm}%` } },
+          { last_name: { [Op.iLike]: `%${searchTerm}%` } },
+          // Recherche dans le nom complet (prénom + nom)
+          literal(`LOWER(CONCAT(first_name, ' ', last_name)) LIKE LOWER('%${searchTerm}%')`)
+        ]
+      },
+      attributes: ['id'],
+      raw: true
+    });
+    
+    const clientIds = matchingClients.map(c => c.id);
+    
+    // Construire les conditions de recherche
     where[Op.or] = [
-      { order_number: { [Op.iLike]: `%${search.trim()}%` } },
-      { delivery_address: { [Op.iLike]: `%${search.trim()}%` } }
+      { order_number: { [Op.iLike]: `%${searchTerm}%` } },
+      { delivery_address: { [Op.iLike]: `%${searchTerm}%` } }
     ];
+    
+    // Ajouter la recherche par client si des clients correspondent
+    if (clientIds.length > 0) {
+      where[Op.or].push({ client_id: { [Op.in]: clientIds } });
+    }
   }
 
-  // ==================== QUERY WITH COMPLETE INCLUDES (comme getOrderById) ====================
+  // ==================== QUERY WITH COMPLETE INCLUDES ====================
   const { count, rows } = await Order.findAndCountAll({
     where,
     include: [
       {
         model: Restaurant,
         as: 'restaurant',
-        // Tous les champs du restaurant (comme getOrderById)
+        required: false
       },
       {
         model: Client,
         as: 'client',
-        // Tous les champs du client (comme getOrderById)
+        required: false
       },
       {
         model: Driver,
         as: 'driver',
-        // Tous les champs du driver (comme getOrderById)
         required: false
       },
       {
         model: OrderItem,
         as: 'order_items',
+        required: false,
         include: [{
           model: MenuItem,
           as: 'menu_item',
-          // Tous les champs du menu_item (comme getOrderById)
+          required: false
         }]
       }
     ],
@@ -970,161 +994,145 @@ export const getRestaurantOrdersHistory = async (restaurantId, filters = {}) => 
     delivery_orders: allOrders.filter(o => o.order_type === 'delivery').length
   };
 
-  // ==================== FORMAT RESPONSE (FORMAT IDENTIQUE À getOrderById) ====================
-  // ==================== FORMAT RESPONSE (FORMAT IDENTIQUE À getOrderById) ====================
-const formattedOrders = rows.map(order => {
-  // Conversion en JSON (comme getOrderById)
-  const orderJSON = order.toJSON();
+  // ==================== FORMAT RESPONSE ====================
+  const formattedOrders = rows.map(order => {
+    const restaurantCoords = order.restaurant?.location?.coordinates || [];
+    const deliveryCoords = order.delivery_location?.coordinates || [];
 
-  // Extraire les coordonnées du restaurant
-  const restaurantCoords = order.restaurant?.location?.coordinates || [];
-  
-  // Extraire les coordonnées de livraison
-  const deliveryCoords = order.delivery_location?.coordinates || [];
-
-  return {
-    // ✅ Tous les champs de l'ordre (comme getOrderById)
-    id: order.id,
-    order_number: order.order_number,
-    client_id: order.client_id,
-    restaurant_id: order.restaurant_id,
-    order_type: order.order_type,
-    status: order.status,
-    livreur_id: order.livreur_id,
-    
-    // Montants
-    subtotal: parseFloat(order.subtotal || 0),
-    delivery_fee: parseFloat(order.delivery_fee || 0),
-    total_amount: parseFloat(order.total_amount || 0),
-    delivery_distance: order.delivery_distance ? parseFloat(order.delivery_distance) : null,
-    
-    // Adresses et localisation
-    delivery_address: order.delivery_address,
-    delivery_location: deliveryCoords.length === 2 ? {
-      type: 'Point',
-      coordinates: deliveryCoords,
-      lat: deliveryCoords[1],
-      lng: deliveryCoords[0]
-    } : null,
-    
-    delivery_instructions: order.delivery_instructions,
-    payment_method: order.payment_method,
-    preparation_time: order.preparation_time,
-    
-    // Timestamps
-    estimated_delivery_time: order.estimated_delivery_time,
-    created_at: order.created_at,
-    updated_at: order.updated_at,
-    accepted_at: order.accepted_at,
-    preparing_started_at: order.preparing_started_at,
-    assigned_at: order.assigned_at,
-    delivering_started_at: order.delivering_started_at,
-    delivered_at: order.delivered_at,
-    
-    // Rating
-    rating: order.rating ? parseFloat(order.rating) : null,
-    review_comment: order.review_comment,
-    decline_reason: order.decline_reason,
-    
-    // ✅ Restaurant complet (comme getOrderById) - with null check
-    restaurant: order.restaurant ? {
-      id: order.restaurant.id,
-      user_id: order.restaurant.user_id,
-      name: order.restaurant.name,
-      description: order.restaurant.description,
-      address: order.restaurant.address,
-      phone_number: order.restaurant.phone_number,
-      email: order.restaurant.email,
-      location: restaurantCoords.length === 2 ? {
+    return {
+      id: order.id,
+      order_number: order.order_number,
+      client_id: order.client_id,
+      restaurant_id: order.restaurant_id,
+      order_type: order.order_type,
+      status: order.status,
+      livreur_id: order.livreur_id,
+      
+      subtotal: parseFloat(order.subtotal || 0),
+      delivery_fee: parseFloat(order.delivery_fee || 0),
+      total_amount: parseFloat(order.total_amount || 0),
+      delivery_distance: order.delivery_distance ? parseFloat(order.delivery_distance) : null,
+      
+      delivery_address: order.delivery_address,
+      delivery_location: deliveryCoords.length === 2 ? {
         type: 'Point',
-        coordinates: restaurantCoords,
-        lat: restaurantCoords[1],
-        lng: restaurantCoords[0]
+        coordinates: deliveryCoords,
+        lat: deliveryCoords[1],
+        lng: deliveryCoords[0]
       } : null,
-      rating: order.restaurant.rating ? parseFloat(order.restaurant.rating) : null,
-      image_url: order.restaurant.image_url,
-      is_active: order.restaurant.is_active,
-      is_premium: order.restaurant.is_premium,
-      status: order.restaurant.status,
-      opening_hours: order.restaurant.opening_hours,
-      categories: order.restaurant.categories,
-      created_at: order.restaurant.created_at,
-      updated_at: order.restaurant.updated_at
-    } : null,
+      
+      delivery_instructions: order.delivery_instructions,
+      payment_method: order.payment_method,
+      preparation_time: order.preparation_time,
+      
+      estimated_delivery_time: order.estimated_delivery_time,
+      created_at: order.created_at,
+      updated_at: order.updated_at,
+      accepted_at: order.accepted_at,
+      preparing_started_at: order.preparing_started_at,
+      assigned_at: order.assigned_at,
+      delivering_started_at: order.delivering_started_at,
+      delivered_at: order.delivered_at,
+      
+      rating: order.rating ? parseFloat(order.rating) : null,
+      review_comment: order.review_comment,
+      decline_reason: order.decline_reason,
+      
+      restaurant: order.restaurant ? {
+        id: order.restaurant.id,
+        user_id: order.restaurant.user_id,
+        name: order.restaurant.name,
+        description: order.restaurant.description,
+        address: order.restaurant.address,
+        phone_number: order.restaurant.phone_number,
+        email: order.restaurant.email,
+        location: restaurantCoords.length === 2 ? {
+          type: 'Point',
+          coordinates: restaurantCoords,
+          lat: restaurantCoords[1],
+          lng: restaurantCoords[0]
+        } : null,
+        rating: order.restaurant.rating ? parseFloat(order.restaurant.rating) : null,
+        image_url: order.restaurant.image_url,
+        is_active: order.restaurant.is_active,
+        is_premium: order.restaurant.is_premium,
+        status: order.restaurant.status,
+        opening_hours: order.restaurant.opening_hours,
+        categories: order.restaurant.categories,
+        created_at: order.restaurant.created_at,
+        updated_at: order.restaurant.updated_at
+      } : null,
 
-    // ✅ Client complet (comme getOrderById) - with null check
-    client: order.client ? {
-      id: order.client.id,
-      user_id: order.client.user_id,
-      first_name: order.client.first_name,
-      last_name: order.client.last_name,
-      email: order.client.email,
-      phone_number: order.client.phone_number,
-      address: order.client.address,
-      profile_image_url: order.client.profile_image_url,
-      loyalty_points: order.client.loyalty_points,
-      is_verified: order.client.is_verified,
-      is_active: order.client.is_active,
-      status: order.client.status,
-      created_at: order.client.created_at,
-      updated_at: order.client.updated_at,
-      full_name: `${order.client.first_name} ${order.client.last_name}`
-    } : null,
+      client: order.client ? {
+        id: order.client.id,
+        user_id: order.client.user_id,
+        first_name: order.client.first_name,
+        last_name: order.client.last_name,
+        email: order.client.email,
+        phone_number: order.client.phone_number,
+        address: order.client.address,
+        profile_image_url: order.client.profile_image_url,
+        loyalty_points: order.client.loyalty_points,
+        is_verified: order.client.is_verified,
+        is_active: order.client.is_active,
+        status: order.client.status,
+        created_at: order.client.created_at,
+        updated_at: order.client.updated_at,
+        full_name: `${order.client.first_name} ${order.client.last_name}`
+      } : null,
 
-    // ✅ Driver complet (comme getOrderById) - already has null check ✓
-    driver: order.driver ? {
-      id: order.driver.id,
-      user_id: order.driver.user_id,
-      driver_code: order.driver.driver_code,
-      first_name: order.driver.first_name,
-      last_name: order.driver.last_name,
-      phone: order.driver.phone,
-      email: order.driver.email,
-      vehicle_type: order.driver.vehicle_type,
-      vehicle_plate: order.driver.vehicle_plate,
-      license_number: order.driver.license_number,
-      status: order.driver.status,
-      current_location: order.driver.current_location,
-      rating: order.driver.rating ? parseFloat(order.driver.rating) : null,
-      total_deliveries: order.driver.total_deliveries,
-      cancellation_count: order.driver.cancellation_count,
-      active_orders: order.driver.active_orders,
-      max_orders_capacity: order.driver.max_orders_capacity,
-      is_verified: order.driver.is_verified,
-      is_active: order.driver.is_active,
-      profile_image_url: order.driver.profile_image_url,
-      last_active_at: order.driver.last_active_at,
-      created_at: order.driver.created_at,
-      updated_at: order.driver.updated_at,
-      full_name: `${order.driver.first_name} ${order.driver.last_name}`
-    } : null,
+      driver: order.driver ? {
+        id: order.driver.id,
+        user_id: order.driver.user_id,
+        driver_code: order.driver.driver_code,
+        first_name: order.driver.first_name,
+        last_name: order.driver.last_name,
+        phone: order.driver.phone,
+        email: order.driver.email,
+        vehicle_type: order.driver.vehicle_type,
+        vehicle_plate: order.driver.vehicle_plate,
+        license_number: order.driver.license_number,
+        status: order.driver.status,
+        current_location: order.driver.current_location,
+        rating: order.driver.rating ? parseFloat(order.driver.rating) : null,
+        total_deliveries: order.driver.total_deliveries,
+        cancellation_count: order.driver.cancellation_count,
+        active_orders: order.driver.active_orders,
+        max_orders_capacity: order.driver.max_orders_capacity,
+        is_verified: order.driver.is_verified,
+        is_active: order.driver.is_active,
+        profile_image_url: order.driver.profile_image_url,
+        last_active_at: order.driver.last_active_at,
+        created_at: order.driver.created_at,
+        updated_at: order.driver.updated_at,
+        full_name: `${order.driver.first_name} ${order.driver.last_name}`
+      } : null,
 
-    // ✅ Order items complets (comme getOrderById)
-    order_items: order.order_items?.map(item => ({
-      id: item.id,
-      order_id: item.order_id,
-      menu_item_id: item.menu_item_id,
-      quantite: item.quantite,
-      prix_unitaire: parseFloat(item.prix_unitaire),
-      prix_total: parseFloat(item.prix_total),
-      instructions_speciales: item.instructions_speciales,
-      created_at: item.created_at,
-      updated_at: item.updated_at,
-      menu_item: item.menu_item ? {
-        id: item.menu_item.id,
-        category_id: item.menu_item.category_id,
-        nom: item.menu_item.nom,
-        description: item.menu_item.description,
-        prix: parseFloat(item.menu_item.prix),
-        photo_url: item.menu_item.photo_url,
-        is_available: item.menu_item.is_available,
-        temps_preparation: item.menu_item.temps_preparation,
-        created_at: item.menu_item.created_at,
-        updated_at: item.menu_item.updated_at
-      } : null
-    })) || []
-  };
-});
+      order_items: order.order_items?.map(item => ({
+        id: item.id,
+        order_id: item.order_id,
+        menu_item_id: item.menu_item_id,
+        quantite: item.quantite,
+        prix_unitaire: parseFloat(item.prix_unitaire),
+        prix_total: parseFloat(item.prix_total),
+        instructions_speciales: item.instructions_speciales,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        menu_item: item.menu_item ? {
+          id: item.menu_item.id,
+          category_id: item.menu_item.category_id,
+          nom: item.menu_item.nom,
+          description: item.menu_item.description,
+          prix: parseFloat(item.menu_item.prix),
+          photo_url: item.menu_item.photo_url,
+          is_available: item.menu_item.is_available,
+          temps_preparation: item.menu_item.temps_preparation,
+          created_at: item.menu_item.created_at,
+          updated_at: item.menu_item.updated_at
+        } : null
+      })) || []
+    };
+  });
 
   return {
     orders: formattedOrders,
