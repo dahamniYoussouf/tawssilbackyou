@@ -1,7 +1,9 @@
 import { sequelize } from "../config/database.js";
 import Order from "../models/Order.js";
 import OrderItem from "../models/OrderItem.js";
+import OrderItemAddition from "../models/OrderItemAddition.js";
 import MenuItem from "../models/MenuItem.js";
+import Addition from "../models/Addition.js";
 import Restaurant from "../models/Restaurant.js";
 import Client from "../models/Client.js";
 import calculateRouteTime from "../services/routingService.js";
@@ -36,7 +38,7 @@ export async function createOrderWithItems(data) {
     throw { status: 400, message: "Order must contain at least one item" };
   }
 
-  // ✅ Validate: client_id required ONLY for delivery orders
+  // Validate: client_id required ONLY for delivery orders
   if (order_type === 'delivery') {
     if (!client_id) {
       throw { status: 400, message: "client_id is required for delivery orders" };
@@ -46,10 +48,13 @@ export async function createOrderWithItems(data) {
     }
   }
 
-  const menuItemIds = items.map(i => i.menu_item_id);
+  const menuItemIds = items
+    .map(i => i.menu_item_id)
+    .filter(id => !!id);
+  const additionIds = items.flatMap(i => (i.additions || []).map(a => a.addition_id)).filter(Boolean);
 
-  // ✅ Restaurant validation (always required)
-  const [restaurant, menuItems] = await Promise.all([
+  // Restaurant validation (always required)
+  const [restaurant, menuItems, additions] = await Promise.all([
     Restaurant.findByPk(restaurant_id, {
       attributes: ['id', 'location'],
       raw: true
@@ -57,12 +62,18 @@ export async function createOrderWithItems(data) {
     MenuItem.findAll({
       where: { id: menuItemIds },
       attributes: ['id', 'nom', 'prix', 'is_available']
-    })
+    }),
+    additionIds.length
+      ? Addition.findAll({
+          where: { id: additionIds },
+          attributes: ['id', 'menu_item_id', 'nom', 'prix', 'is_available']
+        })
+      : Promise.resolve([])
   ]);
 
   if (!restaurant) throw { status: 404, message: "Restaurant not found" };
 
-  // ✅ Client validation (only if client_id provided)
+  // Client validation (only if client_id provided)
   let client = null;
   if (client_id) {
     client = await Client.findByPk(client_id, {
@@ -72,42 +83,80 @@ export async function createOrderWithItems(data) {
     if (!client) throw { status: 404, message: "Client not found" };
   }
 
-  // Validate menu items
-  if (menuItems.length !== menuItemIds.length) {
-    throw { status: 404, message: "One or more menu items not found" };
-  }
-
   const menuMap = new Map(menuItems.map(m => [m.id, m]));
+  const additionMap = new Map(additions.map(a => [a.id, a]));
 
   // Calculate subtotal and prepare order items
   let subtotal = 0;
-  const orderItemsData = items.map(item => {
+  const additionsForItems = [];
+  const orderItemsData = items.map((item, idx) => {
     const menuItem = menuMap.get(item.menu_item_id);
+    const fallbackName = item.menu_item_name || item.menuItemName || "Article POS";
+    const fallbackPrice = item.unit_price ?? item.prix_unitaire ?? item.prix ?? 0;
     
     const quantity = item.quantity || item.quantite;
     const specialInstructions = item.special_instructions || item.instructions_speciales;
     
-    if (!menuItem.is_available) {
+    if (!menuItem && !item.menu_item_id) {
+      throw { status: 400, message: "menu_item_id is required for each item" };
+    }
+
+    if (!menuItem && fallbackPrice === 0) {
+      throw { status: 404, message: `Menu item not found: ${item.menu_item_id}` };
+    }
+
+    if (menuItem && !menuItem.is_available) {
       throw { status: 400, message: `${menuItem.nom} is not available` };
     }
     if (!quantity || quantity < 1) {
       throw { status: 400, message: "Quantity must be at least 1" };
     }
 
-    const itemTotal = parseFloat(menuItem.prix) * quantity;
-    subtotal += itemTotal;
+    let additionsTotal = 0;
+    const additionRows = [];
+    (item.additions || []).forEach(add => {
+      const addition = additionMap.get(add.addition_id);
+      if (!addition) {
+        throw { status: 404, message: "Addition not found" };
+      }
+      if (!addition.is_available) {
+        throw { status: 400, message: `${addition.nom} is not available` };
+      }
+      if (addition.menu_item_id && item.menu_item_id && addition.menu_item_id !== item.menu_item_id) {
+        throw { status: 400, message: `${addition.nom} does not belong to this menu item` };
+      }
+      const addQty = add.quantity || add.quantite || 1;
+      if (addQty < 1) {
+        throw { status: 400, message: "Addition quantity must be at least 1" };
+      }
+      const totalAdditionQty = addQty * quantity;
+      const additionTotal = parseFloat(addition.prix) * totalAdditionQty;
+      additionsTotal += additionTotal;
+      additionRows.push({
+        addition_id: addition.id,
+        quantite: totalAdditionQty,
+        prix_unitaire: addition.prix
+      });
+    });
+    additionsForItems[idx] = additionRows;
+
+    const unitPrice = menuItem ? parseFloat(menuItem.prix) : parseFloat(fallbackPrice);
+    const baseTotal = unitPrice * quantity;
+    subtotal += baseTotal + additionsTotal;
 
     return {
       order_id: null,
       menu_item_id: item.menu_item_id,
+      menu_item_name: menuItem ? menuItem.nom : fallbackName,
       quantite: quantity,
-      prix_unitaire: menuItem.prix,
-      prix_total: itemTotal,
+      prix_unitaire: unitPrice,
+      prix_total: baseTotal,
+      additions_total: additionsTotal,
       instructions_speciales: specialInstructions || null
     };
   });
 
-  // Calculate delivery time estimate
+// Calculate delivery time estimate
   const prepTime = 15;
   let calculatedEstimatedTime = estimated_delivery_time;
   let deliveryDurationMinutes = null;
@@ -146,9 +195,9 @@ export async function createOrderWithItems(data) {
   const transaction = await sequelize.transaction();
 
   try {
-    // ✅ Create order (client_id can be null for pickup)
+    // Create order (client_id can be null for pickup)
     const order = await Order.create({
-      client_id: client_id || null, // ✅ NULL for POS pickup orders
+      client_id: client_id || null, // NULL for POS pickup orders
       restaurant_id,
       order_type,
       delivery_address: order_type === 'delivery' ? delivery_address : null,
@@ -171,11 +220,32 @@ export async function createOrderWithItems(data) {
     // Create order items
     orderItemsData.forEach(item => item.order_id = order.id);
     
-    await OrderItem.bulkCreate(orderItemsData, { 
+    const createdOrderItems = await OrderItem.bulkCreate(orderItemsData, { 
       transaction,
       validate: true,
-      individualHooks: true
+      individualHooks: true,
+      returning: true
     });
+
+    // Create additions linked to order items
+    const additionRows = [];
+    createdOrderItems.forEach((orderItem, idx) => {
+      const rows = additionsForItems[idx] || [];
+      rows.forEach(addRow => {
+        additionRows.push({
+          ...addRow,
+          order_item_id: orderItem.id
+        });
+      });
+    });
+
+    if (additionRows.length) {
+      await OrderItemAddition.bulkCreate(additionRows, {
+        transaction,
+        validate: true,
+        individualHooks: true
+      });
+    }
 
     // Fetch complete order with relations
     const completeOrder = await Order.findByPk(order.id, {
@@ -187,15 +257,27 @@ export async function createOrderWithItems(data) {
         { 
           model: Client, 
           as: 'client',
-          required: false // ✅ Client is optional now
+          required: false // Client is optional now
         },
         { 
           model: OrderItem, 
           as: 'order_items',
-          include: [{ 
-            model: MenuItem, 
-            as: 'menu_item'
-          }]
+          include: [
+            { 
+              model: MenuItem, 
+              as: 'menu_item'
+            },
+            {
+              model: OrderItemAddition,
+              as: 'additions',
+              include: [
+                {
+                  model: Addition,
+                  as: 'addition'
+                }
+              ]
+            }
+          ]
         }
       ],
       transaction
@@ -219,7 +301,7 @@ export async function createOrderWithItems(data) {
           orderNumber: order.order_number,
           orderType: order_type,
           total: order.total_amount,
-          source: client_id ? 'customer' : 'pos' // ✅ Indicate POS orders
+          source: client_id ? 'customer' : 'pos' // Indicate POS orders
         });
 
         // Notify client (only if exists)
@@ -234,7 +316,7 @@ export async function createOrderWithItems(data) {
         
         console.log("✅ Notifications sent for order:", order.order_number);
       } catch (notifyError) {
-        console.error("❌ Post-commit notification failed:", notifyError.message);
+        console.error("⚠️ Post-commit notification failed:", notifyError.message);
       }
     });
 
@@ -242,7 +324,7 @@ export async function createOrderWithItems(data) {
       ...completeOrder.toJSON(),
       delivery_duration_minutes: deliveryDurationMinutes,
       delivery_distance_km: distanceKm,
-      source: client_id ? 'customer' : 'pos' // ✅ Indicate source
+      source: client_id ? 'customer' : 'pos' // Indicate source
     };
 
   } catch (error) {
@@ -273,7 +355,7 @@ export async function getOrdersByRestaurant(restaurantId, filters = {}) {
         { 
           model: Client, 
           as: 'client',
-          required: false, // ✅ Client is optional
+          required: false, // Client is optional
           attributes: ['id', 'first_name', 'last_name', 'phone_number', 'email']
         },
         { 
@@ -284,6 +366,17 @@ export async function getOrdersByRestaurant(restaurantId, filters = {}) {
               model: MenuItem, 
               as: 'menu_item',
               attributes: ['id', 'nom', 'description', 'prix', 'photo_url']
+            },
+            {
+              model: OrderItemAddition,
+              as: 'additions',
+              include: [
+                {
+                  model: Addition,
+                  as: 'addition',
+                  attributes: ['id', 'nom', 'prix']
+                }
+              ]
             }
           ]
         }

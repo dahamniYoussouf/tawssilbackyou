@@ -9,8 +9,10 @@ import AdminNotification from "../src/models/AdminNotification.js";
 import SystemConfig from "../src/models/SystemConfig.js"; 
 import FoodCategory from "../src/models/FoodCategory.js";
 import MenuItem from "../src/models/MenuItem.js";
+import Addition from "../src/models/Addition.js";
 import Order from "../src/models/Order.js";
 import OrderItem from "../src/models/OrderItem.js";
+import OrderItemAddition from "../src/models/OrderItemAddition.js";
 import FavoriteRestaurant from "../src/models/FavoriteRestaurant.js";
 import FavoriteMeal from "../src/models/FavoriteMeal.js";
 import * as associations from "../src/models/index.js";
@@ -105,6 +107,14 @@ const menuItemsByCategory = {
     { name: "Sandwich Thon", description: "Tuna with vegetables", price: 350, image: "https://images.unsplash.com/photo-1509722747041-616f39b57569?w=500" }
   ]
 };
+
+const additionTemplates = [
+  { nom: "Extra Cheese", description: "Mozzarella boost", prix: 80 },
+  { nom: "Extra Sauce", description: "House special sauce", prix: 50 },
+  { nom: "Olives", description: "Black olives topping", prix: 60 },
+  { nom: "Fries", description: "Side of crispy fries", prix: 120 },
+  { nom: "Spicy Mix", description: "Jalapeños & spicy oil", prix: 70 }
+];
 
 const streets = [
   "Rue des Frères Bouadou", "Avenue de l'ALN", "Rue Mohamed Belouizdad",
@@ -504,6 +514,8 @@ const seedDatabase = async () => {
     // ----------------------------
     console.log("🍕 Creating food categories and menu items...");
     const allMenuItems = [];
+    const allAdditions = [];
+    const menuItemAdditionsMap = new Map();
 
     for (let i = 0; i < 100; i++) {
       const restaurant = restaurants[i];
@@ -529,12 +541,29 @@ const seedDatabase = async () => {
             temps_preparation: 10 + Math.floor(Math.random() * 30)
           });
           allMenuItems.push(menuItem);
+
+          // Seed 1-3 additions per menu item
+          const extrasCount = Math.max(1, Math.floor(Math.random() * 3));
+          const shuffledExtras = [...additionTemplates].sort(() => 0.5 - Math.random()).slice(0, extrasCount);
+          const createdExtras = await Addition.bulkCreate(
+            shuffledExtras.map(extra => ({
+              menu_item_id: menuItem.id,
+              nom: extra.nom,
+              description: extra.description,
+              prix: extra.prix + Math.floor(Math.random() * 40) - 10,
+              is_available: Math.random() > 0.05
+            })),
+            { returning: true }
+          );
+          allAdditions.push(...createdExtras);
+          menuItemAdditionsMap.set(menuItem.id, createdExtras);
         }
       }
       
       if ((i + 1) % 20 === 0) console.log(`➡️  ${i + 1} restaurants with menus created...`);
     }
     console.log(`✅ ${allMenuItems.length} menu items created`);
+    console.log(`✅ ${allAdditions.length} additions created`);
 
     // ----------------------------
     // 6️⃣ Orders (1000)
@@ -633,6 +662,8 @@ const seedDatabase = async () => {
     // 7️⃣ Order Items
     // ----------------------------
     console.log("🍕 Creating order items...");
+    const orderSubtotalMap = new Map();
+    const orderItemAdditionPlans = [];
     const orderItems = [];
     
     for (let i = 0; i < createdOrders.length; i++) {
@@ -657,6 +688,24 @@ const seedDatabase = async () => {
             const unitPrice = parseFloat(menuItem.prix);
             const totalPrice = unitPrice * quantity;
             
+            const itemAdditions = menuItemAdditionsMap.get(menuItem.id) || [];
+            const selectedAdditions = [];
+            let additionsTotal = 0;
+
+            if (itemAdditions.length && Math.random() > 0.4) {
+              const extrasCount = Math.min(itemAdditions.length, Math.floor(Math.random() * 2) + 1);
+              const picked = [...itemAdditions].sort(() => 0.5 - Math.random()).slice(0, extrasCount);
+              for (const add of picked) {
+                const addQty = 1;
+                additionsTotal += parseFloat(add.prix) * quantity * addQty;
+                selectedAdditions.push({
+                  addition_id: add.id,
+                  prix: parseFloat(add.prix),
+                  quantity: addQty
+                });
+              }
+            }
+
             orderItems.push({
               order_id: order.id,
               menu_item_id: menuItem.id,
@@ -665,6 +714,17 @@ const seedDatabase = async () => {
               prix_total: totalPrice,
               instructions_speciales: j === 0 && Math.random() > 0.7 ? "Extra sauce please" : null
             });
+
+            orderItemAdditionPlans.push({
+              order_id: order.id,
+              menu_item_id: menuItem.id,
+              quantity,
+              additions: selectedAdditions
+            });
+
+            const combinedTotal = totalPrice + additionsTotal;
+            const currentSubtotal = orderSubtotalMap.get(order.id) || 0;
+            orderSubtotalMap.set(order.id, currentSubtotal + combinedTotal);
           }
         }
       }
@@ -672,7 +732,35 @@ const seedDatabase = async () => {
       if ((i + 1) % 200 === 0) console.log(`➡️  Order items for ${i + 1} orders created...`);
     }
     
-    await OrderItem.bulkCreate(orderItems);
+    const createdOrderItemsRows = await OrderItem.bulkCreate(orderItems, { returning: true });
+
+    const additionRows = [];
+    createdOrderItemsRows.forEach((orderItem, idx) => {
+      const plan = orderItemAdditionPlans[idx] || { additions: [], quantity: 1 };
+      (plan.additions || []).forEach(add => {
+        additionRows.push({
+          order_item_id: orderItem.id,
+          addition_id: add.addition_id,
+          quantite: plan.quantity * (add.quantity || 1),
+          prix_unitaire: add.prix,
+          prix_total: parseFloat(add.prix) * plan.quantity * (add.quantity || 1)
+        });
+      });
+    });
+
+    if (additionRows.length) {
+      await OrderItemAddition.bulkCreate(additionRows);
+      console.log(`✅ ${additionRows.length} order item additions created`);
+    }
+
+    for (const order of createdOrders) {
+      const subtotal = orderSubtotalMap.get(order.id) ?? parseFloat(order.subtotal || 0);
+      const total = subtotal + parseFloat(order.delivery_fee || 0);
+      order.subtotal = subtotal;
+      order.total_amount = total;
+      await order.save();
+    }
+
     console.log(`✅ ${orderItems.length} order items created`);
 
     // ----------------------------
@@ -733,14 +821,14 @@ const seedDatabase = async () => {
     
     for (const order of pendingOrders) {
       const restaurant = restaurants.find(r => r.id === order.restaurant_id);
-      const client = createdClients.find(c => c.id === order.client_id);
+      const client = order.client_id ? createdClients.find(c => c.id === order.client_id) : null;
 
       notifications.push({
         order_id: order.id,
         restaurant_id: order.restaurant_id,
         type: 'pending_order_timeout',
         message: `⚠️ Commande #${order.order_number} sans réponse depuis 3 minutes.\n` +
-                 `Restaurant: ${restaurant.name}\n` +
+                 `Restaurant: ${restaurant?.name ?? 'N/A'}\n` +
                  `Montant: ${order.total_amount} DA`,
         order_details: {
           order_number: order.order_number,
@@ -748,18 +836,18 @@ const seedDatabase = async () => {
           total_amount: parseFloat(order.total_amount),
           delivery_address: order.delivery_address,
           created_at: order.created_at,
-          client: {
+          client: client ? {
             name: `${client.first_name} ${client.last_name}`,
             phone: client.phone_number,
             address: client.address
-          }
+          } : null
         },
-        restaurant_info: {
+        restaurant_info: restaurant ? {
           id: restaurant.id,
           name: restaurant.name,
           address: restaurant.address,
           phone: restaurant.phone_number
-        },
+        } : null,
         is_read: Math.random() > 0.5,
         is_resolved: false
       });

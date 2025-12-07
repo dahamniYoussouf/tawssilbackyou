@@ -53,6 +53,18 @@ export const createOrderWithItemsValidator = [
   body('items.*.quantity')
     .notEmpty().withMessage('Quantity is required')
     .isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
+
+  body('items.*.additions')
+    .optional()
+    .isArray().withMessage('additions must be an array'),
+
+  body('items.*.additions.*.addition_id')
+    .optional()
+    .isUUID().withMessage('addition_id must be a valid UUID'),
+
+  body('items.*.additions.*.quantity')
+    .optional()
+    .isInt({ min: 1 }).withMessage('Addition quantity must be at least 1'),
   
   // REMOVED: unit_price is fetched from MenuItem model
   body('items.*.unit_price')

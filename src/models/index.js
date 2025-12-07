@@ -1,11 +1,14 @@
 import Restaurant from "./Restaurant.js";
 import MenuItem from "./MenuItem.js";
+import Addition from "./Addition.js";
 import FoodCategory from "./FoodCategory.js";
 import Client from "./Client.js";
 import Order from "./Order.js";
 import OrderItem from "./OrderItem.js";
+import OrderItemAddition from "./OrderItemAddition.js";
 import FavoriteMeal from "./FavoriteMeal.js";
 import FavoriteRestaurant from "./FavoriteRestaurant.js";
+import FavoriteAddress from "./FavoriteAddress.js";
 import Driver from "./Driver.js";
 import User from "./User.js";
 import Admin from "./Admin.js";
@@ -107,6 +110,48 @@ OrderItem.belongsTo(MenuItem, {
 });
 
 // ==========================
+// MenuItem & Additions
+// ==========================
+MenuItem.hasMany(Addition, {
+  foreignKey: "menu_item_id",
+  as: "additions",
+  onDelete: "CASCADE",
+  onUpdate: "CASCADE"
+});
+
+Addition.belongsTo(MenuItem, {
+  foreignKey: "menu_item_id",
+  as: "menu_item"
+});
+
+// ==========================
+// OrderItem & OrderItemAdditions
+// ==========================
+OrderItem.hasMany(OrderItemAddition, {
+  foreignKey: "order_item_id",
+  as: "additions",
+  onDelete: "CASCADE",
+  onUpdate: "CASCADE"
+});
+
+OrderItemAddition.belongsTo(OrderItem, {
+  foreignKey: "order_item_id",
+  as: "order_item"
+});
+
+OrderItemAddition.belongsTo(Addition, {
+  foreignKey: "addition_id",
+  as: "addition"
+});
+
+Addition.hasMany(OrderItemAddition, {
+  foreignKey: "addition_id",
+  as: "order_item_additions",
+  onDelete: "CASCADE",
+  onUpdate: "CASCADE"
+});
+
+// ==========================
 // ⭐ Client & Favorite Restaurants (Many-to-Many)
 // ==========================
 Client.belongsToMany(Restaurant, {
@@ -146,6 +191,21 @@ Restaurant.hasMany(FavoriteRestaurant, {
   as: "client_favorites",
   onDelete: "CASCADE",
   onUpdate: "CASCADE"
+});
+
+// ==========================
+// Favorite Addresses
+// ==========================
+Client.hasMany(FavoriteAddress, {
+  foreignKey: "client_id",
+  as: "favorite_addresses",
+  onDelete: "CASCADE",
+  onUpdate: "CASCADE",
+});
+
+FavoriteAddress.belongsTo(Client, {
+  foreignKey: "client_id",
+  as: "client",
 });
 
 // ==========================
@@ -345,16 +405,19 @@ Order.belongsTo(Cashier, {
 Cashier.hasMany(Order, {
   foreignKey: 'created_by_cashier_id',
   as: 'orders'
-});``
+});
 
 export { 
   Restaurant, 
   MenuItem, 
+  Addition,
   FoodCategory, 
   Client, 
   Order, 
   OrderItem, 
+  OrderItemAddition,
   FavoriteRestaurant,
+  FavoriteAddress,
   FavoriteMeal, 
   Driver,
   User,

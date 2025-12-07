@@ -263,3 +263,24 @@ export const getMyOrdersValidator = [
     .withMessage("Search must be between 1 and 100 characters")
     .trim()
 ];
+
+// Favorite addresses
+export const favoriteAddressCreateValidator = [
+  body("name").notEmpty().withMessage("Le nom de l'adresse est requis"),
+  body("address").notEmpty().withMessage("L'adresse est requise"),
+  body("lat").isFloat({ min: -90, max: 90 }).withMessage("Latitude invalide"),
+  body("lng").isFloat({ min: -180, max: 180 }).withMessage("Longitude invalide"),
+  body("is_default").optional().isBoolean().withMessage("is_default doit être un booléen"),
+];
+
+export const favoriteAddressUpdateValidator = [
+  body("name").optional().isString(),
+  body("address").optional().isString(),
+  body("lat").optional().isFloat({ min: -90, max: 90 }).withMessage("Latitude invalide"),
+  body("lng").optional().isFloat({ min: -180, max: 180 }).withMessage("Longitude invalide"),
+  body("is_default").optional().isBoolean().withMessage("is_default doit être un booléen"),
+];
+
+export const favoriteAddressIdValidator = [
+  param("id").notEmpty().withMessage("id requis"),
+];

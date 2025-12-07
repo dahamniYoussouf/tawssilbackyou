@@ -6,7 +6,10 @@ import {
   updateClientValidator,
   deleteClientValidator,
   getAllClientsValidator, 
-  getMyOrdersValidator 
+  getMyOrdersValidator,
+  favoriteAddressCreateValidator,
+  favoriteAddressUpdateValidator,
+  favoriteAddressIdValidator
 } from "../validators/clientValidator.js";
 const router = Router();
 
@@ -23,6 +26,12 @@ router.get(
   validate, 
   clientCtrl.getMyOrders
 );
+
+// Favorite addresses
+router.get("/favorite-addresses", protect, isClient, clientCtrl.listFavoriteAddresses);
+router.post("/favorite-addresses", protect, isClient, favoriteAddressCreateValidator, validate, clientCtrl.createFavoriteAddress);
+router.put("/favorite-addresses/:id", protect, isClient, favoriteAddressIdValidator, favoriteAddressUpdateValidator, validate, clientCtrl.updateFavoriteAddress);
+router.delete("/favorite-addresses/:id", protect, isClient, favoriteAddressIdValidator, validate, clientCtrl.deleteFavoriteAddress);
 
 // Admin routes
 router.get("/getall", protect, authorize('admin'), getAllClientsValidator, validate, clientCtrl.getAll);

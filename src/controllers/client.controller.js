@@ -5,6 +5,7 @@ import {
   getClientOrdersWithFilters
 } from "../services/client.service.js";
 import Client from "../models/Client.js"
+import * as favoriteAddressService from "../services/favoriteAddress.service.js";
 
 
 // Get all with pagination
@@ -192,6 +193,55 @@ export const getMyOrders = async (req, res, next) => {
       pagination: result.pagination,
       summary: result.summary
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ===== Favorite Addresses (Client) =====
+export const listFavoriteAddresses = async (req, res, next) => {
+  try {
+    const clientId = req.user.client_id;
+    const favorites = await favoriteAddressService.listFavoriteAddresses(clientId);
+    res.json({ success: true, data: favorites });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const createFavoriteAddress = async (req, res, next) => {
+  try {
+    const clientId = req.user.client_id;
+    const fav = await favoriteAddressService.createFavoriteAddress(clientId, req.body);
+    res.status(201).json({ success: true, data: fav });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateFavoriteAddress = async (req, res, next) => {
+  try {
+    const clientId = req.user.client_id;
+    const { id } = req.params;
+    const fav = await favoriteAddressService.updateFavoriteAddress(clientId, id, req.body);
+    if (!fav) {
+      return res.status(404).json({ success: false, message: "Adresse introuvable" });
+    }
+    res.json({ success: true, data: fav });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deleteFavoriteAddress = async (req, res, next) => {
+  try {
+    const clientId = req.user.client_id;
+    const { id } = req.params;
+    const ok = await favoriteAddressService.deleteFavoriteAddress(clientId, id);
+    if (!ok) {
+      return res.status(404).json({ success: false, message: "Adresse introuvable" });
+    }
+    res.json({ success: true, message: "Adresse supprimée" });
   } catch (err) {
     next(err);
   }

@@ -4,6 +4,8 @@ import Restaurant from "../../models/Restaurant.js";
 import Client from "../../models/Client.js";
 import Driver from "../../models/Driver.js";
 import OrderItem from "../../models/OrderItem.js";
+import OrderItemAddition from "../../models/OrderItemAddition.js";
+import Addition from "../../models/Addition.js";
 import MenuItem from "../../models/MenuItem.js";
 
 export async function getAllOrdersService(filters = {}) {
@@ -37,10 +39,21 @@ export async function getAllOrdersService(filters = {}) {
   const { count, rows } = await Order.findAndCountAll({
     where,
     include: [
-            { model: OrderItem, as: "order_items", include: [{ model: MenuItem, as: "menu_item" }] },
+      {
+        model: OrderItem,
+        as: "order_items",
+        include: [
+          { model: MenuItem, as: "menu_item" },
+          {
+            model: OrderItemAddition,
+            as: "additions",
+            include: [{ model: Addition, as: "addition" }],
+          },
+        ],
+      },
       { model: Restaurant, as: "restaurant", attributes: ["id", "name", "image_url", "email"] },
       { model: Client, as: "client", attributes: ["id", "first_name", "last_name", "email"] },
-      { model: Driver, as: "driver", attributes: ["id", "first_name", "last_name", "phone", "current_location"] }
+      { model: Driver, as: "driver", attributes: ["id", "first_name", "last_name", "phone", "current_location"] },
     ],
     order: [["created_at", "DESC"]],
     limit: +limit,
@@ -63,7 +76,18 @@ export async function getOrderByIdService(id) {
     include: [
       { model: Restaurant, as: "restaurant" },
       { model: Client, as: "client" },
-      { model: OrderItem, as: "order_items", include: [{ model: MenuItem, as: "menu_item" }] },
+      {
+        model: OrderItem,
+        as: "order_items",
+        include: [
+          { model: MenuItem, as: "menu_item" },
+          {
+            model: OrderItemAddition,
+            as: "additions",
+            include: [{ model: Addition, as: "addition" }],
+          },
+        ],
+      },
       {
         model: Driver,
         as: "driver",
@@ -102,6 +126,18 @@ export async function getClientOrdersService(clientId, filters = {}) {
     include: [
       { model: Restaurant, as: "restaurant", attributes: ["id", "name", "image_url", "rating", "email"] },
       { model: Driver, as: "driver", attributes: ["id", "first_name", "last_name", "phone"] },
+      {
+        model: OrderItem,
+        as: "order_items",
+        include: [
+          { model: MenuItem, as: "menu_item" },
+          {
+            model: OrderItemAddition,
+            as: "additions",
+            include: [{ model: Addition, as: "addition" }],
+          },
+        ],
+      },
     ],
     order: [["created_at", "DESC"]],
     limit: +limit,
@@ -136,6 +172,18 @@ export async function getDriverActiveOrders(driverId) {
     include: [
       { model: Restaurant, as: "restaurant", attributes: ["id", "name", "address", "location", "email"] },
       { model: Client, as: "client", attributes: ["id", "first_name", "last_name", "phone_number"] },
+      {
+        model: OrderItem,
+        as: "order_items",
+        include: [
+          { model: MenuItem, as: "menu_item" },
+          {
+            model: OrderItemAddition,
+            as: "additions",
+            include: [{ model: Addition, as: "addition" }],
+          },
+        ],
+      },
     ],
     order: [["assigned_at", "ASC"]],
   });

@@ -1,4 +1,5 @@
 import OrderItem from "../models/OrderItem.js";
+import OrderItemAddition from "../models/OrderItemAddition.js";
 import MenuItem from "../models/MenuItem.js";
 import Order from "../models/Order.js";
 
@@ -182,11 +183,20 @@ export async function bulkCreateOrderItems(order_id, items) {
 async function updateOrderSubtotal(order_id) {
   const items = await OrderItem.findAll({
     where: { order_id },
-    attributes: ['prix_total']
+    attributes: ['id', 'prix_total'],
+    include: [{
+      model: OrderItemAddition,
+      as: 'additions',
+      attributes: ['prix_total']
+    }]
   });
 
   const subtotal = items.reduce((sum, item) => {
-    return sum + parseFloat(item.prix_total || 0);
+    const base = parseFloat(item.prix_total || 0);
+    const additionsTotal = (item.additions || []).reduce((acc, add) => {
+      return acc + parseFloat(add.prix_total || 0);
+    }, 0);
+    return sum + base + additionsTotal;
   }, 0);
 
   const order = await Order.findByPk(order_id);

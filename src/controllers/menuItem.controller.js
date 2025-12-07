@@ -3,6 +3,7 @@ import * as menuItemService from "../services/menuItem.service.js";
 import MenuItem from "../models/MenuItem.js";
 import FoodCategory from "../models/FoodCategory.js";
 import Cashier from "../models/Cashier.js"; 
+import Addition from "../models/Addition.js";
 import { Op } from "sequelize";
 
 /**
@@ -127,6 +128,11 @@ export const getMyMenuItems = async (req, res, next) => {
           model: FoodCategory, 
           as: 'category', 
           attributes: ['id', 'nom'] 
+        },
+        {
+          model: Addition,
+          as: 'additions',
+          attributes: ['id', 'nom', 'description', 'prix', 'is_available']
         }
       ],
       order,
@@ -567,6 +573,11 @@ export const getCashierMenuItems = async (req, res, next) => {
           model: FoodCategory, 
           as: 'category', 
           attributes: ['id', 'nom'] 
+        },
+        {
+          model: Addition,
+          as: 'additions',
+          attributes: ['id', 'nom', 'description', 'prix', 'is_available']
         }
       ],
       order,

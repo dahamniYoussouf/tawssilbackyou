@@ -484,6 +484,47 @@ export const getRestaurantOrders = async (req, res, next) => {
     const orders = await getOrdersByRestaurant(restaurant_id, filters);
     
     res.json({
+      success: true,
+      message: 'Orders retrieved successfully',
+      data: orders,
+      count: orders.length
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get orders for authenticated cashier (by their restaurant)
+export const getCashierOrders = async (req, res, next) => {
+  try {
+    const cashierId = req.user?.cashier_id;
+    if (!cashierId) {
+      return res.status(401).json({
+        success: false,
+        message: "Cashier authentication required"
+      });
+    }
+
+    const cashier = await Cashier.findByPk(cashierId, {
+      attributes: ['id', 'restaurant_id']
+    });
+
+    if (!cashier) {
+      return res.status(404).json({
+        success: false,
+        message: "Cashier not found"
+      });
+    }
+
+    const filters = {
+      status: req.query.status,
+      order_type: req.query.order_type
+    };
+
+    const orders = await getOrdersByRestaurant(cashier.restaurant_id, filters);
+
+    res.json({
+      success: true,
       message: 'Orders retrieved successfully',
       data: orders,
       count: orders.length

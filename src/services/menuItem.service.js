@@ -1,5 +1,6 @@
 import { Op } from "sequelize";
 import MenuItem from "../models/MenuItem.js";
+import Addition from "../models/Addition.js";
 import FoodCategory from "../models/FoodCategory.js";
 import Restaurant from "../models/Restaurant.js";
 import FavoriteMeal from "../models/FavoriteMeal.js";
@@ -52,7 +53,8 @@ export async function getAllMenuItems(filters = {}) {
     where,
     include: [
       { model: FoodCategory, as: 'category', attributes: ['id', 'nom'] },
-      { model: Restaurant, as: 'restaurant', attributes: ['id', 'name', 'image_url', 'email'] }
+      { model: Restaurant, as: 'restaurant', attributes: ['id', 'name', 'image_url', 'email'] },
+      { model: Addition, as: 'additions', attributes: ['id', 'nom', 'description', 'prix', 'is_available'] }
     ],
     order: [['created_at', 'DESC']],
     limit: +limit,
@@ -74,7 +76,8 @@ export async function getMenuItemById(id) {
   const item = await MenuItem.findByPk(id, {
     include: [
       { model: FoodCategory, as: 'category' },
-      { model: Restaurant, as: 'restaurant' }
+      { model: Restaurant, as: 'restaurant' },
+      { model: Addition, as: 'additions', attributes: ['id', 'nom', 'description', 'prix', 'is_available'] }
     ]
   });
 
@@ -95,7 +98,8 @@ export async function getMenuItemsByCategory(filters) {
     where,
     include: [
       { model: FoodCategory, as: "category", attributes: ["id", "nom"] },
-      { model: Restaurant, as: "restaurant", attributes: ["id", "name", "email"] }
+      { model: Restaurant, as: "restaurant", attributes: ["id", "name", "email"] },
+      { model: Addition, as: "additions", attributes: ["id", "nom", "description", "prix", "is_available"] }
     ],
     order: [['nom', 'ASC']]
   });

@@ -32,6 +32,7 @@ router.get('/', protect, getAllOrdersValidator, validate, orderController.getAll
 router.get('/nearby', protect, isDriver, orderController.getNearbyOrders);
 router.get('/client/:clientId', protect, isClient, getClientOrdersValidator, validate, orderController.getClientOrders);
 router.get('/restaurant/:restaurant_id/orders', protect, isRestaurant, orderController.getRestaurantOrders);
+router.get('/cashier/history', protect, isCashier, orderController.getCashierOrders);
 router.put('/drivers/:driverId/gps', protect, isDriver, updateDriverGPSValidator, validate, orderController.updateDriverGPS);
 
 // ==================== ORDER BY ID & TRACKING ====================

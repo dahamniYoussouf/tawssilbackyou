@@ -4,6 +4,8 @@ import Restaurant from "../../models/Restaurant.js";
 import Client from "../../models/Client.js";
 import Driver from "../../models/Driver.js";
 import OrderItem from "../../models/OrderItem.js";
+import OrderItemAddition from "../../models/OrderItemAddition.js";
+import Addition from "../../models/Addition.js";
 import MenuItem from "../../models/MenuItem.js";
 import calculateRouteTime from "../routingService.js";
 import { canDriverAcceptOrder } from "../multiDeliveryService.js";
@@ -61,9 +63,20 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
     },
     where: whereConditions,
     include: [
-      { model: OrderItem, as: "order_items", include: [{ model: MenuItem, as: "menu_item" }] },
+      {
+        model: OrderItem,
+        as: "order_items",
+        include: [
+          { model: MenuItem, as: "menu_item" },
+          {
+            model: OrderItemAddition,
+            as: "additions",
+            include: [{ model: Addition, as: "addition" }],
+          },
+        ],
+      },
       { model: Restaurant, as: "restaurant", attributes: ["id", "name", "address", "location", "image_url", "email"] },
-      { model: Client, as: "client", attributes: ["id", "first_name", "last_name", "phone_number"] }
+      { model: Client, as: "client", attributes: ["id", "first_name", "last_name", "phone_number"] },
     ],
     order: [[literal("distance"), "ASC"], ["created_at", "DESC"]],
     limit,
