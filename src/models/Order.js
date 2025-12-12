@@ -108,13 +108,22 @@ const Order = sequelize.define('Order', {
     type: DataTypes.DATE,
   },
   
-  // Simple rating
+  // Ratings
+  // Restaurant rating (kept for backward compatibility)
   rating: {
     type: DataTypes.DECIMAL(2, 1),
-    validate: { min: 1.0, max: 5.0 }
+    validate: { min: 1.0, max: 5.0 },
+    comment: 'Restaurant rating (1-5)'
+  },
+  // Driver-specific rating
+  driver_rating: {
+    type: DataTypes.DECIMAL(2, 1),
+    validate: { min: 1.0, max: 5.0 },
+    comment: 'Driver rating (1-5)'
   },
   review_comment: {
     type: DataTypes.TEXT,
+    comment: 'Optional comment provided with a rating'
   },
   
   // Decline reason
@@ -205,7 +214,7 @@ Order.prototype.canTransitionTo = function(newStatus) {
 
 // Status checks
 Order.prototype.canBeRated = function() {
-  return this.status === 'delivered' && !this.rating;
+  return this.status === 'delivered' && !this.rating && !this.driver_rating;
 };
 
 // Get time elapsed since status change

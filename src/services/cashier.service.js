@@ -2,7 +2,9 @@
 import Cashier from "../models/Cashier.js";
 import Restaurant from "../models/Restaurant.js";
 import Order from "../models/Order.js";
-import { Op } from "sequelize";
+import OrderItem from "../models/OrderItem.js";
+import MenuItem from "../models/MenuItem.js";
+import { Op, fn, col } from "sequelize";
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 /**
@@ -204,6 +206,84 @@ export const getCashierStatistics = async (cashier_id, filters = {}) => {
       shift_start: cashier.shift_start,
       shift_end: cashier.shift_end,
       status: cashier.status
+    }
+  };
+};
+
+/**
+ * Dashboard metrics for cashier (today)
+ */
+export const getCashierDashboardToday = async (cashier_id) => {
+  const cashier = await Cashier.findByPk(cashier_id, { attributes: ['id', 'restaurant_id'] });
+  if (!cashier) return null;
+
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+
+  const orders = await Order.findAll({
+    where: {
+      created_by_cashier_id: cashier_id,
+      created_at: {
+        [Op.gte]: start,
+        [Op.lte]: end,
+      },
+    },
+    attributes: ['id', 'status', 'total_amount', 'created_at', 'delivered_at', 'client_id'],
+  });
+
+  const orderIds = orders.map(o => o.id);
+
+  // Sales and metrics
+  const deliveredOrders = orders.filter(o => o.status === 'delivered');
+  const todaySales = deliveredOrders.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
+  const ordersCount = orders.length;
+  const avgTimeMinutes = deliveredOrders.length > 0
+    ? deliveredOrders.reduce((sum, o) => {
+        if (!o.delivered_at) return sum;
+        const diffMs = new Date(o.delivered_at) - new Date(o.created_at);
+        return sum + Math.max(0, diffMs / 60000);
+      }, 0) / deliveredOrders.length
+    : null;
+  const uniqueCustomers = new Set(orders.map(o => o.client_id).filter(Boolean)).size;
+
+  // Top items (by quantity)
+  let topItems = [];
+  if (orderIds.length > 0) {
+    const items = await OrderItem.findAll({
+      where: { order_id: { [Op.in]: orderIds } },
+      attributes: [
+        'menu_item_id',
+        [fn('SUM', col('quantite')), 'qty']
+      ],
+      group: ['menu_item_id'],
+      order: [[fn('SUM', col('quantite')), 'DESC']],
+      limit: 5,
+      include: [{
+        model: MenuItem,
+        as: 'menu_item',
+        attributes: ['id', 'nom', 'prix', 'photo_url']
+      }]
+    });
+
+    topItems = items.map(item => ({
+      id: item.menu_item_id,
+      name: item.menu_item?.nom,
+      price: item.menu_item?.prix ? parseFloat(item.menu_item.prix) : null,
+      photo_url: item.menu_item?.photo_url || null,
+      quantity: parseInt(item.getDataValue('qty'), 10) || 0
+    }));
+  }
+
+  return {
+    sales_today: parseFloat(todaySales.toFixed(2)),
+    orders_today: ordersCount,
+    avg_time_minutes: avgTimeMinutes !== null ? parseFloat(avgTimeMinutes.toFixed(1)) : null,
+    unique_customers: uniqueCustomers,
+    top_items: topItems,
+    period: {
+      from: start,
+      to: end
     }
   };
 };

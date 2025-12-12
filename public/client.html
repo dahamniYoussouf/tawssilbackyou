@@ -74,12 +74,41 @@ button:disabled{background:#ccc;cursor:not-allowed}
 <div class="empty">No orders yet</div>
 </div>
 </div>
+
+<div class="section">
+<h2>⭐ Rate Your Order</h2>
+<div id="rating_hint" class="status" style="margin-bottom:10px;display:none"></div>
+<input id="rating_order_id" placeholder="Order ID (auto-filled after placing)" />
+<div class="row">
+  <select id="rating_restaurant">
+    <option value="">Restaurant: select 1-5</option>
+    <option value="5">5 ★</option>
+    <option value="4">4 ★</option>
+    <option value="3">3 ★</option>
+    <option value="2">2 ★</option>
+    <option value="1">1 ★</option>
+  </select>
+  <select id="rating_driver">
+    <option value="">Driver: select 1-5</option>
+    <option value="5">5 ★</option>
+    <option value="4">4 ★</option>
+    <option value="3">3 ★</option>
+    <option value="2">2 ★</option>
+    <option value="1">1 ★</option>
+  </select>
+</div>
+<textarea id="rating_comment" placeholder="Optional comment"></textarea>
+<div class="row">
+  <button onclick="skipRating()">Passer</button>
+  <button onclick="submitRating()">Envoyer</button>
+</div>
+</div>
 </div>
 
 <script>
 let socket = null;
 let auth = { role: null, token: null, user: null, profile: null };
-let state = { cart: [], restaurants: [], menu: [], currentOrder: null };
+let state = { cart: [], restaurants: [], menu: [], currentOrder: null, ratingEnabled: false };
 
 function timeline(s, isNotification = false) {
   const e = document.getElementById('c_timeline');
@@ -114,6 +143,9 @@ function initSocket() {
     console.log('🔔 Notification received:', data);
     const message = data.message || JSON.stringify(data);
     timeline(`🔔 ${message}`, true);
+    if (data.type === 'order_delivered') {
+      setRatingEnabled(true, data.orderId || state.currentOrder);
+    }
     if (Notification.permission === 'granted') {
       new Notification('Order Update', { body: message, icon: '🍔' });
     }
@@ -122,6 +154,9 @@ function initSocket() {
   socket.on('order_update', data => {
     console.log('🔄 Order update:', data);
     timeline(`🔄 Order ${data.order_number || ''} → ${data.status}`, true);
+    if (state.currentOrder && data.id === state.currentOrder && data.status === 'delivered') {
+      setRatingEnabled(true, data.id);
+    }
   });
 
   socket.on('disconnect', () => {
@@ -287,6 +322,7 @@ async function placeOrder() {
       const orderNumber = j.data?.order_number || j.order_number || orderId;
       timeline(`✅ Order #${orderNumber} placed successfully!`, true);
       state.currentOrder = orderId;
+      setRatingEnabled(false, orderId); // rating only after delivery
       state.cart = [];
       renderCart();
       alert(`Order placed successfully!\nOrder #${orderNumber}\nYou'll receive live updates.`);
@@ -296,6 +332,85 @@ async function placeOrder() {
   } catch (e) {
     alert('Error placing order: ' + e.message);
   }
+}
+
+function setRatingOrderId(orderId) {
+  const input = document.getElementById('rating_order_id');
+  if (orderId && input) {
+    input.value = orderId;
+    const hint = document.getElementById('rating_hint');
+    if (hint) {
+      hint.style.display = 'inline-block';
+      hint.textContent = `Order ready to rate: ${orderId}`;
+    }
+  }
+}
+
+function setRatingEnabled(enabled, orderId) {
+  const restaurantSelect = document.getElementById('rating_restaurant');
+  const driverSelect = document.getElementById('rating_driver');
+  const comment = document.getElementById('rating_comment');
+  const sendBtn = document.querySelector('button[onclick=\"submitRating()\"]');
+  const skipBtn = document.querySelector('button[onclick=\"skipRating()\"]');
+  const hint = document.getElementById('rating_hint');
+
+  if (orderId) setRatingOrderId(orderId);
+
+  [restaurantSelect, driverSelect, comment, sendBtn, skipBtn].forEach(el => {
+    if (el) el.disabled = !enabled;
+  });
+
+  if (hint) {
+    hint.style.display = 'inline-block';
+    hint.textContent = enabled
+      ? `Order delivered. You can rate now (ID: ${document.getElementById('rating_order_id').value || ''})`
+      : 'Rating will be available once the order is delivered.';
+  }
+
+  state.ratingEnabled = enabled;
+}
+
+async function submitRating() {
+  if (!auth.token) return alert('Please login first');
+  if (!state.ratingEnabled) return alert('You can rate only after the order is delivered.');
+  const orderId = document.getElementById('rating_order_id').value || state.currentOrder;
+  if (!orderId) return alert('Provide an order ID to rate');
+
+  const restaurantRating = document.getElementById('rating_restaurant').value;
+  const driverRating = document.getElementById('rating_driver').value;
+  const comment = document.getElementById('rating_comment').value;
+
+  if (!restaurantRating && !driverRating) {
+    return alert('Select at least one rating (restaurant or driver).');
+  }
+
+  const payload = {
+    ...(restaurantRating ? { restaurant_rating: parseFloat(restaurantRating) } : {}),
+    ...(driverRating ? { driver_rating: parseFloat(driverRating) } : {}),
+    ...(comment ? { review_comment: comment } : {})
+  };
+
+  try {
+    const r = await apiFetch(`/order/${orderId}/rating`, { method: 'POST', body: JSON.stringify(payload) });
+    const j = await r.json();
+    if (!r.ok) {
+      return alert('Error: ' + (j.message || 'Unknown error'));
+    }
+    timeline(`Rating sent for order ${orderId}`, true);
+    alert('Thank you for your feedback!');
+    document.getElementById('rating_restaurant').value = '';
+    document.getElementById('rating_driver').value = '';
+    document.getElementById('rating_comment').value = '';
+  } catch (e) {
+    alert('Error sending rating: ' + e.message);
+  }
+}
+
+function skipRating() {
+  document.getElementById('rating_restaurant').value = '';
+  document.getElementById('rating_driver').value = '';
+  document.getElementById('rating_comment').value = '';
+  timeline('Rating skipped');
 }
 </script>
 </body>

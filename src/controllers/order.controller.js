@@ -417,23 +417,37 @@ export const getOrderTracking = async (req, res, next) => {
 export const addRating = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { rating, review_comment } = req.body;
+    const { rating, restaurant_rating, driver_rating, review_comment } = req.body;
     
-    if (!rating) {
+    const restaurantRating = restaurant_rating !== undefined ? restaurant_rating : rating;
+    
+    if (restaurantRating === undefined && driver_rating === undefined) {
       return res.status(400).json({
         success: false,
-        message: "Rating is required"
+        message: "At least one rating (restaurant or driver) is required"
       });
     }
     
-    if (rating < 1 || rating > 5) {
+    if (restaurantRating !== undefined && (restaurantRating < 1 || restaurantRating > 5)) {
       return res.status(400).json({
         success: false,
         message: "Rating must be between 1 and 5"
       });
     }
+
+    if (driver_rating !== undefined && (driver_rating < 1 || driver_rating > 5)) {
+      return res.status(400).json({
+        success: false,
+        message: "Driver rating must be between 1 and 5"
+      });
+    }
     
-    const order = await orderService.addRatingService(id, rating, review_comment);
+    const order = await orderService.addRatingService(
+      id,
+      restaurantRating,
+      driver_rating,
+      review_comment
+    );
     
     res.json({
       success: true,

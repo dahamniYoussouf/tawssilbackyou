@@ -217,8 +217,16 @@ export const addRatingValidator = [
     .isUUID().withMessage('Invalid order ID format'),
   
   body('rating')
-    .notEmpty().withMessage('Rating is required')
+    .optional()
     .isFloat({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
+
+  body('restaurant_rating')
+    .optional()
+    .isFloat({ min: 1, max: 5 }).withMessage('Restaurant rating must be between 1 and 5'),
+
+  body('driver_rating')
+    .optional()
+    .isFloat({ min: 1, max: 5 }).withMessage('Driver rating must be between 1 and 5'),
   
   body('review_comment')
     .optional()

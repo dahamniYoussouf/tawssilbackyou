@@ -5,7 +5,8 @@ import {
   updateCashier,
   deleteCashier,
   updateCashierStatus,
-  getCashierStatistics
+  getCashierStatistics,
+  getCashierDashboardToday
 } from "../services/cashier.service.js";
 
 /**
@@ -301,6 +302,35 @@ export const getStatistics = async (req, res, next) => {
     }
 
     res.json({ success: true, data: stats });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Dashboard (today) for cashier
+ */
+export const getDashboardToday = async (req, res, next) => {
+  try {
+    const cashierId = req.user.cashier_id;
+    
+    if (!cashierId) {
+      return res.status(400).json({
+        success: false,
+        message: "Cashier profile not found in token"
+      });
+    }
+
+    const dashboard = await getCashierDashboardToday(cashierId);
+
+    if (!dashboard) {
+      return res.status(404).json({
+        success: false,
+        message: "Cashier not found"
+      });
+    }
+
+    res.json({ success: true, data: dashboard });
   } catch (err) {
     next(err);
   }

@@ -11,6 +11,7 @@ router.get("/profile/me", protect, isCashier, cashierCtrl.getProfile);
 router.put("/profile", protect, isCashier, cashierCtrl.updateProfile);
 router.patch("/status", protect, isCashier, cashierCtrl.updateStatus);
 router.get("/statistics/me", protect, isCashier, cashierCtrl.getStatistics);
+router.get("/dashboard/today", protect, isCashier, cashierCtrl.getDashboardToday);
 
 // ===== ADMIN/RESTAURANT ROUTES =====
 router.get("/getall", protect, authorize('admin', 'restaurant'), cashierCtrl.getAll);
