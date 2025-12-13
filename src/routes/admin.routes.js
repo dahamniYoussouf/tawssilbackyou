@@ -58,6 +58,7 @@ router.get('/favorites/stats', adminCtrl.getFavoritesStats);
 
 // ==================== STATISTICS ====================
 router.get('/statistics', adminCtrl.getStatistics);
+router.get('/monitoring', adminCtrl.getMonitoringSnapshot);
 
 // ==================== CONFIGURATIONS ====================
 router.get('/config/all', adminCtrl.getAllConfigs);
