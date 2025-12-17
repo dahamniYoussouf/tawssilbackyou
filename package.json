@@ -12,6 +12,7 @@
     "sync": "node ./src/sync.js",
     "seed": "node seeders/seed.js",
     "seed:fresh": "node seeders/seed.js",
+    "home-seed": "node seeders/homepageOnlySeed.js",
     "db:add-driver-rating": "node ./src/scripts/addDriverRatingColumn.js"
   },
   "author": "ocraniawan",

@@ -7,6 +7,13 @@ import Restaurant from "../src/models/Restaurant.js";
 import Admin from "../src/models/Admin.js";
 import AdminNotification from "../src/models/AdminNotification.js";
 import SystemConfig from "../src/models/SystemConfig.js"; 
+import Announcement from "../src/models/Announcement.js";
+import HomeCategory from "../src/models/HomeCategory.js";
+import ThematicSelection from "../src/models/ThematicSelection.js";
+import RecommendedDish from "../src/models/RecommendedDish.js";
+import Promotion from "../src/models/Promotion.js";
+import PromotionMenuItem from "../src/models/PromotionMenuItem.js";
+import DailyDeal from "../src/models/DailyDeal.js";
 import FoodCategory from "../src/models/FoodCategory.js";
 import MenuItem from "../src/models/MenuItem.js";
 import Addition from "../src/models/Addition.js";
@@ -17,6 +24,7 @@ import FavoriteRestaurant from "../src/models/FavoriteRestaurant.js";
 import FavoriteMeal from "../src/models/FavoriteMeal.js";
 import * as associations from "../src/models/index.js";
 import Cashier from "../src/models/Cashier.js";
+import { seedHomepageModules } from "./homepageSeeder.js";
 
 import bcrypt from "bcryptjs";
 
@@ -516,6 +524,7 @@ const seedDatabase = async () => {
     const allMenuItems = [];
     const allAdditions = [];
     const menuItemAdditionsMap = new Map();
+    const restaurantMenuMap = new Map();
 
     for (let i = 0; i < 100; i++) {
       const restaurant = restaurants[i];
@@ -541,6 +550,9 @@ const seedDatabase = async () => {
             temps_preparation: 10 + Math.floor(Math.random() * 30)
           });
           allMenuItems.push(menuItem);
+          const restaurantMenu = restaurantMenuMap.get(restaurant.id) || [];
+          restaurantMenu.push(menuItem);
+          restaurantMenuMap.set(restaurant.id, restaurantMenu);
 
           // Seed 1-3 additions per menu item
           const extrasCount = Math.max(1, Math.floor(Math.random() * 3));
@@ -564,6 +576,11 @@ const seedDatabase = async () => {
     }
     console.log(`✅ ${allMenuItems.length} menu items created`);
     console.log(`✅ ${allAdditions.length} additions created`);
+
+    await seedHomepageModules({
+      restaurants,
+      restaurantMenuMap
+    });
 
     // ----------------------------
     // 6️⃣ Orders (1000)
@@ -639,7 +656,8 @@ const seedDatabase = async () => {
         preparation_time: 15 + Math.floor(Math.random() * 20),
         estimated_delivery_time: new Date(createdAt.getTime() + (30 + Math.random() * 30) * 60 * 1000),
         rating: status === 'delivered' && Math.random() > 0.3 ? parseFloat((3 + Math.random() * 2).toFixed(1)) : null,
-        review_comment: status === 'delivered' && Math.random() > 0.7 ? "Great food and fast delivery!" : null,
+        restaurant_review_comment: status === 'delivered' && Math.random() > 0.7 ? "Great food and fast delivery!" : null,
+        driver_review_comment: status === 'delivered' && Math.random() > 0.6 ? "Driver arrived on time and courteous" : null,
         decline_reason: status === 'declined' ? "Restaurant is too busy" : null,
         created_at: createdAt,
         updated_at: deliveredAt || deliveringStartedAt || assignedAt || preparingStartedAt || acceptedAt || createdAt,

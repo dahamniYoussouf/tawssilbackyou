@@ -5,11 +5,13 @@ import {
   updateAnnouncement,
   deleteAnnouncement
 } from "../services/announcement.service.js";
+import { clearHomepageModulesCache } from "../services/homepage.service.js";
 
 // Create
 export const create = async (req, res, next) => {
   try {
     const announcement = await createAnnouncement(req.body);
+    await clearHomepageModulesCache();
     res.status(201).json({
       success: true,
       message: "Announcement created successfully",
@@ -55,6 +57,7 @@ export const update = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Announcement not found" });
     }
 
+    await clearHomepageModulesCache();
     res.json({ success: true, message: "Announcement updated successfully" });
   } catch (err) {
     next(err);
@@ -71,6 +74,7 @@ export const remove = async (req, res, next) => {
       return res.status(404).json({ success: false, message: "Announcement not found" });
     }
 
+    await clearHomepageModulesCache();
     res.status(200).json({ success: true, message: "Announcement deleted successfully" });
   } catch (err) {
     next(err);

@@ -1,158 +1,320 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Driver - Realtime Delivery</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<style>
-body{font-family:Arial,Helvetica,sans-serif;background:#f4f6fa;margin:0;padding:20px;min-height:100vh}
-.container{max-width:900px;margin:0 auto}
-h1{text-align:center;color:#0f62fe;margin-bottom:30px}
-.section{background:#fff;padding:20px;border-radius:10px;box-shadow:0 4px 10px rgba(0,0,0,.1);margin-bottom:20px}
-h2{margin-top:0;color:#0f62fe;font-size:18px;border-bottom:2px solid #e5e7eb;padding-bottom:10px;display:flex;justify-content:space-between;align-items:center}
-h2 .count-badge{background:#eef2ff;color:#0f62fe;padding:4px 12px;border-radius:999px;font-size:14px;font-weight:bold}
-input,button,select{width:100%;padding:10px;margin:6px 0;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;font-size:14px}
-button{background:#0f62fe;color:#fff;font-weight:bold;cursor:pointer;border:none}
-button:hover{background:#084cd2}
-button.success{background:#10b981}
-button.success:hover{background:#059669}
-button.danger{background:#dc2626}
-button.danger:hover{background:#991b1b}
-button.warning{background:#f59e0b}
-button.warning:hover{background:#d97706}
-button.online{background:#10b981;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
-.card{border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:12px 0;background:#fafbff;position:relative}
-.card.highlight{border-color:#0f62fe;border-width:2px;box-shadow:0 0 0 3px rgba(15,98,254,.1)}
-.card.active-order{border-left:4px solid #10b981;background:#f0fdf4}
-.row{display:flex;gap:8px}
-.row>*{flex:1}
-.status-badge{display:inline-block;background:#eef2ff;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:bold;color:#0f62fe;margin:4px 0}
-.status-badge.online{background:#d1fae5;color:#065f46}
-.status-badge.offline{background:#fee2e2;color:#991b1b}
-.status-badge.assigned{background:#dbeafe;color:#1e40af}
-.status-badge.delivering{background:#fef3c7;color:#92400e}
-.log{background:#0b1020;color:#d1fae5;padding:15px;border-radius:6px;height:250px;overflow:auto;font-family:monospace;font-size:12px}
-.empty{color:#999;font-style:italic;text-align:center;padding:20px}
-.delivery-badge{position:absolute;top:10px;right:10px;background:#fef3c7;color:#92400e;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:bold}
-.location-info{background:#f9fafb;padding:10px;border-radius:6px;margin:10px 0;font-size:13px}
-.broadcast-notice{animation:slideIn 0.3s ease-out}
-@keyframes slideIn{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}
-.capacity-info{background:#eef2ff;padding:12px;border-radius:8px;margin:15px 0;font-size:14px}
-.capacity-bar{background:#e5e7eb;height:28px;border-radius:14px;overflow:hidden;margin-top:10px;position:relative}
-.capacity-fill{background:linear-gradient(90deg, #10b981, #059669);height:100%;transition:width 0.3s;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;font-size:13px}
-.capacity-fill.full{background:linear-gradient(90deg, #f59e0b, #d97706)}
-.order-actions{display:flex;gap:8px;margin-top:12px}
-.order-actions button{width:auto;padding:8px 16px;font-size:13px}
-.order-number{font-size:16px;font-weight:bold;color:#0f62fe}
-.tabs{display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid #e5e7eb}
-.tab{padding:10px 20px;cursor:pointer;border:none;background:none;color:#666;font-weight:600;border-bottom:2px solid transparent;margin-bottom:-2px;transition:all 0.2s}
-.tab:hover{color:#0f62fe}
-.tab.active{color:#0f62fe;border-bottom-color:#0f62fe}
-.tab-content{display:none}
-.tab-content.active{display:block}
-.tab .badge{background:#dc2626;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px}
-.order-route{background:#fff;padding:12px;border-radius:8px;margin:10px 0;border:1px solid #e5e7eb}
-.route-step{display:flex;align-items:start;margin:8px 0;padding:8px;border-left:3px solid #e5e7eb;padding-left:12px}
-.route-step.current{border-left-color:#10b981;background:#f0fdf4}
-.route-step-icon{margin-right:10px;font-size:18px}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Driver - Tawssil Cockpit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #050a12;
+      color: #f8fafc;
+      --accent: #10b981;
+      --accent-dark: #047857;
+      --panel: #0f172a;
+      --panel-soft: #111b2c;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(180deg, #020617, #0f172a);
+      color: #f8fafc;
+    }
+    .driver-shell {
+      display: grid;
+      grid-template-columns: 320px 1fr 360px;
+      gap: 1rem;
+      padding: 1.5rem;
+      min-height: 100vh;
+    }
+    .driver-sidebar,
+    .driver-log,
+    .driver-main > .panel {
+      background: var(--panel);
+      border-radius: 24px;
+      padding: 1.5rem;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 35px 60px rgba(0,0,0,0.45);
+    }
+    .driver-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      background: #050a12;
+    }
+    .brand {
+      font-size: 1.6rem;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #f8fafc;
+    }
+    .brand span { font-size: 0.9rem; color: var(--accent); }
+    .sidebar-card {
+      background: var(--panel-soft);
+      border-radius: 18px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .sidebar-card h2 { margin: 0; font-size: 1.1rem; color: #f8fafc; }
+    input, select, button, textarea { font-family: inherit; }
+    .sidebar-card input,
+    .sidebar-card select {
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: #0f172a;
+      color: #f8fafc;
+    }
+    .sidebar-card button {
+      border: none;
+      border-radius: 12px;
+      padding: 0.8rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 10px 20px rgba(16,185,129,0.35);
+    }
+    .status-pill {
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      background: rgba(16,185,129,0.2);
+      color: var(--accent);
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+    .location-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.6rem;
+    }
+    #online_btn {
+      border-radius: 12px;
+      border: none;
+      padding: 0.85rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 15px 25px rgba(16,185,129,0.35);
+    }
+    .capacity {
+      border: 1px solid rgba(255,255,255,0.1);
+      background: #111b2c;
+    }
+    .capacity-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .capacity-bar {
+      background: rgba(255,255,255,0.07);
+      border-radius: 999px;
+      overflow: hidden;
+      height: 28px;
+    }
+    .capacity-fill {
+      background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+      height: 100%;
+      width: 0;
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .driver-main {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      background: var(--panel-soft);
+      border: none;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .panel-header h2 { margin: 0; font-size: 1.4rem; color: #f8fafc; }
+    .panel-header button {
+      border: none;
+      border-radius: 12px;
+      padding: 0.6rem 1.2rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      color: #fff;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .panel .empty { margin: 0; color: #a5b4fc; }
+    .log-panel { background: #020617; }
+    .log-panel h2 { color: #f8fafc; margin: 0 0 0.6rem; }
+    .log-panel .log {
+      background: transparent;
+      border: none;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+      height: 100%;
+    }
+    .tabs {
+      display: flex;
+      gap: 0.6rem;
+    }
+    .tab {
+      border: none;
+      padding: 0.65rem 1.2rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      color: #f8fafc;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .tab.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .tab-content {
+      display: none;
+      flex-direction: column;
+      gap: 0.85rem;
+    }
+    .tab-content.active { display: flex; }
+    #d_deliveries .card,
+    #nearby_deliveries .card {
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 1rem;
+      background: #111b2c;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      color: #f8fafc;
+    }
+    #d_deliveries .card.highlight {
+      border-color: var(--accent);
+      box-shadow: 0 20px 30px rgba(16,185,129,0.25);
+    }
+    .tabs .badge {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+      border-radius: 999px;
+      padding: 0.15rem 0.7rem;
+      font-size: 0.75rem;
+    }
+    @media (max-width: 1100px) {
+      .driver-shell { grid-template-columns: 1fr; }
+      .driver-log { order: -1; }
+    }
 </style>
 </head>
 <body>
-<div class="container">
-<h1>🛵 Driver Portal</h1>
-
-<div class="section">
-<h2>🔐 Login</h2>
-<input id="d_email" placeholder="Email" type="email" value="driver5@example.com">
-<input id="d_password" type="password" placeholder="Password" value="password123">
-<button onclick="driverLogin()">Login as Driver</button>
-<div id="login_status" class="status-badge" style="display:none;margin-top:10px"></div>
-</div>
-
-<div class="section">
-<h2>🎯 Status Management</h2>
-<select id="status_select" onchange="changeStatus()" disabled>
-  <option value="available">🟢 Available - Ready for deliveries</option>
-  <option value="busy">🟡 Busy - On active delivery</option>
-  <option value="offline">🔴 Offline - Not accepting orders</option>
-  <option value="suspended">⛔ Suspended - Account restricted</option>
-</select>
-<div id="status_info" style="margin-top:10px;font-size:13px;color:#666"></div>
-</div>
-
-<div class="section">
-<h2>📍 Location & Status</h2>
-<div class="row">
-<input id="d_lat" placeholder="Latitude" value="36.75">
-<input id="d_lng" placeholder="Longitude" value="2.8">
-</div>
-<button id="online_btn" onclick="toggleOnline()" disabled>🟢 Go Online</button>
-<div id="driver_status" style="margin-top:10px"></div>
-
-<!-- Capacity Info -->
-<div id="capacity_display" style="display:none">
-<div class="capacity-info">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <strong>📦 Active Orders</strong>
-    <span id="capacity_text">0 / 5</span>
+  <div class="driver-shell">
+    <aside class="driver-sidebar">
+      <div class="brand">
+        <strong>Driver Portal</strong>
+        <span>Live</span>
+      </div>
+      <div class="sidebar-card">
+        <h2>Connexion</h2>
+        <input id="d_email" placeholder="Email" type="email" value="driver5@example.com">
+        <input id="d_password" type="password" placeholder="Password" value="password123">
+        <button onclick="driverLogin()">Login</button>
+        <div id="login_status" class="status-badge" style="display:none"></div>
+      </div>
+      <div class="sidebar-card">
+        <h2>Statut</h2>
+        <select id="status_select" onchange="changeStatus()" disabled>
+          <option value="available">Available</option>
+          <option value="busy">Busy</option>
+          <option value="offline">Offline</option>
+          <option value="suspended">Suspended</option>
+        </select>
+        <div id="status_info"></div>
+      </div>
+      <div class="sidebar-card">
+        <h2>Position</h2>
+        <div class="location-grid">
+          <input id="d_lat" placeholder="Latitude" value="36.75">
+          <input id="d_lng" placeholder="Longitude" value="2.8">
+        </div>
+        <button id="online_btn" onclick="toggleOnline()" disabled>Go Online</button>
+        <div id="driver_status"></div>
+      </div>
+      <div class="sidebar-card capacity" id="capacity_display" style="display:none">
+        <h2>Capacité</h2>
+        <div class="capacity-info">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <strong>Active Orders</strong>
+            <span id="capacity_text">0 / 5</span>
+          </div>
+          <div class="capacity-bar">
+            <div id="capacity_fill" class="capacity-fill">0%</div>
+          </div>
+          <div style="font-size:0.85rem;color:#475569;">
+            <span id="capacity_message">Ready to accept orders</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <main class="driver-main">
+      <section class="panel" id="active_orders_section" style="display:none">
+        <div class="panel-header">
+          <h2>My Active Orders</h2>
+          <button onclick="loadActiveOrders()">Refresh</button>
+        </div>
+        <div id="active_orders_list">
+          <div class="empty">No active orders</div>
+        </div>
+      </section>
+      <section class="panel" id="deliveries_section" style="display:none">
+        <div class="panel-header">
+          <h2>Available Deliveries</h2>
+        </div>
+        <div class="tabs">
+          <button class="tab active" onclick="switchTab('available')">
+            Available <span class="badge" id="available_count">0</span>
+          </button>
+          <button class="tab" onclick="switchTab('nearby')">Nearby</button>
+        </div>
+        <div id="tab_available" class="tab-content active">
+          <div id="d_deliveries">
+            <div class="empty">No deliveries available. Go online to receive requests!</div>
+          </div>
+        </div>
+        <div id="tab_nearby" class="tab-content">
+          <button onclick="loadNearbyOrders()">Refresh Nearby</button>
+          <div id="nearby_deliveries">
+            <div class="empty">Click refresh to load nearby orders</div>
+          </div>
+        </div>
+      </section>
+    </main>
+    <aside class="driver-log">
+      <section class="panel">
+        <h2>Activity Log</h2>
+        <pre id="d_log" class="log">Waiting for connection...</pre>
+        <div id="driver_notifications"></div>
+      </section>
+    </aside>
   </div>
-  <div class="capacity-bar">
-    <div id="capacity_fill" class="capacity-fill" style="width:0%">0%</div>
-  </div>
-  <div style="margin-top:8px;font-size:12px;color:#666;text-align:center">
-    <span id="capacity_message">Ready to accept orders</span>
-  </div>
-</div>
-</div>
-</div>
-
-<!-- Active Orders Section -->
-<div class="section" id="active_orders_section" style="display:none">
-<h2>
-  <span>🚚 My Active Orders</span>
-  <span class="count-badge" id="active_count">0</span>
-</h2>
-<button onclick="loadActiveOrders()" style="margin-bottom:15px">🔄 Refresh Active Orders</button>
-<div id="active_orders_list">
-<div class="empty">No active orders</div>
-</div>
-</div>
-
-<!-- Available Deliveries Section -->
-<div class="section" id="deliveries_section" style="display:none">
-<h2>🚨 Available Deliveries</h2>
-<div class="tabs">
-  <button class="tab active" onclick="switchTab('available')">
-    📋 Available <span class="badge" id="available_count">0</span>
-  </button>
-  <button class="tab" onclick="switchTab('nearby')">
-    📍 Nearby
-  </button>
-</div>
-
-<div id="tab_available" class="tab-content active">
-  <div id="d_deliveries">
-    <div class="empty">No deliveries available. Go online to receive requests!</div>
-  </div>
-</div>
-
-<div id="tab_nearby" class="tab-content">
-  <button onclick="loadNearbyOrders()" style="margin-bottom:15px">🔄 Refresh Nearby</button>
-  <div id="nearby_deliveries">
-    <div class="empty">Click refresh to load nearby orders</div>
-  </div>
-</div>
-</div>
-
-<div class="section">
-<h2>📊 Activity Log</h2>
-<pre id="d_log" class="log">Waiting for connection...</pre>
-</div>
-</div>
-
-<script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
 let socket = null;
 let auth = {role: null, token: null, user: null, profile: null};
 let isOnline = false;

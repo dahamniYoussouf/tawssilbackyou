@@ -22,6 +22,22 @@ export const getAll = async (req, res, next) => {
 };
 
 /**
+ * Create a lightweight restaurant stub (used by tests and quick seeds).
+ * This endpoint creates an associated restaurant user behind the scenes.
+ */
+export const createRestaurant = async (req, res, next) => {
+  try {
+    const restaurant = await restaurantService.createRestaurant(req.body);
+    res.status(201).json({
+      success: true,
+      data: restaurant
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Filter nearby restaurants with advanced options
  * ✅ REQUIRES AUTHENTICATION - client_id from JWT
  * Cached for 3 minutes

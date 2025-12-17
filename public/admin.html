@@ -36,10 +36,53 @@ button.success:hover{background:#059669}
 .stat-card{background:#fff;padding:15px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.1);text-align:center}
 .stat-value{font-size:32px;font-weight:bold;color:#0f62fe}
 .stat-label{font-size:14px;color:#666;margin-top:5px}
+.api-sim-section{background:linear-gradient(135deg,#0f172a,#1e2a44);color:#f8fafc;padding:20px;border-radius:12px;margin-bottom:20px;border:1px solid rgba(248,250,252,.15)}
+.api-sim-section h2{margin-top:0;color:#a6d6ff}
+.api-sim-description{margin:0 0 15px;color:#cbd5f5;font-size:14px;max-width:960px}
+.api-sim-controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:center}
+.api-sim-controls select{flex:1;max-width:280px;background:#0b1a30;color:#f8fafc;border:1px solid rgba(255,255,255,.4)}
+.api-sim-controls button{background:#10b981;color:#fff;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;border:none;cursor:pointer;transition:transform .2s ease}
+.api-sim-controls button:hover{transform:translateY(-1px)}
+.api-sim-status{font-size:13px;color:#a5f3fc;margin-left:auto;white-space:nowrap}
+.api-sim-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
+.api-sim-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:12px;padding:12px 16px;text-align:left}
+.api-sim-label{font-size:12px;color:#cbd5f5;margin-top:4px}
+.api-sim-value{font-size:28px;font-weight:700;color:#34d399}
+.api-sim-response-wrapper{background:#020b16;border-radius:12px;padding:10px;border:1px solid rgba(255,255,255,.15)}
+.api-sim-response-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.api-sim-response{background:#020b16;color:#e2e8f0;border:none;border-radius:8px;padding:10px;font-size:12px;max-height:220px;overflow:auto;font-family:monospace;white-space:pre-wrap}
+.api-sim-copy{padding:6px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:transparent;color:#cbd5f5;font-size:11px;cursor:pointer}
 .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:15px}
 .toast{position:fixed;top:20px;right:20px;background:#10b981;color:#fff;padding:15px 20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.2);animation:slideIn 0.3s;z-index:1000}
 .toast.error{background:#dc2626}
 .toast.warning{background:#f59e0b}
+.homepage-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+.homepage-summary .stat-card{background:#f8fafc;color:#0f172a;border:1px solid #e5e7eb;box-shadow:none}
+.announcement-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:10px}
+.announcement-summary-card{background:#fff;padding:14px;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.08);text-align:center}
+.announcement-breakdown{margin-top:14px;background:#fff;border-radius:8px;padding:12px;border:1px solid #e5e7eb;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.announcement-breakdown-item{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f1f5f9}
+.announcement-breakdown-item:last-child{border-bottom:none}
+.announcement-breakdown-label{font-size:14px;color:#0f172a}
+.announcement-breakdown-value{font-weight:600;color:#0f62fe}
+.homepage-section-controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.homepage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:10px}
+.homepage-panel{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px;box-shadow:0 6px 16px rgba(15,23,42,.06)}
+.homepage-panel h3{margin:0 0 8px;font-size:16px;color:#0f62fe}
+.homepage-item,.homepage-card{border:1px solid rgba(15,23,42,.08);border-radius:10px;padding:12px;margin-bottom:10px;background:#fafbff;display:flex;flex-direction:column;gap:4px}
+.homepage-item strong{font-size:14px;color:#111827}
+.homepage-item p,.homepage-card p{margin:0;font-size:13px;color:#475569;line-height:1.4}
+.homepage-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.homepage-tag{background:#eff6ff;color:#0f62fe;border-radius:999px;padding:2px 10px;font-size:11px;font-weight:600}
+.homepage-card span{font-size:12px;color:#94a3b8}
+.homepage-panel .empty{margin:0}
+.homepage-timestamp{font-size:12px;color:#475569;margin-bottom:12px}
+.announcement-table-wrapper{overflow-x:auto;margin-top:10px}
+.announcement-table{width:100%;border-collapse:collapse;font-size:13px}
+.announcement-table th,.announcement-table td{border-bottom:1px solid #e5e7eb;padding:8px;text-align:left}
+.announcement-table th{font-size:12px;text-transform:uppercase;color:#6b7280}
+.announcement-table td{color:#111827}
+.announcement-table .announcement-status{font-weight:600}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 .order-info{font-size:13px;line-height:1.6}
 .order-info strong{color:#0f62fe}
@@ -75,6 +118,85 @@ button.success:hover{background:#059669}
 <div class="stat-card">
 <div class="stat-value" id="stat_resolved">0</div>
 <div class="stat-label">Resolved</div>
+</div>
+</div>
+
+<div class="section" id="announcement_summary_section" style="display:none">
+<h2>📰 Announcements</h2>
+<div class="announcement-summary">
+<div class="announcement-summary-card">
+<div class="stat-value" id="stat_announcements_total">0</div>
+<div class="stat-label">Total announcements</div>
+</div>
+<div class="announcement-summary-card">
+<div class="stat-value" id="stat_announcements_active">0</div>
+<div class="stat-label">Active now</div>
+</div>
+</div>
+<div id="announcement_breakdown_list" class="announcement-breakdown">
+<div class="empty">Aucune annonce associée pour l'instant.</div>
+</div>
+</div>
+
+<div class="section" id="announcement_management_section" style="display:none">
+<h2>🛠️ Announcement management</h2>
+<div class="announcement-table-wrapper">
+<table class="announcement-table">
+<thead>
+<tr>
+<th>Title</th>
+<th>Restaurant</th>
+<th>Period</th>
+<th>Status</th>
+<th>Type</th>
+</tr>
+</thead>
+<tbody id="announcement_management_body">
+<!-- rows inserted here -->
+</tbody>
+<tfoot id="announcement_management_empty" class="empty" style="display:none">
+<tr><td colspan="5">No announcements yet.</td></tr>
+</tfoot>
+</table>
+</div>
+</div>
+
+<!-- Simulation API Section -->
+<div class="section api-sim-section" id="api_sim_section" style="display:none">
+<h2>Simulation API en direct</h2>
+<p class="api-sim-description">Choisissez un endpoint administrateur et lancez une requête sécurisée : la réponse s'affiche en direct et les principaux indicateurs se mettent à jour en temps réel.</p>
+<div class="api-sim-controls">
+<select id="api_sim_endpoint">
+<option value="monitoring">/admin/monitoring (instantané)</option>
+<option value="statistics">/admin/statistics (indicateurs globaux)</option>
+</select>
+<button type="button" onclick="runApiSimulation(true)">Lancer la simulation</button>
+<span id="api_sim_status" class="api-sim-status">Prêt à simuler</span>
+</div>
+<div class="api-sim-summary">
+<div class="api-sim-card">
+<div class="api-sim-value" id="api_sim_value_active_orders">0</div>
+<div class="api-sim-label">Commandes actives</div>
+</div>
+<div class="api-sim-card">
+<div class="api-sim-value" id="api_sim_value_total_orders">0</div>
+<div class="api-sim-label">Commandes totales</div>
+</div>
+<div class="api-sim-card">
+<div class="api-sim-value" id="api_sim_value_online_drivers">0</div>
+<div class="api-sim-label">Livreurs connectés</div>
+</div>
+<div class="api-sim-card">
+<div class="api-sim-value" id="api_sim_value_revenue">0 DA</div>
+<div class="api-sim-label">Revenu estimé</div>
+</div>
+</div>
+<div class="api-sim-response-wrapper">
+<div class="api-sim-response-header">
+<span>Réponse brute</span>
+<button type="button" class="api-sim-copy" onclick="copyApiResponse()">Copier</button>
+</div>
+<pre id="api_sim_response" class="api-sim-response">Aucune réponse</pre>
 </div>
 </div>
 
@@ -116,12 +238,67 @@ button.success:hover{background:#059669}
 <h2>📊 Activity Log</h2>
 <pre id="admin_log" class="log">Waiting for connection...</pre>
 </div>
+<div class="section" id="public_homepage_section" style="display:none">
+  <h2>Public homepage feed (client view)</h2>
+  <p class="homepage-timestamp" id="public_homepage_timestamp">Data will appear after loading the public feed.</p>
+  <div class="homepage-section-controls">
+    <button type="button" onclick="loadPublicHomepage()">Refresh public feed</button>
+  </div>
+  <div class="homepage-summary">
+    <div class="stat-card">
+      <div class="stat-value" id="stat_public_home_categories">0</div>
+      <div class="stat-label">Home categories</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat_public_promotions">0</div>
+      <div class="stat-label">Promotions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat_public_nearby">0</div>
+      <div class="stat-label">Nearby restaurants</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat_public_restaurants">0</div>
+      <div class="stat-label">Restaurants returned</div>
+    </div>
+  </div>
+  <div class="homepage-grid">
+    <div class="homepage-panel">
+      <h3>Home categories</h3>
+      <div id="public_home_categories_list"></div>
+    </div>
+    <div class="homepage-panel">
+      <h3>Promotions</h3>
+      <div id="public_promotions_list"></div>
+    </div>
+    <div class="homepage-panel">
+      <h3>Daily deals</h3>
+      <div id="public_daily_deals_list"></div>
+    </div>
+    <div class="homepage-panel">
+      <h3>Announcements</h3>
+      <div id="public_announcements_list"></div>
+    </div>
+    <div class="homepage-panel">
+      <h3>Recommended dishes</h3>
+      <div id="public_recommended_list"></div>
+    </div>
+    <div class="homepage-panel">
+      <h3>Nearby restaurants</h3>
+      <div id="public_homepage_nearby"></div>
+    </div>
+  </div>
+</div>
+
 </div>
 
 <script>
 let socket = null;
 let auth = {role: null, token: null, user: null, profile: null};
 let notifications = [];
+let apiSimulationTimer = null;
+let apiSimulationBusy = false;
+let apiSimulationLastEndpoint = 'monitoring';
 
 function log(...msg) {
 const e = document.getElementById('admin_log');
@@ -262,9 +439,15 @@ document.getElementById('stats_section').style.display = 'grid';
 document.getElementById('filter_section').style.display = 'block';
 document.getElementById('notifications_section').style.display = 'block';
 document.getElementById('log_section').style.display = 'block';
+document.getElementById('api_sim_section').style.display = 'block';
 
 // Initialize socket
 initSocket();
+
+  // Kick off API simulation
+  runApiSimulation(true);
+  startApiSimulationAutoRefresh();
+  loadAnnouncementManagement();
 
 // Request browser notifications
 if ('Notification' in window && Notification.permission === 'default') {
@@ -273,6 +456,10 @@ Notification.requestPermission();
 
 // Load notifications
 await loadNotifications();
+
+// Load homepage snapshot data
+// Load the public homepage feed
+await loadPublicHomepage();
 
 showToast('Admin logged in successfully!');
 } else {
@@ -436,6 +623,283 @@ document.getElementById('stat_pending').textContent = pending;
 document.getElementById('stat_resolved').textContent = resolved;
 }
 
+function createTagList(items = []) {
+const filtered = (items || []).filter(Boolean);
+if (!filtered.length) return null;
+const wrapper = document.createElement('div');
+wrapper.className = 'homepage-tags';
+filtered.forEach(value => {
+const tag = document.createElement('span');
+tag.className = 'homepage-tag';
+tag.textContent = value;
+wrapper.appendChild(tag);
+});
+return wrapper;
+}
+
+function renderList(containerId, items, builder, emptyMessage = 'No data to show') {
+const container = document.getElementById(containerId);
+if (!container) return;
+container.innerHTML = '';
+if (!items || !items.length) {
+container.innerHTML = `<div class="empty">${emptyMessage}</div>`;
+return;
+}
+items.forEach(item => {
+const element = builder(item);
+if (element) {
+container.appendChild(element);
+}
+});
+}
+
+function formatDistance(meters) {
+if (meters === undefined || meters === null) return null;
+const value = Number(meters);
+if (Number.isNaN(value)) return null;
+if (value >= 1000) {
+return `${(value / 1000).toFixed(1)} km`;
+}
+return `${Math.round(value)} m`;
+}
+
+function formatDateRange(start, end) {
+const parts = [];
+if (start) parts.push(new Date(start).toLocaleDateString());
+if (end) parts.push(new Date(end).toLocaleDateString());
+if (!parts.length) return null;
+return parts.join(' → ');
+}
+
+function createModuleCard(title, description, tags = []) {
+const card = document.createElement('div');
+card.className = 'homepage-item';
+const header = document.createElement('strong');
+header.textContent = title || 'Untitled';
+card.appendChild(header);
+if (description) {
+const desc = document.createElement('p');
+desc.textContent = description;
+card.appendChild(desc);
+}
+const tagList = createTagList(tags);
+if (tagList) card.appendChild(tagList);
+return card;
+}
+
+function createDetailedCard(title, description, tags = []) {
+const card = document.createElement('div');
+card.className = 'homepage-card';
+const header = document.createElement('strong');
+header.textContent = title || 'Untitled';
+card.appendChild(header);
+if (description) {
+const desc = document.createElement('p');
+desc.textContent = description;
+card.appendChild(desc);
+}
+const tagList = createTagList(tags);
+if (tagList) card.appendChild(tagList);
+return card;
+}
+
+function buildHomeCategoryCard(item) {
+return createModuleCard(item.name, item.description, [
+item.is_active ? 'Active' : 'Inactive',
+item.slug,
+item.display_order ? `Order ${item.display_order}` : null
+]);
+}
+
+function buildThematicCard(item) {
+return createModuleCard(item.name, item.description, [
+item.is_active ? 'Active' : 'Inactive',
+item.home_category_id ? `Category ${item.home_category_id}` : null
+]);
+}
+
+function buildPromotionCard(item) {
+return createModuleCard(
+item.title,
+item.description || item.custom_message,
+[
+item.badge_text,
+item.type,
+formatDateRange(item.start_date, item.end_date),
+item.is_active ? 'Active' : 'Inactive'
+]
+);
+}
+
+function buildDailyDealCard(item) {
+const promo = item.promotion || {};
+return createModuleCard(
+promo.title || 'Daily deal',
+promo.description,
+[
+promo.restaurant?.name ? `Restaurant: ${promo.restaurant.name}` : null,
+formatDateRange(item.start_date, item.end_date),
+item.is_active ? 'Active' : 'Inactive'
+]
+);
+}
+
+function buildAnnouncementCard(item) {
+  const tags = [
+    item.restaurant?.name ? `Restaurant: ${item.restaurant.name}` : null,
+    item.type ? `Type: ${item.type}` : null,
+    formatDateRange(item.start_date, item.end_date),
+    item.is_active ? "Active" : "Inactive"
+  ].filter(Boolean);
+  return createModuleCard(item.title, item.content, tags);
+}
+
+function buildRecommendedDishCard(item) {
+const menu = item.menu_item || {};
+const restaurantName = item.restaurant?.name;
+return createModuleCard(
+menu.nom || 'Recommended dish',
+item.reason || menu.description,
+[
+menu.prix ? `${menu.prix} DA` : null,
+restaurantName ? `Restaurant: ${restaurantName}` : null,
+item.is_active ? 'Active' : 'Inactive'
+]
+);
+}
+
+function buildRestaurantCard(item) {
+const meta = [
+item.is_premium ? 'Premium' : null,
+item.rating ? `⭐ ${item.rating}` : null,
+item.status,
+item.is_open === true ? 'Open' : item.is_open === false ? 'Closed' : null,
+Array.isArray(item.categories) ? item.categories.slice(0, 3).join(', ') : item.categories,
+formatDistance(item.distance),
+item.delivery_time_min && item.delivery_time_max ? `ETA ${item.delivery_time_min}-${item.delivery_time_max} min` : null
+].filter(Boolean);
+return createDetailedCard(
+item.name || 'Restaurant',
+item.description || item.address,
+meta
+);
+}
+
+function buildNearbyCard(item) {
+const meta = [
+item.is_premium ? 'Premium' : null,
+item.status,
+item.is_open === true ? 'Open now' : item.is_open === false ? 'Closed' : null,
+formatDistance(item.distance),
+item.delivery_time_min && item.delivery_time_max ? `ETA ${item.delivery_time_min}-${item.delivery_time_max} min` : null
+].filter(Boolean);
+return createDetailedCard(
+item.name || 'Nearby restaurant',
+item.address,
+meta
+);
+}
+
+function buildMenuItemCard(item) {
+return createModuleCard(
+item.nom || 'Menu item',
+item.description,
+[
+item.prix ? `${item.prix} DA` : null,
+item.category?.nom ? `Category: ${item.category.nom}` : null,
+item.restaurant?.name ? `Restaurant: ${item.restaurant.name}` : null,
+item.is_available === false ? 'Unavailable' : 'Available'
+]
+);
+}
+
+function updatePublicHomepageSummary(data) {
+  const categories = (data.homeCategories || []).length;
+  const promotions = (data.promotions || []).length;
+  const nearby = (data.nearby?.formatted || []).length;
+  const restaurants = (data.restaurants || []).length;
+  document.getElementById('stat_public_home_categories').textContent = categories;
+  document.getElementById('stat_public_promotions').textContent = promotions;
+  document.getElementById('stat_public_nearby').textContent = nearby;
+  document.getElementById('stat_public_restaurants').textContent = restaurants;
+  const ts = document.getElementById('public_homepage_timestamp');
+  if (ts) {
+    ts.textContent = `Updated at ${new Date().toLocaleTimeString()}`;
+  }
+}
+
+function renderPublicHomepage(data) {
+  renderList(
+    'public_home_categories_list',
+    data.homeCategories,
+    buildHomeCategoryCard,
+    'No home categories yet'
+  );
+  renderList(
+    'public_promotions_list',
+    data.promotions,
+    buildPromotionCard,
+    'No promotions visible to clients'
+  );
+  renderList(
+    'public_daily_deals_list',
+    data.dailyDeals,
+    buildDailyDealCard,
+    'No daily deals active'
+  );
+  renderList(
+    'public_announcements_list',
+    data.announcements,
+    buildAnnouncementCard,
+    'No announcements configured'
+  );
+  renderList(
+    'public_recommended_list',
+    data.recommendedDishes,
+    buildRecommendedDishCard,
+    'No recommended dishes'
+  );
+  renderList(
+    'public_homepage_nearby',
+    data.nearby?.formatted,
+    buildNearbyCard,
+    'No nearby restaurants returned'
+  );
+  updatePublicHomepageSummary(data);
+  const section = document.getElementById('public_homepage_section');
+  if (section) section.style.display = 'block';
+}
+
+async function loadPublicHomepage() {
+  const statusEl = document.getElementById('public_homepage_timestamp');
+  if (statusEl) {
+    statusEl.textContent = 'Loading public homepage...';
+  }
+  try {
+    const payload = {
+      lat: 36.747385,
+      lng: 6.27404,
+      radius: 5000,
+      page: 1,
+      pageSize: 20
+    };
+    const r = await apiFetch('/homepage', { method: 'POST', body: JSON.stringify(payload) });
+    const res = await r.json();
+    if (!r.ok) {
+      throw new Error(res.message || 'Failed to load public homepage');
+    }
+    const data = res.data || {};
+    renderPublicHomepage(data);
+    showToast('Public homepage loaded');
+  } catch (error) {
+    if (statusEl) {
+      statusEl.textContent = 'Failed to load public homepage';
+    }
+    console.error('Public homepage error:', error);
+    showToast('Unable to load public homepage', 'error');
+  }
+}
+
 async function markAsRead(notificationId) {
 log('📖 Marking notification as read:', notificationId);
 
@@ -503,6 +967,218 @@ alert('Error: ' + e.message);
 log('❌ Error:', e.message);
 }
 }
+
+function initApiSimulationUI() {
+const endpointSelect = document.getElementById('api_sim_endpoint');
+if (!endpointSelect) {
+return;
+}
+endpointSelect.value = apiSimulationLastEndpoint;
+endpointSelect.addEventListener('change', () => {
+apiSimulationLastEndpoint = endpointSelect.value;
+runApiSimulation(true);
+});
+}
+
+async function runApiSimulation(force = false) {
+if (!auth.token) {
+return;
+}
+if (apiSimulationBusy && !force) {
+return;
+}
+const endpointSelect = document.getElementById('api_sim_endpoint');
+const endpoint = endpointSelect?.value || apiSimulationLastEndpoint;
+apiSimulationLastEndpoint = endpoint;
+const statusEl = document.getElementById('api_sim_status');
+const responseEl = document.getElementById('api_sim_response');
+if (statusEl) {
+statusEl.textContent = `Simulation /admin/${endpoint} en cours...`;
+}
+apiSimulationBusy = true;
+try {
+const response = await apiFetch(`/admin/${endpoint}`);
+const json = await response.json();
+if (!response.ok) {
+throw new Error(json.message || 'Simulation échouée');
+}
+const payload = json.data || {};
+updateApiSummaryCards(payload);
+if (responseEl) {
+responseEl.textContent = JSON.stringify(payload, null, 2);
+}
+if (statusEl) {
+statusEl.textContent = `Dernière réponse /admin/${endpoint} (${new Date().toLocaleTimeString()})`;
+}
+} catch (error) {
+if (responseEl) {
+responseEl.textContent = error.message;
+}
+if (statusEl) {
+statusEl.textContent = `Erreur: ${error.message}`;
+}
+log('Simulation API failed:', error);
+showToast('Simulation API échouée', 'error');
+} finally {
+apiSimulationBusy = false;
+}
+}
+
+function updateApiSummaryCards(payload) {
+  const realtime = payload.realtimeStats || {};
+  const ordersStats = payload.orders || {};
+const revenueValue = payload.revenue?.total ?? ordersStats.revenue ?? realtime.revenue ?? 0;
+const activeOrders = realtime.activeOrders ?? realtime.active_orders ?? ordersStats.inProgress ?? 0;
+const totalOrders = ordersStats.total ?? realtime.total ?? payload.totalOrders ?? 0;
+const onlineDrivers = realtime.onlineDrivers ?? payload.onlineDrivers ?? payload.drivers?.total ?? 0;
+const activeEl = document.getElementById('api_sim_value_active_orders');
+const totalEl = document.getElementById('api_sim_value_total_orders');
+const driversEl = document.getElementById('api_sim_value_online_drivers');
+const revenueEl = document.getElementById('api_sim_value_revenue');
+if (activeEl) {
+activeEl.textContent = activeOrders;
+}
+if (totalEl) {
+totalEl.textContent = totalOrders;
+}
+if (driversEl) {
+driversEl.textContent = onlineDrivers;
+}
+  if (revenueEl) {
+    if (typeof revenueValue === 'number' && Number.isFinite(revenueValue)) {
+      revenueEl.textContent = `${Math.round(revenueValue)} DA`;
+    } else {
+      revenueEl.textContent = String(revenueValue || '0 DA');
+    }
+  }
+  updateAnnouncementSummary(payload.announcement_summary || null);
+}
+
+function updateAnnouncementSummary(summary) {
+  const section = document.getElementById('announcement_summary_section');
+  if (!section) {
+    return;
+  }
+  if (!summary) {
+    section.style.display = 'none';
+    return;
+  }
+  const totalEl = document.getElementById('stat_announcements_total');
+  const activeEl = document.getElementById('stat_announcements_active');
+  if (totalEl) {
+    totalEl.textContent = summary.total ?? 0;
+  }
+  if (activeEl) {
+    activeEl.textContent = summary.active ?? 0;
+  }
+  const breakdownEl = document.getElementById('announcement_breakdown_list');
+  if (breakdownEl) {
+    breakdownEl.innerHTML = '';
+    const breakdownList = summary.breakdown || [];
+    if (breakdownList.length === 0) {
+      breakdownEl.innerHTML = '<div class="empty">Aucune annonce associée pour l\'instant.</div>';
+    } else {
+      breakdownList.forEach((bucket) => {
+        const item = document.createElement('div');
+        item.className = 'announcement-breakdown-item';
+        const label = document.createElement('span');
+        label.className = 'announcement-breakdown-label';
+        label.textContent = bucket.restaurant?.name || 'Global';
+        const value = document.createElement('span');
+        value.className = 'announcement-breakdown-value';
+        value.textContent = `${bucket.active}/${bucket.total} actives`;
+        item.appendChild(label);
+        item.appendChild(value);
+        breakdownEl.appendChild(item);
+      });
+    }
+  }
+  section.style.display = 'block';
+}
+
+async function loadAnnouncementManagement() {
+  const section = document.getElementById('announcement_management_section');
+  if (!section || !auth.token) return;
+  try {
+    const response = await apiFetch('/announcement/getall');
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.message || 'Impossible de charger les annonces');
+    }
+    updateAnnouncementManagementTable(payload.data || []);
+  } catch (error) {
+    showToast(error.message || 'Failed to load announcement list', 'error');
+    section.style.display = 'none';
+  }
+}
+
+function updateAnnouncementManagementTable(items = []) {
+  const section = document.getElementById('announcement_management_section');
+  if (!section) return;
+  const tbody = document.getElementById('announcement_management_body');
+  const emptyFoot = document.getElementById('announcement_management_empty');
+  if (!tbody || !emptyFoot) return;
+  tbody.innerHTML = '';
+  if (!items.length) {
+    emptyFoot.style.display = '';
+    section.style.display = 'none';
+    return;
+  }
+  emptyFoot.style.display = 'none';
+  section.style.display = 'block';
+  items.forEach((announcement) => {
+    const row = document.createElement('tr');
+    const restaurantName = announcement.restaurant?.name || 'Global';
+    const labelNode = document.createElement('td');
+    labelNode.textContent = announcement.title || 'Untitled';
+    const restaurantNode = document.createElement('td');
+    restaurantNode.textContent = restaurantName;
+    const periodNode = document.createElement('td');
+    periodNode.textContent = formatDateRange(announcement.start_date, announcement.end_date) || '—';
+    const statusNode = document.createElement('td');
+    statusNode.textContent = announcement.is_active ? 'Active' : 'Inactive';
+    statusNode.className = 'announcement-status';
+    const typeNode = document.createElement('td');
+    typeNode.textContent = announcement.type || 'info';
+    row.appendChild(labelNode);
+    row.appendChild(restaurantNode);
+    row.appendChild(periodNode);
+    row.appendChild(statusNode);
+    row.appendChild(typeNode);
+    tbody.appendChild(row);
+  });
+}
+
+function startApiSimulationAutoRefresh() {
+if (apiSimulationTimer) {
+clearInterval(apiSimulationTimer);
+}
+apiSimulationTimer = setInterval(() => runApiSimulation(), 20000);
+}
+
+function copyApiResponse() {
+const responseEl = document.getElementById('api_sim_response');
+if (!responseEl) {
+return;
+}
+const text = responseEl.textContent || '';
+if (!text) {
+return;
+}
+if (navigator.clipboard?.writeText) {
+navigator.clipboard.writeText(text).then(() => showToast('Réponse copiée'));
+return;
+}
+const textarea = document.createElement('textarea');
+textarea.value = text;
+document.body.appendChild(textarea);
+textarea.select();
+document.execCommand('copy');
+textarea.remove();
+showToast('Réponse copiée');
+}
+
+initApiSimulationUI();
 
 function playNotificationSound() {
 try {

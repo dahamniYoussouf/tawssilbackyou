@@ -1,5 +1,14 @@
 import Announcement from "../models/Announcement.js";
+import Restaurant from "../models/Restaurant.js";
 import { Op } from "sequelize";
+
+const announcementInclude = [
+  {
+    model: Restaurant,
+    as: "restaurant",
+    attributes: ["id", "name", "address", "phone_number"]
+  }
+];
 
 // Create a new announcement
 export const createAnnouncement = async (data) => {
@@ -9,6 +18,7 @@ export const createAnnouncement = async (data) => {
 // Get all announcements
 export const getAllAnnouncements = async () => {
   return Announcement.findAll({
+    include: announcementInclude,
     order: [["created_at", "DESC"]],
   });
 };
@@ -17,14 +27,27 @@ export const getAllAnnouncements = async () => {
 export const getActiveAnnouncements = async () => {
   const now = new Date();
 
-  const announcements = await Announcement.findAll({
+  return Announcement.findAll({
     where: {
-      is_active: true
+      is_active: true,
+      [Op.and]: [
+        {
+          [Op.or]: [
+            { start_date: null },
+            { start_date: { [Op.lte]: now } }
+          ]
+        },
+        {
+          [Op.or]: [
+            { end_date: null },
+            { end_date: { [Op.gte]: now } }
+          ]
+        }
+      ]
     },
+    include: announcementInclude,
     order: [["created_at", "DESC"]],
   });
-
-  return announcements;
 };
 
 // Update announcement

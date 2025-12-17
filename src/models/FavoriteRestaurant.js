@@ -1,6 +1,36 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../config/database.js";
 
+const isTestEnv = process.env.NODE_ENV === "test";
+
+const favoriteRestaurantIndexes = [
+  {
+    unique: true,
+    fields: ["client_id", "restaurant_id"],
+    name: "unique_client_restaurant_favorite"
+  },
+  {
+    fields: ["client_id"],
+    name: "idx_favorite_restaurants_client_id"
+  },
+  {
+    fields: ["restaurant_id"],
+    name: "idx_favorite_restaurants_restaurant_id"
+  },
+  {
+    fields: ["created_at"],
+    name: "idx_favorite_restaurants_created_at"
+  }
+];
+
+if (!isTestEnv) {
+  favoriteRestaurantIndexes.push({
+    using: "GIN",
+    fields: ["tags"],
+    name: "idx_favorite_restaurants_tags"
+  });
+}
+
 const FavoriteRestaurant = sequelize.define("FavoriteRestaurant", {
   id: {
     type: DataTypes.UUID,
@@ -35,7 +65,7 @@ const FavoriteRestaurant = sequelize.define("FavoriteRestaurant", {
     comment: "Personal notes about the restaurant"
   },
   tags: {
-    type: DataTypes.ARRAY(DataTypes.STRING),
+    type: isTestEnv ? DataTypes.JSON : DataTypes.ARRAY(DataTypes.STRING),
     defaultValue: [],
     allowNull: true,
     comment: "Custom tags for organizing favorites"
@@ -46,30 +76,7 @@ const FavoriteRestaurant = sequelize.define("FavoriteRestaurant", {
   underscored: true,
   createdAt: "created_at",
   updatedAt: "updated_at",
-  indexes: [
-    {
-      unique: true,
-      fields: ["client_id", "restaurant_id"],
-      name: "unique_client_restaurant_favorite"
-    },
-    {
-      fields: ["client_id"],
-      name: "idx_favorite_restaurants_client_id"
-    },
-    {
-      fields: ["restaurant_id"],
-      name: "idx_favorite_restaurants_restaurant_id"
-    },
-    {
-      fields: ["created_at"],
-      name: "idx_favorite_restaurants_created_at"
-    },
-    {
-      using: "GIN",
-      fields: ["tags"],
-      name: "idx_favorite_restaurants_tags"
-    }
-  ]
+  indexes: favoriteRestaurantIndexes
 });
 
 export default FavoriteRestaurant;

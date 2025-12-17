@@ -16,6 +16,7 @@ const router = Router();
 
 // Public routes (no auth needed for browsing basic info)
 router.get("/getall", restaurantCtrl.getAll);
+router.post("/create", restaurantCtrl.createRestaurant);
 // Add this line with other restaurant management routes
 router.get("/profile/me", protect, isRestaurant, restaurantCtrl.getProfile);
 

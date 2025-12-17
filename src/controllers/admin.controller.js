@@ -5,6 +5,7 @@ import Driver from "../models/Driver.js";
 import Client from "../models/Client.js";
 import Restaurant from "../models/Restaurant.js";
 import AdminNotification from "../models/AdminNotification.js";
+import Announcement from "../models/Announcement.js";
 import { 
   getMaxOrdersPerDriver, 
   updateMaxOrdersPerDriver 
@@ -22,6 +23,25 @@ import os from 'os';
 import { sequelize } from '../config/database.js';
 import fs from 'fs';
 import path from 'path';
+import * as adminHomepageService from '../services/adminHomepage.service.js';
+
+const DEFAULT_CLIENT_LAT = 36.75;
+const DEFAULT_CLIENT_LNG = 3.05;
+
+const normalizeCategoriesParam = (value) => {
+  if (!value) return undefined;
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === 'string') {
+    return value.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  return undefined;
+};
+
+const parseNumber = (value, fallback) => {
+  if (value === undefined || value === null) return fallback;
+  const parsed = parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
 
 const swaggerApiCache = {
   endpoints: null,
@@ -151,6 +171,33 @@ export const resolveNotification = async (req, res, next) => {
         message: err.message
       });
     }
+    next(err);
+  }
+};
+
+export const getHomepageSnapshot = async (req, res, next) => {
+  try {
+    const limit = parseInt(req.query.menu_item_limit, 10);
+    const nearbyFilters = {
+      lat: parseNumber(req.query.lat, DEFAULT_CLIENT_LAT),
+      lng: parseNumber(req.query.lng, DEFAULT_CLIENT_LNG),
+      radius: parseNumber(req.query.radius, 5000),
+      q: req.query.q,
+      categories: normalizeCategoriesParam(req.query.categories),
+      page: parseInt(req.query.page, 10) || 1,
+      pageSize: parseInt(req.query.pageSize, 10) || 20
+    };
+
+    const payload = await adminHomepageService.getAdminHomepageSnapshot({
+      menuItemLimit: Number.isNaN(limit) ? 200 : limit,
+      nearbyFilters
+    });
+
+    res.json({
+      success: true,
+      data: payload
+    });
+  } catch (err) {
     next(err);
   }
 };
@@ -1197,10 +1244,12 @@ export const getStatistics = async (req, res, next) => {
     const notifications = await AdminNotification.findAll({
       attributes: ['id', 'is_read', 'is_resolved', 'type', 'created_at']
     });
-    const totalNotifications = notifications.length;
-    const unreadNotifications = notifications.filter(n => !n.is_read).length;
-    const unresolvedNotifications = notifications.filter(n => !n.is_resolved).length;
-    const resolvedNotifications = notifications.filter(n => n.is_resolved).length;
+    const notificationStats = {
+      total: notifications.length,
+      unread: notifications.filter(n => !n.is_read).length,
+      unresolved: notifications.filter(n => !n.is_resolved).length,
+      resolved: notifications.filter(n => n.is_resolved).length
+    };
 
     // Calculate growth (compare with previous month - simplified for now)
     // In a real implementation, you'd compare with previous period
@@ -1238,12 +1287,7 @@ export const getStatistics = async (req, res, next) => {
         active: activeClients,
         verified: verifiedClients
       },
-      notifications: {
-        total: totalNotifications,
-        unread: unreadNotifications,
-        unresolved: unresolvedNotifications,
-        resolved: resolvedNotifications
-      }
+      notifications: notificationStats
     };
 
     // Cache for 2 minutes (120 seconds)
@@ -1434,6 +1478,50 @@ export const getMonitoringSnapshot = async (req, res, next) => {
       )
     ];
 
+    const announcementRecords = await Announcement.findAll({
+      attributes: ['id', 'is_active', 'restaurant_id'],
+      include: [{
+        model: Restaurant,
+        as: 'restaurant',
+        attributes: ['id', 'name']
+      }]
+    });
+    const totalAnnouncements = announcementRecords.length;
+    const activeAnnouncements = announcementRecords.filter(a => a.is_active).length;
+    const announcementGroups = new Map();
+    announcementRecords.forEach((announcement) => {
+      const restaurantRef = announcement.restaurant || null;
+      const key = restaurantRef?.id || 'global';
+      if (!announcementGroups.has(key)) {
+        announcementGroups.set(key, {
+          restaurant: restaurantRef ? { id: restaurantRef.id, name: restaurantRef.name } : null,
+          total: 0,
+          active: 0
+        });
+      }
+      const bucket = announcementGroups.get(key);
+      bucket.total += 1;
+      if (announcement.is_active) {
+        bucket.active += 1;
+      }
+    });
+    const announcementBreakdown = Array.from(announcementGroups.values());
+    const announcementSummary = {
+      total: totalAnnouncements,
+      active: activeAnnouncements,
+      breakdown: announcementBreakdown
+    };
+
+    const notifications = await AdminNotification.findAll({
+      attributes: ['id', 'is_read', 'is_resolved', 'type', 'created_at']
+    });
+    const notificationStats = {
+      total: notifications.length,
+      unread: notifications.filter(n => !n.is_read).length,
+      unresolved: notifications.filter(n => !n.is_resolved).length,
+      resolved: notifications.filter(n => n.is_resolved).length
+    };
+
     const cpuUsage = process.cpuUsage();
     const cpuPercent = Math.min(
       100,
@@ -1489,6 +1577,8 @@ export const getMonitoringSnapshot = async (req, res, next) => {
           keys: cacheStats.keys || 0
         }
       },
+      notifications: notificationStats,
+      announcement_summary: announcementSummary,
       apiCatalog: getAllApiDefinitions(),
       alerts: []
     };

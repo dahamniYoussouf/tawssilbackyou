@@ -50,6 +50,17 @@ const Announcement = sequelize.define("Announcement", {
     type: DataTypes.DATE,
     allowNull: true,
     comment: "When to stop showing"
+  },
+  restaurant_id: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    references: {
+      model: "restaurants",
+      key: "id"
+    },
+    onDelete: "SET NULL",
+    onUpdate: "CASCADE",
+    comment: "Optional restaurant associated with this announcement"
   }
 }, {
   tableName: "announcements",

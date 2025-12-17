@@ -1,4 +1,3 @@
-import { Op } from "sequelize";
 import Order from "../../models/Order.js";
 import Restaurant from "../../models/Restaurant.js";
 import Driver from "../../models/Driver.js";
@@ -7,7 +6,7 @@ import Driver from "../../models/Driver.js";
  * Add ratings for restaurant and/or driver on a delivered order.
  * Applies average update using the rated orders count to keep consistency.
  */
-export async function addRatingService(orderId, restaurantRating, driverRating, reviewComment) {
+export async function addRatingService(orderId, restaurantRating, driverRating, restaurantComment, driverComment) {
   const order = await Order.findByPk(orderId);
 
   if (!order) throw { status: 404, message: "Order not found" };
@@ -32,8 +31,11 @@ export async function addRatingService(orderId, restaurantRating, driverRating, 
   if (hasDriverRating) {
     updates.driver_rating = parseFloat(driverRating);
   }
-  if (reviewComment !== undefined) {
-    updates.review_comment = reviewComment;
+  if (restaurantComment !== undefined) {
+    updates.restaurant_review_comment = restaurantComment;
+  }
+  if (driverComment !== undefined) {
+    updates.driver_review_comment = driverComment;
   }
 
   await order.update(updates);

@@ -121,9 +121,23 @@ const Order = sequelize.define('Order', {
     validate: { min: 1.0, max: 5.0 },
     comment: 'Driver rating (1-5)'
   },
-  review_comment: {
+  restaurant_review_comment: {
     type: DataTypes.TEXT,
-    comment: 'Optional comment provided with a rating'
+    comment: 'Optional comment provided for the restaurant rating',
+    field: 'review_comment'
+  },
+  driver_review_comment: {
+    type: DataTypes.TEXT,
+    comment: 'Optional comment provided for the driver rating'
+  },
+  review_comment: {
+    type: DataTypes.VIRTUAL,
+    get() {
+      return this.getDataValue('restaurant_review_comment');
+    },
+    set(value) {
+      this.setDataValue('restaurant_review_comment', value);
+    }
   },
   
   // Decline reason

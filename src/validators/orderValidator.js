@@ -228,6 +228,16 @@ export const addRatingValidator = [
     .optional()
     .isFloat({ min: 1, max: 5 }).withMessage('Driver rating must be between 1 and 5'),
   
+  body('restaurant_review_comment')
+    .optional()
+    .isString().withMessage('Restaurant comment must be a string')
+    .isLength({ max: 1000 }).withMessage('Restaurant comment must not exceed 1000 characters'),
+
+  body('driver_review_comment')
+    .optional()
+    .isString().withMessage('Driver comment must be a string')
+    .isLength({ max: 1000 }).withMessage('Driver comment must not exceed 1000 characters'),
+
   body('review_comment')
     .optional()
     .isString().withMessage('Review comment must be a string')

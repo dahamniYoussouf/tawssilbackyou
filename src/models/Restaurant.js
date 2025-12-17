@@ -1,6 +1,36 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../config/database.js";
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
+import { normalizeCategoryList, slugify } from "../utils/slug.js";
+
+const isTestEnv = process.env.NODE_ENV === "test";
+
+const restaurantIndexes = [
+  {
+    fields: ['status']
+  },
+  {
+    fields: ['is_active']
+  },
+  {
+    fields: ['is_premium']
+  }
+];
+
+if (!isTestEnv) {
+  restaurantIndexes.push(
+    {
+      fields: ['location'],
+      using: 'gist',
+      name: 'restaurants_location_gix'
+    },
+    {
+      fields: ['categories'],
+      using: 'gin',
+      name: 'restaurants_categories_gin'
+    }
+  );
+}
 
 const Restaurant = sequelize.define('Restaurant', {
   id: {
@@ -46,21 +76,20 @@ const Restaurant = sequelize.define('Restaurant', {
     },
     comment: 'Restaurant contact email'
   },
-  location:
-  process.env.NODE_ENV === "test"
-        ? {
-            type: DataTypes.JSON,
-            allowNull: true,
-          }
-        : {
-    type: DataTypes.GEOGRAPHY('POINT', 4326),
-    allowNull: false,
-    validate: {
-      notNull: {
-        msg: 'La localisation est requise'
+  location: isTestEnv
+    ? {
+        type: DataTypes.JSON,
+        allowNull: true,
       }
-    }
-  },
+    : {
+        type: DataTypes.GEOGRAPHY('POINT', 4326),
+        allowNull: false,
+        validate: {
+          notNull: {
+            msg: 'La localisation est requise'
+          }
+        }
+      },
   rating: {
     type: DataTypes.DECIMAL(2, 1),
     allowNull: true,
@@ -101,24 +130,22 @@ const Restaurant = sequelize.define('Restaurant', {
     comment: "Opening hours per day, e.g.: { Mon: {open: 9:00 a.m., close: 6:00 p.m.}, Tue: {...} }"
   }, 
   categories: {
-    type: DataTypes.ARRAY(DataTypes.ENUM(
-      'pizza',
-      'burger',
-      'tacos',
-      'sandwish'
-    )),
+    type: isTestEnv
+      ? DataTypes.JSON
+      : DataTypes.ARRAY(DataTypes.STRING),
     allowNull: false,
     defaultValue: [],
     validate: {
-      notEmpty: {
-        msg: 'Restaurant must have at least one category'
-      },
       isValidArray(value) {
         if (!Array.isArray(value)) {
           throw new Error('Categories must be an array');
         }
         if (value.length === 0) {
           throw new Error('Restaurant must have at least one category');
+        }
+        const normalized = normalizeCategoryList(value);
+        if (normalized.length === 0) {
+          throw new Error('Categories must contain valid slugs');
         }
       }
     },
@@ -142,27 +169,15 @@ const Restaurant = sequelize.define('Restaurant', {
       }
     }
   },
-  indexes: [
-    {
-      fields: ['status']
-    },
-    {
-      fields: ['is_active']
-    },
-    {
-      fields: ['is_premium']
-    },
-    {
-      fields: ['location'],
-      using: 'gist',
-      name: 'restaurants_location_gix'
-    }, 
-    {
-    fields: ['categories'],
-    using: 'gin',
-    name: 'restaurants_categories_gin'
+  indexes: restaurantIndexes
+});
+
+const sanitizeCategories = (values) => normalizeCategoryList(values);
+
+Restaurant.beforeValidate((restaurant) => {
+  if (restaurant.categories) {
+    restaurant.categories = sanitizeCategories(restaurant.categories);
   }
-  ]
 });
 
 // Helper methods
@@ -198,22 +213,25 @@ Restaurant.prototype.isOpen = function () {
 };
 
 Restaurant.prototype.hasCategory = function(category) {
-  return this.categories && this.categories.includes(category);
+  const slug = slugify(category);
+  return !!slug && Array.isArray(this.categories) && this.categories.includes(slug);
 };
 
 Restaurant.prototype.addCategory = function(category) {
-  if (!this.categories) {
+  const slug = slugify(category);
+  if (!slug) return;
+  if (!Array.isArray(this.categories)) {
     this.categories = [];
   }
-  if (!this.categories.includes(category)) {
-    this.categories.push(category);
+  if (!this.categories.includes(slug)) {
+    this.categories.push(slug);
   }
 };
 
 Restaurant.prototype.removeCategory = function(category) {
-  if (this.categories) {
-    this.categories = this.categories.filter(cat => cat !== category);
-  }
+  const slug = slugify(category);
+  if (!slug || !Array.isArray(this.categories)) return;
+  this.categories = this.categories.filter((cat) => cat !== slug);
 };
 
 export default Restaurant;

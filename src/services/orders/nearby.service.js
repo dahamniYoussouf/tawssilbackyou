@@ -195,7 +195,9 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
       
       // Rating
       rating: order.rating ? parseFloat(order.rating) : null,
-      review_comment: order.review_comment,
+      restaurant_review_comment: order.restaurant_review_comment,
+      driver_review_comment: order.driver_review_comment,
+      review_comment: order.restaurant_review_comment ?? order.driver_review_comment ?? null,
       decline_reason: order.decline_reason,
       
       // Relations complètes (comme getOrderById)

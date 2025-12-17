@@ -24,6 +24,11 @@ export const createAnnouncementValidator = [
     .isString()
     .withMessage("JavaScript must be a string"),
 
+  body("restaurant_id")
+    .optional()
+    .isUUID()
+    .withMessage("Restaurant ID must be a valid UUID"),
+
   body("type")
     .optional()
     .isIn(["info", "success", "warning", "error"])
@@ -84,6 +89,11 @@ export const updateAnnouncementValidator = [
     .optional()
     .isString()
     .withMessage("JavaScript must be a string"),
+
+  body("restaurant_id")
+    .optional()
+    .isUUID()
+    .withMessage("Restaurant ID must be a valid UUID"),
 
   body("type")
     .optional()

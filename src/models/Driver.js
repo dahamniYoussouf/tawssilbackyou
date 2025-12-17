@@ -2,6 +2,28 @@ import { DataTypes } from "sequelize";
 import { sequelize } from "../config/database.js";
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
+const isTestEnv = process.env.NODE_ENV === "test";
+
+const driverIndexes = [
+  {
+    fields: ['status']
+  },
+  {
+    fields: ['phone']
+  },
+  {
+    fields: ['driver_code']
+  }
+];
+
+if (!isTestEnv) {
+  driverIndexes.push({
+    fields: ['current_location'],
+    using: 'gist',
+    name: 'drivers_location_gix'
+  });
+}
+
 const Driver = sequelize.define('Driver', {
   id: {
     type: DataTypes.UUID,
@@ -72,17 +94,16 @@ const Driver = sequelize.define('Driver', {
     allowNull: false,
     comment: "Current driver status"
   },
-  current_location: 
-    process.env.NODE_ENV === "test"
-      ? {
-          type: DataTypes.JSON,
-          allowNull: true,
-        }
-      : {
-    type: DataTypes.GEOGRAPHY('POINT', 4326),
-    allowNull: true,
-    comment: "Current GPS coordinates"
-  },
+  current_location: isTestEnv
+    ? {
+        type: DataTypes.JSON,
+        allowNull: true,
+      }
+    : {
+        type: DataTypes.GEOGRAPHY('POINT', 4326),
+        allowNull: true,
+        comment: "Current GPS coordinates"
+      },
   rating: {
     type: DataTypes.DECIMAL(2, 1),
     allowNull: true,
@@ -100,7 +121,7 @@ const Driver = sequelize.define('Driver', {
     comment: "Total number of completed deliveries"
   },
     active_orders: {
-    type: DataTypes.ARRAY(DataTypes.UUID),
+    type: isTestEnv ? DataTypes.JSON : DataTypes.ARRAY(DataTypes.UUID),
     defaultValue: [],
     allowNull: false,
     comment: "Array of active order IDs (multiple deliveries)"
@@ -166,22 +187,7 @@ const Driver = sequelize.define('Driver', {
       }
     }
   },
-  indexes: [
-    {
-      fields: ['status']
-    },
-    {
-      fields: ['phone']
-    },
-    {
-      fields: ['driver_code']
-    },
-      {
-    fields: ['current_location'],
-    using: 'gist', 
-    name: 'drivers_location_gix'
-  }
-  ]
+  indexes: driverIndexes
 });
 
 // Instance methods

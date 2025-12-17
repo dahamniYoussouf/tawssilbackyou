@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import Restaurant from "../models/Restaurant.js";
 import FavoriteRestaurant from "../models/FavoriteRestaurant.js";
 import FoodCategory from "../models/FoodCategory.js";
@@ -9,6 +10,73 @@ import axios from "axios";
 import FavoriteMeal from "../models/FavoriteMeal.js";
 import OrderItem from "../models/OrderItem.js";
 import Driver from "../models/Driver.js";
+import User from "../models/User.js";
+import cacheService from "./cache.service.js";
+import { normalizeCategoryList } from "../utils/slug.js";
+
+const NEARBY_CACHE_TTL = 60; // seconds
+const METERS_PER_DEGREE = 111320;
+const MIN_TILE_METERS = 500;
+
+const normalizeQueryKey = (value) => (typeof value === "string" ? value.trim().toLowerCase() : "");
+
+const buildNearbyCacheKey = ({
+  latitude,
+  longitude,
+  radius,
+  categories,
+  q,
+  page,
+  pageSize
+}) => {
+  const categoryList = Array.isArray(categories)
+    ? categories
+    : (categories ? [categories] : []);
+  const normalizedCategories = categoryList
+    .map((cat) => cat?.toString().trim())
+    .filter(Boolean);
+  normalizedCategories.sort();
+  const categoriesKey = normalizedCategories.length ? normalizedCategories.join("|") : "all";
+  const queryKey = normalizeQueryKey(q) || "all";
+  const tileSizeMeters = Math.max(radius, MIN_TILE_METERS);
+  const tileSizeDegrees = Math.max(tileSizeMeters / METERS_PER_DEGREE, 0.0001);
+  const latTile = Math.floor(latitude / tileSizeDegrees);
+  const lngTile = Math.floor(longitude / tileSizeDegrees);
+
+  return [
+    "restaurant:nearby",
+    `tile:${latTile}:${lngTile}`,
+    `radius:${Math.round(radius)}`,
+    `page:${page}`,
+    `pageSize:${pageSize}`,
+    `query:${queryKey}`,
+    `cats:${categoriesKey}`
+  ].join(":");
+};
+
+const buildFavoriteMap = async (clientId) => {
+  if (!clientId) {
+    return new Map();
+  }
+
+  const favorites = await FavoriteRestaurant.findAll({
+    where: { client_id: clientId },
+    attributes: ["restaurant_id", "id"],
+    raw: true
+  });
+
+  const map = new Map();
+  favorites.forEach((fav) => map.set(fav.restaurant_id, fav.id));
+
+  return map;
+};
+
+const applyFavoritesToRestaurants = (restaurants = [], favoriteMap = new Map()) => {
+  return restaurants.map((restaurant) => ({
+    ...restaurant,
+    favorite_uuid: favoriteMap.get(restaurant.id) || null
+  }));
+};
 
 
 
@@ -27,6 +95,71 @@ export const getAllRestaurants = async () => {
   }));
 };
 
+export const createRestaurant = async (payload) => {
+  const {
+    name,
+    description,
+    address,
+    lat,
+    lng,
+    email,
+    phone_number,
+    categories,
+    rating,
+    image_url,
+    is_active = true,
+    is_premium = false,
+    status = "pending",
+    opening_hours
+  } = payload;
+
+  const latitude = Number(lat);
+  const longitude = Number(lng);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new Error("Invalid latitude or longitude");
+  }
+
+  const normalizedCategories = normalizeCategoryList(categories || ["uncategorized"]);
+  if (normalizedCategories.length === 0) {
+    normalizedCategories.push("other");
+  }
+
+  const userEmail = email || `restaurant-${Date.now()}@tawssil.local`;
+  const userPassword = payload.password || crypto.randomUUID?.() || String(Math.random()).slice(2, 12);
+  const user = await User.create({
+    email: userEmail,
+    password: userPassword,
+    role: "restaurant"
+  });
+
+  const restaurant = await Restaurant.create({
+    user_id: user.id,
+    name,
+    description: description || null,
+    address: address || null,
+    phone_number: phone_number || null,
+    email: email || null,
+    location: {
+      type: "Point",
+      coordinates: [longitude, latitude]
+    },
+    rating: rating !== undefined ? parseFloat(rating) : 0.0,
+    image_url: image_url || null,
+    is_active,
+    is_premium,
+    status,
+    opening_hours: opening_hours || null,
+    categories: normalizedCategories
+  });
+
+  const restaurantJson = restaurant.toJSON();
+  return {
+    ...restaurantJson,
+    uuid: restaurantJson.id,
+    user_email: user.email
+  };
+};
+
 /**
  * Filter restaurants nearby with category, query, pagination, and favorites
  */
@@ -38,7 +171,7 @@ export const filterNearbyRestaurants = async (filters) => {
     lng,
     radius = 2000,
     q,
-    categories, // Changed from category (now accepts array)
+    categories,
     page = 1,
     pageSize = 20
   } = filters;
@@ -51,7 +184,7 @@ export const filterNearbyRestaurants = async (filters) => {
       const response = await axios.get("https://nominatim.openstreetmap.org/search", {
         params: { q: address, format: "json", limit: 1 },
         headers: { "User-Agent": "food-delivery-app" },
-        timeout: 10000 // 10 secondes timeout
+        timeout: 10000
       });
 
       if (response.data.length === 0) {
@@ -69,12 +202,10 @@ export const filterNearbyRestaurants = async (filters) => {
         throw error;
       }
     } catch (error) {
-      // Si c'est déjà une erreur avec un statut, la relancer
       if (error.status) {
         throw error;
       }
 
-      // Gérer les erreurs axios
       if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
         const timeoutError = new Error("Geocoding service timeout. Please try again or use coordinates.");
         timeoutError.status = 503;
@@ -93,13 +224,11 @@ export const filterNearbyRestaurants = async (filters) => {
         throw rateLimitError;
       }
 
-      // Erreur générique de géocodage
       const geocodeError = new Error("Unable to geocode address. Please check the address or use coordinates.");
       geocodeError.status = 400;
       throw geocodeError;
     }
   }
-  // Handle coordinate-based search
   else if (lat && lng) {
     latitude = parseFloat(lat);
     longitude = parseFloat(lng);
@@ -110,7 +239,6 @@ export const filterNearbyRestaurants = async (filters) => {
       throw error;
     }
   }
-  // Neither provided
   else {
     const error = new Error("Address or coordinates required");
     error.status = 400;
@@ -118,8 +246,31 @@ export const filterNearbyRestaurants = async (filters) => {
   }
 
   const searchRadius = parseInt(radius, 10);
+  const normalizedPage = Math.max(1, parseInt(page, 10) || 1);
+  const normalizedPageSize = Math.max(1, parseInt(pageSize, 10) || 20);
+  const limit = normalizedPageSize;
+  const offset = (normalizedPage - 1) * limit;
+  const favoriteMapPromise = buildFavoriteMap(client_id);
+  const cacheKey = buildNearbyCacheKey({
+    latitude,
+    longitude,
+    radius: searchRadius,
+    categories,
+    q,
+    page: normalizedPage,
+    pageSize: normalizedPageSize
+  });
 
-  // Base WHERE conditions
+  const cached = await cacheService.get(cacheKey);
+  const favoriteMap = await favoriteMapPromise;
+  if (cached) {
+    return {
+      ...cached,
+      formatted: applyFavoritesToRestaurants(cached.formatted, favoriteMap),
+      client_id: client_id || null
+    };
+  }
+
   const whereConditions = {
     [Op.and]: [
       { is_active: true },
@@ -130,27 +281,21 @@ export const filterNearbyRestaurants = async (filters) => {
     ]
   };
 
-  // Filter by restaurant name
   if (q && q.trim()) {
     whereConditions[Op.and].push({
       name: { [Op.iLike]: `%${q.trim()}%` }
     });
   }
 
-  // Filter by categories (using PostgreSQL array operators)
   if (categories) {
     const categoryArray = Array.isArray(categories) ? categories : [categories];
     whereConditions[Op.and].push({
       categories: {
-        [Op.overlap]: categoryArray // Matches restaurants that have ANY of the specified categories
+        [Op.overlap]: categoryArray
       }
     });
   }
 
-  const limit = parseInt(pageSize, 10);
-  const offset = (parseInt(page, 10) - 1) * limit;
-
-  // Main query (removed include for RestaurantCategory)
   const result = await Restaurant.findAll({
     attributes: {
       include: [
@@ -160,6 +305,18 @@ export const filterNearbyRestaurants = async (filters) => {
         ]
       ]
     },
+    include: [
+      {
+        model: MenuItem,
+        as: "menu_items",
+        attributes: ["id", "nom", "description", "prix", "photo_url", "is_available", "temps_preparation"],
+        where: { is_available: true },
+        required: false,
+        separate: true,
+        limit: 2,
+        order: [["created_at", "DESC"]]
+      }
+    ],
     where: whereConditions,
     order: [
       ["is_premium", "DESC"],
@@ -169,36 +326,25 @@ export const filterNearbyRestaurants = async (filters) => {
     offset
   });
 
-  // Get client's favorite restaurants
-  const favoriteMap = new Map();
-  if (client_id) {
-    const favorites = await FavoriteRestaurant.findAll({
-      where: { client_id },
-      attributes: ["restaurant_id", "id"],
-      raw: true
-    });
-    favorites.forEach(fav => favoriteMap.set(fav.restaurant_id, fav.id));
-  }
-
-  // Format response
-  // Utiliser la distance fournie par la BDD (en mètres) pour calculer le temps de livraison
-  const formatted = result.map((r) => {
+  const formattedBase = result.map((r) => {
     const coords = r.location?.coordinates || [];
-    const favoriteUuid = favoriteMap.get(r.id) || null;
-
     const prepTime = 15;
-    
-    // Distance en mètres depuis la BDD (ST_Distance retourne des mètres)
     const distanceMeters = r.dataValues.distance || 0;
     const distanceKm = distanceMeters / 1000;
-    
-    // Calculer le temps de livraison basé sur la distance (vitesse moyenne: 40 km/h)
     const speedKmh = 40;
     const deliveryTimeMinutes = (distanceKm / speedKmh) * 60;
-    
-    // Temps optimiste et pessimiste (comme calculateRouteTime)
-    const deliveryTimeMin = Math.floor(deliveryTimeMinutes * 0.9); // -10%
-    const deliveryTimeMax = Math.ceil(deliveryTimeMinutes * 1.2);  // +20%
+    const deliveryTimeMin = Math.floor(deliveryTimeMinutes * 0.9);
+    const deliveryTimeMax = Math.ceil(deliveryTimeMinutes * 1.2);
+
+    const sampleDishes = (r.menu_items || []).map((item) => ({
+      id: item.id,
+      name: item.nom,
+      description: item.description,
+      price: item.prix ? parseFloat(item.prix) : null,
+      image_url: item.photo_url,
+      is_available: item.is_available,
+      prep_time_minutes: item.temps_preparation
+    }));
 
     return {
       id: r.id,
@@ -211,24 +357,32 @@ export const filterNearbyRestaurants = async (filters) => {
       delivery_time_min: prepTime + deliveryTimeMin,
       delivery_time_max: prepTime + deliveryTimeMax,
       image_url: r.image_url,
-      distance: distanceMeters, // Distance en mètres
+      distance: distanceMeters,
       is_premium: r.is_premium,
       status: r.status,
       is_open: r.isOpen(),
-      categories: r.categories, // Changed from category object
-      favorite_uuid: favoriteUuid,
-      email: r.email || null
+      categories: r.categories,
+      favorite_uuid: null,
+      email: r.email || null,
+      menu_items: sampleDishes
     };
-  })
+  });
 
-  return {
-    formatted,
-    count: formatted.length,
-    page: parseInt(page, 10),
-    pageSize: limit,
+  const cachePayload = {
+    formatted: formattedBase,
+    count: formattedBase.length,
+    page: normalizedPage,
+    pageSize: normalizedPageSize,
     radius: searchRadius,
     center: { lat: latitude, lng: longitude },
-    searchType: address ? "address" : "coordinates",
+    searchType: address ? "address" : "coordinates"
+  };
+
+  await cacheService.set(cacheKey, cachePayload, NEARBY_CACHE_TTL);
+
+  return {
+    ...cachePayload,
+    formatted: applyFavoritesToRestaurants(formattedBase, favoriteMap),
     client_id: client_id || null
   };
 };
@@ -1035,7 +1189,9 @@ export const getRestaurantOrdersHistory = async (restaurantId, filters = {}) => 
       delivered_at: order.delivered_at,
       
       rating: order.rating ? parseFloat(order.rating) : null,
-      review_comment: order.review_comment,
+      restaurant_review_comment: order.restaurant_review_comment,
+      driver_review_comment: order.driver_review_comment,
+      review_comment: order.restaurant_review_comment ?? order.driver_review_comment ?? null,
       decline_reason: order.decline_reason,
       
       restaurant: order.restaurant ? {

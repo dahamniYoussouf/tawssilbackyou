@@ -8,7 +8,3 @@ beforeAll(async () => {
 afterEach(async () => {
   await Restaurant.destroy({ where: {} }); // clear restaurants table between tests
 });
-
-afterAll(async () => {
-  await sequelize.close(); // close DB connection after all tests
-});

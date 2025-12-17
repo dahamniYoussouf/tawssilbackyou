@@ -7,9 +7,9 @@ import {
   verifyOTP,
   refreshAccessToken,  
   logout, 
-      registerCashier        
+  registerCashier        
 } from '../controllers/auth.controller.js';
-import { protect } from '../middlewares/auth.js';
+import { protect, authorize } from '../middlewares/auth.js';
 import { validate } from '../middlewares/validate.js';
 import {
   requestOTPValidator,
@@ -19,6 +19,7 @@ import {
   refreshTokenValidator,
   logoutValidator
 } from '../validators/authValidator.js';
+import { registerCashierValidator } from '../validators/cashierValidator.js';
 
 const router = express.Router();
 
@@ -68,8 +69,11 @@ router.get('/profile', protect, getProfile);
  * Can only be done by admins or restaurant owners.
  */
 router.post(
-  '/register/cashier', 
-  protect, 
+  '/register/cashier',
+  protect,
+  authorize('admin', 'restaurant'),
+  registerCashierValidator,
+  validate,
   registerCashier
 );
 

@@ -30,6 +30,8 @@ import geocodeRoutes from "./routes/geocode.js";
 import auth from "./routes/auth.route.js";
 import admin from "./routes/admin.routes.js"; 
 import cashier from "./routes/cashier.routes.js";
+import homepage from "./routes/homepage.route.js";
+import homepageV2 from "./routes/homepage.v2.route.js";
 
 
 
@@ -74,6 +76,9 @@ app.use("/admin", admin);
 app.use("/api", uploadRoutes);
 app.use("/api", geocodeRoutes);
 app.use("/cashier", cashier);
+app.use("/homepage", homepage);
+app.use("/api/v1/homepage", homepage);
+app.use("/api/v2/homepage", homepageV2);
 
 
 

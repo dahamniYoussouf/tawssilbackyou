@@ -1,5 +1,7 @@
 import { body, param, query } from "express-validator";
 
+const CATEGORY_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 /**
  * Validator for creating a restaurant
  */
@@ -80,38 +82,10 @@ export const createRestaurantValidator = [
     .withMessage("Categories must be a non-empty array"),
 
   body("categories.*")
-    .isIn([
-      'fast_food',
-      'italian',
-      'chinese',
-      'pizza',
-      'sushi',
-      'burger',
-      'healthy',
-      'desserts',
-      'cafe',
-      'bakery',
-      'indian',
-      'mexican',
-      'mediterranean',
-      'asian',
-      'american',
-      'french',
-      'seafood',
-      'vegetarian',
-      'vegan',
-      'grill',
-      'bbq',
-      'sandwich',
-      'chicken',
-      'middle_eastern',
-      'thai',
-      'pizza',
-      'burger',
-      'tacos',
-      'sandwish'
-    ])
-    .withMessage("Each category must be a valid category enum value")
+    .isString()
+    .trim()
+    .matches(CATEGORY_SLUG_PATTERN)
+    .withMessage("Each category must be a slug (lowercase letters, numbers, hyphens)")
 ];
 
 /**
@@ -197,13 +171,10 @@ export const updateRestaurantValidator = [
 
   body("categories.*")
     .optional()
-    .isIn([
-      'pizza',
-      'burger',
-      'tacos',
-      'sandwish'
-    ])
-    .withMessage("Each category must be a valid category enum value")
+    .isString()
+    .trim()
+    .matches(CATEGORY_SLUG_PATTERN)
+    .withMessage("Each category must be a slug (lowercase letters, numbers, hyphens)")
 ];
 
 /**

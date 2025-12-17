@@ -12,6 +12,36 @@ import {
 } from '../validators/configValidator.js';
 import { validate } from '../middlewares/validate.js';
 import { notifyAllDrivers } from '../controllers/admin.controller.js';
+import * as homeCategoryCtrl from '../controllers/homeCategory.controller.js';
+import * as thematicSelectionCtrl from '../controllers/thematicSelection.controller.js';
+import * as promotionCtrl from '../controllers/promotion.controller.js';
+import * as dailyDealCtrl from '../controllers/dailyDeal.controller.js';
+import * as recommendedDishCtrl from '../controllers/recommendedDish.controller.js';
+import {
+  createHomeCategoryValidator,
+  deleteHomeCategoryValidator,
+  updateHomeCategoryValidator
+} from '../validators/homeCategoryValidator.js';
+import {
+  createThematicSelectionValidator,
+  deleteThematicSelectionValidator,
+  updateThematicSelectionValidator
+} from '../validators/thematicSelectionValidator.js';
+import {
+  createPromotionValidator,
+  deletePromotionValidator,
+  updatePromotionValidator
+} from '../validators/promotionValidator.js';
+import {
+  createDailyDealValidator,
+  deleteDailyDealValidator,
+  updateDailyDealValidator
+} from '../validators/dailyDealValidator.js';
+import {
+  createRecommendedDishValidator,
+  deleteRecommendedDishValidator,
+  updateRecommendedDishValidator
+} from '../validators/recommendedDishValidator.js';
 
 
 
@@ -79,5 +109,111 @@ router.post('/notify/drivers', protect, authorize('admin'), notifyAllDrivers);
 router.get('/cache/stats', adminCtrl.getCacheStats);
 router.post('/cache/clear', adminCtrl.clearCache);
 router.post('/cache/invalidate/:pattern', adminCtrl.invalidateCachePattern);
+
+// ==================== HOMEPAGE CATEGORIES ====================
+router.get('/homepage/categories', homeCategoryCtrl.getCategories);
+router.get('/homepage/overview', adminCtrl.getHomepageSnapshot);
+router.post(
+  '/homepage/categories',
+  createHomeCategoryValidator,
+  validate,
+  homeCategoryCtrl.createCategory
+);
+router.put(
+  '/homepage/categories/:id',
+  updateHomeCategoryValidator,
+  validate,
+  homeCategoryCtrl.updateCategory
+);
+router.delete(
+  '/homepage/categories/:id',
+  deleteHomeCategoryValidator,
+  validate,
+  homeCategoryCtrl.removeCategory
+);
+
+// ==================== HOMEPAGE THEMATIC SELECTIONS ====================
+router.get('/homepage/thematic-selections', thematicSelectionCtrl.getSelections);
+router.post(
+  '/homepage/thematic-selections',
+  createThematicSelectionValidator,
+  validate,
+  thematicSelectionCtrl.createSelection
+);
+router.put(
+  '/homepage/thematic-selections/:id',
+  updateThematicSelectionValidator,
+  validate,
+  thematicSelectionCtrl.updateSelection
+);
+router.delete(
+  '/homepage/thematic-selections/:id',
+  deleteThematicSelectionValidator,
+  validate,
+  thematicSelectionCtrl.removeSelection
+);
+
+// ==================== HOMEPAGE RECOMMENDED DISHES ====================
+router.get('/homepage/recommended-dishes', recommendedDishCtrl.getRecommendedDishes);
+router.post(
+  '/homepage/recommended-dishes',
+  createRecommendedDishValidator,
+  validate,
+  recommendedDishCtrl.create
+);
+router.put(
+  '/homepage/recommended-dishes/:id',
+  updateRecommendedDishValidator,
+  validate,
+  recommendedDishCtrl.update
+);
+router.delete(
+  '/homepage/recommended-dishes/:id',
+  deleteRecommendedDishValidator,
+  validate,
+  recommendedDishCtrl.remove
+);
+
+// ==================== HOMEPAGE DAILY DEALS ====================
+router.get('/homepage/daily-deals', dailyDealCtrl.getDailyDeals);
+router.post(
+  '/homepage/daily-deals',
+  createDailyDealValidator,
+  validate,
+  dailyDealCtrl.create
+);
+router.put(
+  '/homepage/daily-deals/:id',
+  updateDailyDealValidator,
+  validate,
+  dailyDealCtrl.update
+);
+router.delete(
+  '/homepage/daily-deals/:id',
+  deleteDailyDealValidator,
+  validate,
+  dailyDealCtrl.remove
+);
+
+// ==================== PROMOTIONS ====================
+router.get('/promotions', promotionCtrl.getPromotions);
+router.post(
+  '/promotions',
+  createPromotionValidator,
+  validate,
+  promotionCtrl.create
+);
+router.put(
+  '/promotions/:id',
+  updatePromotionValidator,
+  validate,
+  promotionCtrl.update
+);
+router.delete(
+  '/promotions/:id',
+  deletePromotionValidator,
+  validate,
+  promotionCtrl.remove
+);
 
 export default router;

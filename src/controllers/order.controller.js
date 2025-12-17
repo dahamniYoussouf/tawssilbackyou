@@ -417,9 +417,17 @@ export const getOrderTracking = async (req, res, next) => {
 export const addRating = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { rating, restaurant_rating, driver_rating, review_comment } = req.body;
+    const {
+      rating,
+      restaurant_rating,
+      driver_rating,
+      review_comment,
+      restaurant_review_comment,
+      driver_review_comment
+    } = req.body;
     
     const restaurantRating = restaurant_rating !== undefined ? restaurant_rating : rating;
+    const restaurantComment = restaurant_review_comment ?? review_comment;
     
     if (restaurantRating === undefined && driver_rating === undefined) {
       return res.status(400).json({
@@ -446,7 +454,8 @@ export const addRating = async (req, res, next) => {
       id,
       restaurantRating,
       driver_rating,
-      review_comment
+      restaurantComment,
+      driver_review_comment
     );
     
     res.json({

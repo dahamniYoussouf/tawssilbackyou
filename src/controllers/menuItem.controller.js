@@ -4,7 +4,43 @@ import MenuItem from "../models/MenuItem.js";
 import FoodCategory from "../models/FoodCategory.js";
 import Cashier from "../models/Cashier.js"; 
 import Addition from "../models/Addition.js";
+import Promotion from "../models/Promotion.js";
 import { Op } from "sequelize";
+
+const promotionAttributes = [
+  "id",
+  "title",
+  "description",
+  "type",
+  "scope",
+  "discount_value",
+  "currency",
+  "badge_text",
+  "custom_message",
+  "is_active",
+  "start_date",
+  "end_date",
+  "restaurant_id",
+  "menu_item_id"
+];
+
+const buildActivePromotionWhere = (referenceDate = new Date()) => ({
+  is_active: true,
+  [Op.and]: [
+    {
+      [Op.or]: [
+        { start_date: null },
+        { start_date: { [Op.lte]: referenceDate } }
+      ]
+    },
+    {
+      [Op.or]: [
+        { end_date: null },
+        { end_date: { [Op.gte]: referenceDate } }
+      ]
+    }
+  ]
+});
 
 /**
  * Create a new menu item
@@ -121,6 +157,7 @@ export const getMyMenuItems = async (req, res, next) => {
         order = [['created_at', 'DESC']];
     }
 
+    const promotionWhere = buildActivePromotionWhere();
     const { count, rows } = await MenuItem.findAndCountAll({
       where,
       include: [
@@ -133,6 +170,21 @@ export const getMyMenuItems = async (req, res, next) => {
           model: Addition,
           as: 'additions',
           attributes: ['id', 'nom', 'description', 'prix', 'is_available']
+        },
+        {
+          model: Promotion,
+          as: 'primary_promotions',
+          attributes: promotionAttributes,
+          where: promotionWhere,
+          required: false
+        },
+        {
+          model: Promotion,
+          as: 'promotions',
+          through: { attributes: [] },
+          attributes: promotionAttributes,
+          where: promotionWhere,
+          required: false
         }
       ],
       order,
@@ -165,7 +217,8 @@ export const getAll = async (req, res, next) => {
     const result = await menuItemService.getAllMenuItems(filters);
     res.json({
       success: true,
-      ...result
+      data: result.items,
+      pagination: result.pagination
     });
   } catch (err) {
     next(err);
@@ -566,6 +619,7 @@ export const getCashierMenuItems = async (req, res, next) => {
         order = [['created_at', 'DESC']];
     }
 
+    const promotionWhere = buildActivePromotionWhere();
     const { count, rows } = await MenuItem.findAndCountAll({
       where,
       include: [
@@ -578,6 +632,22 @@ export const getCashierMenuItems = async (req, res, next) => {
           model: Addition,
           as: 'additions',
           attributes: ['id', 'nom', 'description', 'prix', 'is_available']
+        }
+        ,
+        {
+          model: Promotion,
+          as: 'primary_promotions',
+          attributes: promotionAttributes,
+          where: promotionWhere,
+          required: false
+        },
+        {
+          model: Promotion,
+          as: 'promotions',
+          through: { attributes: [] },
+          attributes: promotionAttributes,
+          where: promotionWhere,
+          required: false
         }
       ],
       order,

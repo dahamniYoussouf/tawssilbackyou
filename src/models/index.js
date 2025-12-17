@@ -15,6 +15,13 @@ import Admin from "./Admin.js";
 import AdminNotification from "./AdminNotification.js";
 import SystemConfig from "./SystemConfig.js";
 import Cashier from "./Cashier.js";
+import HomeCategory from "./HomeCategory.js";
+import ThematicSelection from "./ThematicSelection.js";
+import Promotion from "./Promotion.js";
+import PromotionMenuItem from "./PromotionMenuItem.js";
+import DailyDeal from "./DailyDeal.js";
+import RecommendedDish from "./RecommendedDish.js";
+import Announcement from "./Announcement.js";
 
 
 
@@ -149,6 +156,93 @@ Addition.hasMany(OrderItemAddition, {
   as: "order_item_additions",
   onDelete: "CASCADE",
   onUpdate: "CASCADE"
+});
+
+// ==========================
+// Promotions & MenuItems
+// ==========================
+Promotion.belongsTo(Restaurant, {
+  foreignKey: "restaurant_id",
+  as: "restaurant"
+});
+
+Restaurant.hasMany(Promotion, {
+  foreignKey: "restaurant_id",
+  as: "promotions"
+});
+
+Promotion.belongsTo(MenuItem, {
+  foreignKey: "menu_item_id",
+  as: "menu_item"
+});
+
+MenuItem.hasMany(Promotion, {
+  foreignKey: "menu_item_id",
+  as: "primary_promotions"
+});
+
+Promotion.belongsToMany(MenuItem, {
+  through: PromotionMenuItem,
+  foreignKey: "promotion_id",
+  otherKey: "menu_item_id",
+  as: "menu_items"
+});
+
+MenuItem.belongsToMany(Promotion, {
+  through: PromotionMenuItem,
+  foreignKey: "menu_item_id",
+  otherKey: "promotion_id",
+  as: "promotions"
+});
+
+PromotionMenuItem.belongsTo(Promotion, {
+  foreignKey: "promotion_id",
+  as: "promotion"
+});
+
+PromotionMenuItem.belongsTo(MenuItem, {
+  foreignKey: "menu_item_id",
+  as: "menu_item"
+});
+
+Promotion.hasMany(PromotionMenuItem, {
+  foreignKey: "promotion_id",
+  as: "linked_menu_items"
+});
+
+MenuItem.hasMany(PromotionMenuItem, {
+  foreignKey: "menu_item_id",
+  as: "promotion_links"
+});
+
+Promotion.hasMany(DailyDeal, {
+  foreignKey: "promotion_id",
+  as: "daily_deals"
+});
+
+DailyDeal.belongsTo(Promotion, {
+  foreignKey: "promotion_id",
+  as: "promotion"
+});
+
+RecommendedDish.belongsTo(Restaurant, {
+  foreignKey: "restaurant_id",
+  as: "restaurant"
+});
+
+Restaurant.hasMany(RecommendedDish, {
+  foreignKey: "restaurant_id",
+  as: "recommended_dishes"
+});
+
+RecommendedDish.belongsTo(MenuItem, {
+  foreignKey: "menu_item_id",
+  as: "menu_item"
+});
+
+MenuItem.hasMany(RecommendedDish, {
+  foreignKey: "menu_item_id",
+  as: "recommended_entries"
 });
 
 // ==========================
@@ -358,6 +452,30 @@ Driver.hasMany(AdminNotification, {
   as: 'admin_notifications'
 });
 
+Announcement.belongsTo(Restaurant, {
+  foreignKey: 'restaurant_id',
+  as: 'restaurant',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE'
+});
+
+Restaurant.hasMany(Announcement, {
+  foreignKey: 'restaurant_id',
+  as: 'announcements',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE'
+});
+
+HomeCategory.hasMany(ThematicSelection, {
+  foreignKey: 'home_category_id',
+  as: 'thematic_selections'
+});
+
+ThematicSelection.belongsTo(HomeCategory, {
+  foreignKey: 'home_category_id',
+  as: 'home_category'
+});
+
 
 // ==========================
 // ⚙️ SystemConfig & Admin
@@ -424,6 +542,11 @@ export {
    Admin, 
   AdminNotification, 
   SystemConfig,
-  Cashier
+  Cashier,
+  HomeCategory,
+  ThematicSelection,
+  Promotion,
+  PromotionMenuItem,
+  DailyDeal,
+  RecommendedDish
 };
-

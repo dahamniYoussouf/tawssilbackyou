@@ -5,6 +5,9 @@ import Driver from '../models/Driver.js';
 import Restaurant from '../models/Restaurant.js';
 import Admin from '../models/Admin.js';
 import Cashier from '../models/Cashier.js';
+import { normalizeCategoryList } from '../utils/slug.js';
+import { CASHIER_STATUS_VALUES } from "../validators/cashierValidator.js";
+import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 
 // OTP Store (use Redis in production)
@@ -52,7 +55,6 @@ const sendOTP = async (phoneOrEmail, otp) => {
 // ============================================
 
 // STEP 1: Request OTP (First time or when token expired)
-import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
 export const requestOTP = async (req, res) => {
   try {
@@ -338,8 +340,13 @@ export const register = async (req, res) => {
           throw new Error('Valid latitude and longitude are required');
         }
 
-        const categories = profileData.categories || ['pizza'];
-        if (!Array.isArray(categories) || categories.length === 0) {
+        const rawCategories = Array.isArray(profileData.categories)
+          ? profileData.categories
+          : profileData.categories
+            ? [profileData.categories]
+            : [];
+        const categories = normalizeCategoryList(rawCategories);
+        if (categories.length === 0) {
           throw new Error('At least one category is required');
         }
 
@@ -560,7 +567,11 @@ export const registerCashier = async (req, res) => {
       last_name, 
       phone, 
       restaurant_id,
-      permissions 
+      permissions,
+      profile_image_url,
+      status,
+      is_active,
+      notes
     } = req.body;
 
     // Validate required fields
@@ -593,6 +604,33 @@ export const registerCashier = async (req, res) => {
     const cashierCode = await Cashier.generateCashierCode();
 
     // Create cashier profile
+    const parsedPermissions = (() => {
+      if (typeof permissions === "string") {
+        try {
+          return JSON.parse(permissions);
+        } catch (_err) {
+          return null;
+        }
+      }
+      return permissions;
+    })();
+
+    const defaultPermissions = {
+      can_create_orders: true,
+      can_cancel_orders: false,
+      can_apply_discounts: false,
+      can_process_refunds: false,
+      can_view_reports: false
+    };
+
+    const finalPermissions = {
+      ...defaultPermissions,
+      ...(parsedPermissions && typeof parsedPermissions === "object" ? parsedPermissions : {})
+    };
+
+    const finalStatus = CASHIER_STATUS_VALUES.includes(status) ? status : "offline";
+    const isActiveFlag = typeof is_active === "boolean" ? is_active : true;
+
     const cashier = await Cashier.create({
       user_id: user.id,
       restaurant_id,
@@ -601,13 +639,11 @@ export const registerCashier = async (req, res) => {
       last_name,
       phone: normalizePhoneNumber(phone),
       email,
-      permissions: permissions || {
-        can_create_orders: true,
-        can_cancel_orders: false,
-        can_apply_discounts: false,
-        can_process_refunds: false,
-        can_view_reports: false
-      }
+      permissions: finalPermissions,
+      profile_image_url: profile_image_url || null,
+      status: finalStatus,
+      is_active: isActiveFlag,
+      notes: notes || null
     });
 
     res.status(201).json({
