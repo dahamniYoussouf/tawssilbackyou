@@ -7,6 +7,10 @@ const MenuItem = sequelize.define("MenuItem", {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
+  restaurant_id: {
+    type: DataTypes.UUID,
+    allowNull: false,
+  },
   category_id: {
     type: DataTypes.UUID,
     allowNull: false,

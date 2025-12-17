@@ -22,6 +22,7 @@ export async function createMenuItem(data) {
   if (!category) throw { status: 404, message: "Category not found" };
 
   return await MenuItem.create({
+    restaurant_id: category.restaurant_id,
     category_id,
     nom,
     description,
@@ -161,6 +162,7 @@ export async function updateMenuItem(id, updates) {
   if (updates.category_id) {
     const category = await FoodCategory.findByPk(updates.category_id);
     if (!category) throw { status: 404, message: "Category not found" };
+    updates.restaurant_id = category.restaurant_id;
   }
 
   await item.update(updates);
