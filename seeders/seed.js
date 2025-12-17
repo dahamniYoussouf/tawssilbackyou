@@ -541,6 +541,7 @@ const seedDatabase = async () => {
         const items = menuItemsByCategory[categoryType] || [];
         for (const item of items) {
           const menuItem = await MenuItem.create({
+            restaurant_id: restaurant.id,
             category_id: category.id,
             nom: item.name,
             description: item.description,
