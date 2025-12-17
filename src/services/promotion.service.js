@@ -36,10 +36,7 @@ const deriveBadgeText = (payload) => {
     case "free_delivery":
       return "Livraison gratuite";
     case "buy_x_get_y":
-      if (payload.buy_quantity && payload.free_quantity) {
-        return `${payload.buy_quantity} acheté = ${payload.free_quantity} offert`;
-      }
-      return "Offre achetez X obtenez Y";
+      return payload.badge_text || payload.custom_message || "Offre spéciale";
     case "other":
       return payload.custom_message?.slice(0, 80) || "Offre spéciale";
     default:

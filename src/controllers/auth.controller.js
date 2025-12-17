@@ -8,6 +8,7 @@ import Cashier from '../models/Cashier.js';
 import { normalizeCategoryList } from '../utils/slug.js';
 import { CASHIER_STATUS_VALUES } from "../validators/cashierValidator.js";
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
+import * as favoriteAddressService from '../services/favoriteAddress.service.js';
 
 
 // OTP Store (use Redis in production)
@@ -207,6 +208,10 @@ export const verifyOTP = async (req, res) => {
       createdAt: Date.now()
     });
 
+    const favoriteAddresses = client
+      ? await favoriteAddressService.listFavoriteAddresses(client.id)
+      : [];
+
     res.json({
       message: 'Login successful',
       access_token: accessToken,
@@ -217,7 +222,8 @@ export const verifyOTP = async (req, res) => {
         email: user.email,
         role: user.role
       },
-      profile: client
+      profile: client,
+      favorite_addresses: favoriteAddresses
     });
 
   } catch (error) {
@@ -537,6 +543,11 @@ export const login = async (req, res) => {
       createdAt: Date.now()
     });
 
+    let favoriteAddresses = [];
+    if (user.role === 'client' && profile?.id) {
+      favoriteAddresses = await favoriteAddressService.listFavoriteAddresses(profile.id);
+    }
+
     // ✅ Response
     res.json({
       message: 'Login successful',
@@ -548,7 +559,8 @@ export const login = async (req, res) => {
         email: user.email,
         role: user.role
       },
-      profile
+      profile,
+      favorite_addresses: favoriteAddresses
     });
 
   } catch (error) {

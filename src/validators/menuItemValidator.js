@@ -90,7 +90,7 @@ export const getMyMenuItemsValidator = [
 
   query("limit")
     .optional()
-    .isInt({ min: 1, max: 100 }).withMessage("limit must be between 1 and 100"),
+    .isInt({ min: 1, max: 1000 }).withMessage("limit must be between 1 and 1000"),
 
   query("category_id")
     .optional()
@@ -119,7 +119,7 @@ export const getAllMenuItemsValidator = [
 
   query("limit")
     .optional()
-    .isInt({ min: 1, max: 100 }).withMessage("limit must be between 1 and 100"),
+    .isInt({ min: 1, max: 1000 }).withMessage("limit must be between 1 and 1000"),
 
   query("category_id")
     .optional()

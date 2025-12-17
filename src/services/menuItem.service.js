@@ -38,6 +38,7 @@ export async function getAllMenuItems(filters = {}) {
     page = 1,
     limit = 20,
     category_id,
+    restaurant_id,
     is_available,
     search
   } = filters;
@@ -45,17 +46,36 @@ export async function getAllMenuItems(filters = {}) {
   const offset = (page - 1) * limit;
   const where = {};
 
-  if (category_id) where.category_id = category_id;
-  if (is_available !== undefined) where.is_available = is_available;
-  if (search) where.nom = { [Op.iLike]: `%${search}%` };
+  if (category_id) {
+    where.category_id = category_id;
+  }
+  if (is_available !== undefined) {
+    where.is_available = is_available;
+  }
+  if (search) {
+    where.nom = { [Op.iLike]: `%${search}%` };
+  }
+
+  const categoryInclude = {
+    model: FoodCategory,
+    as: 'category',
+    attributes: ['id', 'nom']
+  };
+
+  if (restaurant_id) {
+    categoryInclude.where = { restaurant_id };
+    categoryInclude.required = true;
+  }
+
+  const include = [
+    categoryInclude,
+    { model: Restaurant, as: 'restaurant', attributes: ['id', 'name', 'image_url', 'email'] },
+    { model: Addition, as: 'additions', attributes: ['id', 'nom', 'description', 'prix', 'is_available'] }
+  ];
 
   const { count, rows } = await MenuItem.findAndCountAll({
     where,
-    include: [
-      { model: FoodCategory, as: 'category', attributes: ['id', 'nom'] },
-      { model: Restaurant, as: 'restaurant', attributes: ['id', 'name', 'image_url', 'email'] },
-      { model: Addition, as: 'additions', attributes: ['id', 'nom', 'description', 'prix', 'is_available'] }
-    ],
+    include,
     order: [['created_at', 'DESC']],
     limit: +limit,
     offset: +offset

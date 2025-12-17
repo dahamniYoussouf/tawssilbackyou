@@ -155,8 +155,8 @@ export const seedHomepageModules = async ({ restaurants, restaurantMenuMap }) =>
       is_active: true
     },
     {
-      title: "1 acheté = 1 offert",
-      description: "Produit identique offert automatiquement",
+      title: "Plat bonus",
+      description: "Recevez un plat complémentaire automatiquement",
       type: "buy_x_get_y",
       restaurant_id: promoRestaurant.id,
       menu_item_id: getMenuItemIdsForRestaurant(promoRestaurant.id, 1)[0] || null,

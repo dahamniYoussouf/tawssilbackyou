@@ -64,6 +64,26 @@ const buildNearbyFilters = (source = {}) => {
   return filters;
 };
 
+const buildNearbyResponse = (nearby) => ({
+  count: nearby.count,
+  page: nearby.page,
+  pageSize: nearby.pageSize,
+  radius: nearby.radius,
+  center: nearby.center,
+  searchType: nearby.searchType,
+  data: nearby.formatted
+});
+
+const buildHomepagePayload = (modules, nearby) => {
+  const restaurantItems = nearby.formatted ?? [];
+  return {
+    ...modules,
+    offers: modules.dailyDeals ?? [],
+    restaurants: restaurantItems,
+    nearby: buildNearbyResponse(nearby)
+  };
+};
+
 export const getHomepageOverview = async (req, res, next) => {
   try {
     const body = {
@@ -86,18 +106,7 @@ export const getHomepageOverview = async (req, res, next) => {
 
     res.json({
       success: true,
-      data: {
-        ...modules,
-        nearby: {
-          count: nearby.count,
-          page: nearby.page,
-          pageSize: nearby.pageSize,
-          radius: nearby.radius,
-          center: nearby.center,
-          searchType: nearby.searchType,
-          data: nearby.formatted
-        }
-      }
+      data: buildHomepagePayload(modules, nearby)
     });
   } catch (err) {
     next(err);
@@ -112,18 +121,7 @@ const respondWithModules = async (filters, res, next) => {
 
     res.json({
       success: true,
-      data: {
-        ...modules,
-        nearby: {
-          count: nearby.count,
-          page: nearby.page,
-          pageSize: nearby.pageSize,
-          radius: nearby.radius,
-          center: nearby.center,
-          searchType: nearby.searchType,
-          data: nearby.formatted
-        }
-      }
+      data: buildHomepagePayload(modules, nearby)
     });
   } catch (err) {
     next(err);

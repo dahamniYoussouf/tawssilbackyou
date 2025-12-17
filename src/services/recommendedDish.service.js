@@ -1,6 +1,7 @@
 import MenuItem from "../models/MenuItem.js";
 import RecommendedDish from "../models/RecommendedDish.js";
 import Restaurant from "../models/Restaurant.js";
+import FoodCategory from "../models/FoodCategory.js";
 
 const ensurePremiumRestaurant = async (restaurant_id) => {
   const restaurant = await Restaurant.findByPk(restaurant_id);
@@ -14,13 +15,26 @@ const ensurePremiumRestaurant = async (restaurant_id) => {
 };
 
 const ensureMenuItemMatchesRestaurant = async (menu_item_id, restaurant_id) => {
-  const menuItem = await MenuItem.findByPk(menu_item_id);
+  const menuItem = await MenuItem.findByPk(menu_item_id, {
+    include: [
+      {
+        model: FoodCategory,
+        as: "category",
+        attributes: ["restaurant_id"]
+      }
+    ]
+  });
   if (!menuItem) {
     throw new Error("Menu item not found");
   }
-  if (restaurant_id && menuItem.restaurant_id !== restaurant_id) {
+
+  const itemRestaurantId =
+    menuItem.restaurant_id ?? menuItem.category?.restaurant_id ?? null;
+
+  if (restaurant_id && String(itemRestaurantId) !== String(restaurant_id)) {
     throw new Error("Menu item does not belong to the provided restaurant");
   }
+
   return menuItem;
 };
 
