@@ -413,54 +413,53 @@ export const getOrderTracking = async (req, res, next) => {
 
 // ==================== RATING ====================
 
-// Add rating (only for delivered orders)
-export const addRating = async (req, res, next) => {
+export const addRestaurantRating = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const {
-      rating,
-      restaurant_rating,
-      driver_rating,
-      review_comment,
-      restaurant_review_comment,
-      driver_review_comment
-    } = req.body;
-    
-    const restaurantRating = restaurant_rating !== undefined ? restaurant_rating : rating;
-    const restaurantComment = restaurant_review_comment ?? review_comment;
-    
-    if (restaurantRating === undefined && driver_rating === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: "At least one rating (restaurant or driver) is required"
-      });
-    }
-    
-    if (restaurantRating !== undefined && (restaurantRating < 1 || restaurantRating > 5)) {
-      return res.status(400).json({
-        success: false,
-        message: "Rating must be between 1 and 5"
-      });
-    }
+    const { restaurant_rating, restaurant_review_comment } = req.body;
 
-    if (driver_rating !== undefined && (driver_rating < 1 || driver_rating > 5)) {
-      return res.status(400).json({
-        success: false,
-        message: "Driver rating must be between 1 and 5"
-      });
-    }
-    
-    const order = await orderService.addRatingService(
+    const order = await orderService.addRestaurantRatingService(
       id,
-      restaurantRating,
-      driver_rating,
-      restaurantComment,
-      driver_review_comment
+      restaurant_rating,
+      restaurant_review_comment
     );
-    
+
     res.json({
       success: true,
-      message: "Rating added successfully",
+      message: "Restaurant rating submitted successfully",
+      data: order
+    });
+  } catch (err) {
+    if (err.status === 404) {
+      return res.status(404).json({
+        success: false,
+        message: err.message
+      });
+    }
+    if (err.status === 400) {
+      return res.status(400).json({
+        success: false,
+        message: err.message
+      });
+    }
+    next(err);
+  }
+};
+
+export const addDriverRating = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { driver_rating, driver_review_comment } = req.body;
+
+    const order = await orderService.addDriverRatingService(
+      id,
+      driver_rating,
+      driver_review_comment
+    );
+
+    res.json({
+      success: true,
+      message: "Driver rating submitted successfully",
       data: order
     });
   } catch (err) {

@@ -211,37 +211,34 @@ export const updateDriverGPSValidator = [
 
 // ==================== RATING VALIDATOR ====================
 
-export const addRatingValidator = [
+export const addRestaurantRatingValidator = [
   param('id')
     .notEmpty().withMessage('Order ID is required')
     .isUUID().withMessage('Invalid order ID format'),
-  
-  body('rating')
-    .optional()
-    .isFloat({ min: 1, max: 5 }).withMessage('Rating must be between 1 and 5'),
 
   body('restaurant_rating')
-    .optional()
+    .notEmpty().withMessage('Restaurant rating is required')
     .isFloat({ min: 1, max: 5 }).withMessage('Restaurant rating must be between 1 and 5'),
 
-  body('driver_rating')
-    .optional()
-    .isFloat({ min: 1, max: 5 }).withMessage('Driver rating must be between 1 and 5'),
-  
   body('restaurant_review_comment')
     .optional()
     .isString().withMessage('Restaurant comment must be a string')
-    .isLength({ max: 1000 }).withMessage('Restaurant comment must not exceed 1000 characters'),
+    .isLength({ max: 1000 }).withMessage('Restaurant comment must not exceed 1000 characters')
+];
+
+export const addDriverRatingValidator = [
+  param('id')
+    .notEmpty().withMessage('Order ID is required')
+    .isUUID().withMessage('Invalid order ID format'),
+
+  body('driver_rating')
+    .notEmpty().withMessage('Driver rating is required')
+    .isFloat({ min: 1, max: 5 }).withMessage('Driver rating must be between 1 and 5'),
 
   body('driver_review_comment')
     .optional()
     .isString().withMessage('Driver comment must be a string')
-    .isLength({ max: 1000 }).withMessage('Driver comment must not exceed 1000 characters'),
-
-  body('review_comment')
-    .optional()
-    .isString().withMessage('Review comment must be a string')
-    .isLength({ max: 1000 }).withMessage('Review comment must not exceed 1000 characters')
+    .isLength({ max: 1000 }).withMessage('Driver comment must not exceed 1000 characters')
 ];
 
 // ==================== LEGACY VALIDATORS (kept for backward compatibility) ====================

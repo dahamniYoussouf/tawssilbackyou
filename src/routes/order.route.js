@@ -3,7 +3,8 @@ import {
   createOrderValidator,
   getAllOrdersValidator,
   getOrderByIdValidator,
-  addRatingValidator,
+  addRestaurantRatingValidator,
+  addDriverRatingValidator,
   getClientOrdersValidator,
   createOrderWithItemsValidator,
   declineOrderValidator,
@@ -53,6 +54,7 @@ router.post('/:id/complete-delivery', protect, isDriver, getOrderByIdValidator, 
 router.post('/:id/driver-cancel', protect, isDriver, driverCancelOrderValidator,validate, orderController.driverCancelOrder);
 // ==================== RATING ====================
 
-router.post('/:id/rating', protect, isClient, addRatingValidator, validate, orderController.addRating);
+router.post('/:id/restaurant-rating', protect, isClient, addRestaurantRatingValidator, validate, orderController.addRestaurantRating);
+router.post('/:id/driver-rating', protect, isClient, addDriverRatingValidator, validate, orderController.addDriverRating);
 
 export default router;

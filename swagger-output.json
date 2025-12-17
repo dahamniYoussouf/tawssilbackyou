@@ -2349,7 +2349,7 @@
         }
       }
     },
-    "/{id}/rating": {
+    "/{id}/restaurant-rating": {
       "post": {
         "description": "",
         "parameters": [
@@ -2370,13 +2370,81 @@
             "schema": {
               "type": "object",
               "properties": {
-                "rating": {
-                  "example": "any"
+                "restaurant_rating": {
+                  "example": 5
                 },
-                "review_comment": {
-                  "example": "any"
+                "restaurant_review_comment": {
+                  "example": "Great food and a smooth pickup"
                 }
-              }
+              },
+              "required": [
+                "restaurant_rating"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "0": {
+            "description": ""
+          },
+          "1": {
+            "description": ""
+          },
+          "3": {
+            "description": ""
+          },
+          "4": {
+            "description": ""
+          },
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/{id}/driver-rating": {
+      "post": {
+        "description": "",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "driver_rating": {
+                  "example": 5
+                },
+                "driver_review_comment": {
+                  "example": "Driver was polite and on time"
+                }
+              },
+              "required": [
+                "driver_rating"
+              ]
             }
           }
         ],
