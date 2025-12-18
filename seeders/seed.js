@@ -518,15 +518,15 @@ const seedDatabase = async () => {
 
 
     // ----------------------------
-    // 5️⃣ Catégories & Menus (pour les 100 premiers restaurants)
+    // 5️⃣ Catégories & Menus (pour tous les restaurants)
     // ----------------------------
-    console.log("🍕 Creating food categories and menu items...");
+    console.log("🍕 Creating food categories and menu items for all restaurants...");
     const allMenuItems = [];
     const allAdditions = [];
     const menuItemAdditionsMap = new Map();
     const restaurantMenuMap = new Map();
 
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < restaurants.length; i++) {
       const restaurant = restaurants[i];
       
       for (const categoryType of restaurant.categories) {
@@ -594,7 +594,7 @@ const seedDatabase = async () => {
     
     for (let i = 0; i < 1000; i++) {
       const client = createdClients[i % createdClients.length];
-      const restaurant = restaurants[i % 100];
+      const restaurant = restaurants[i % restaurants.length];
       const driver = i % 3 === 0 ? createdDrivers[i % createdDrivers.length] : null;
       const status = orderStatuses[Math.floor(Math.random() * orderStatuses.length)];
       
@@ -795,7 +795,7 @@ const seedDatabase = async () => {
       const favCount = Math.floor(Math.random() * 5) + 1;
       
       for (let j = 0; j < favCount; j++) {
-        const restaurant = restaurants[Math.floor(Math.random() * 100)];
+        const restaurant = restaurants[Math.floor(Math.random() * restaurants.length)];
         
         favoriteRestaurants.push({
           client_id: client.id,

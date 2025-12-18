@@ -3,6 +3,7 @@ import Restaurant from "../models/Restaurant.js";
 import FavoriteRestaurant from "../models/FavoriteRestaurant.js";
 import FoodCategory from "../models/FoodCategory.js";
 import MenuItem from "../models/MenuItem.js";
+import Addition from "../models/Addition.js";
 import Client from "../models/Client.js";
 import Order from "../models/Order.js";
 import { Op, literal } from "sequelize";
@@ -720,6 +721,12 @@ export const getCategoriesWithMenuItems = async (restaurantId, clientId = null) 
     throw new Error('Restaurant not found');
   }
 
+  const restaurantPlain = restaurant.get({ plain: true });
+  const coordinates = restaurant.getCoordinates();
+  if (coordinates) {
+    restaurantPlain.coordinates = coordinates;
+  }
+
   // Fetch all categories with their menu items
   const categories = await FoodCategory.findAll({
     where: { restaurant_id: restaurantId },
@@ -737,6 +744,18 @@ export const getCategoriesWithMenuItems = async (restaurantId, clientId = null) 
         'temps_preparation',
         'is_available'
       ]
+      ,
+      include: [{
+        model: Addition,
+        as: 'additions',
+        attributes: [
+          'id',
+          'nom',
+          'description',
+          'prix',
+          'is_available'
+        ]
+      }]
     }],
     order: [
       ['ordre_affichage', 'ASC'],
@@ -782,7 +801,15 @@ export const getCategoriesWithMenuItems = async (restaurantId, clientId = null) 
           temps_preparation: item.temps_preparation,
           is_available: item.is_available,
           is_favorite: favoritesMap.has(item.id),
-          favorite_id: favoritesMap.get(item.id) || null
+          favorite_id: favoritesMap.get(item.id) || null,
+          additions: (item.additions || []).map(addition => ({
+            id: addition.id,
+            nom: addition.nom,
+            description: addition.description,
+            prix: parseFloat(addition.prix),
+            is_available: addition.is_available
+          })),
+          additions_count: item.additions ? item.additions.length : 0
         }))
       : [],
     items_count: category.items ? category.items.length : 0
@@ -791,6 +818,7 @@ export const getCategoriesWithMenuItems = async (restaurantId, clientId = null) 
   return {
     restaurant_id: restaurantId,
     restaurant_name: restaurant.name,
+    restaurant: restaurantPlain,
     categories: formattedCategories,
     total_categories: formattedCategories.length,
     total_items: formattedCategories.reduce((sum, cat) => sum + cat.items_count, 0)

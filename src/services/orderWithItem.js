@@ -163,7 +163,7 @@ const roundMoney = (value) => Number(Number(value || 0).toFixed(2));
  * ✅ NOW SUPPORTS NULL client_id FOR PICKUP ORDERS (POS)
  */
 export async function createOrderWithItems(data) {
-  const {
+  let {
     client_id, // ✅ CAN BE NULL FOR POS PICKUP ORDERS
     restaurant_id,
     order_type = 'pickup', // Default to pickup for POS
