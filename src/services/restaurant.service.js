@@ -14,12 +14,111 @@ import Driver from "../models/Driver.js";
 import User from "../models/User.js";
 import cacheService from "./cache.service.js";
 import { normalizeCategoryList } from "../utils/slug.js";
+import { listPromotions } from "./promotion.service.js";
 
 const NEARBY_CACHE_TTL = 60; // seconds
 const METERS_PER_DEGREE = 111320;
 const MIN_TILE_METERS = 500;
 
 const normalizeQueryKey = (value) => (typeof value === "string" ? value.trim().toLowerCase() : "");
+
+const roundMoney = (value) => Number(Number(value ?? 0).toFixed(2));
+
+const toDecimal = (value) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return 0;
+  }
+  return Number(value);
+};
+
+const derivePromotionLabel = (promotion, discountValue) => {
+  if (promotion.badge_text) {
+    return promotion.badge_text;
+  }
+
+  switch (promotion.type) {
+    case "percentage":
+      return discountValue ? `-${discountValue}%` : promotion.title;
+    case "amount":
+      return discountValue ? `-${discountValue} ${promotion.currency || "DZD"}` : promotion.title;
+    case "buy_x_get_y":
+      if (promotion.buy_quantity && promotion.free_quantity) {
+        return `Buy ${promotion.buy_quantity} get ${promotion.free_quantity}`;
+      }
+      break;
+    case "free_delivery":
+      return "Livraison gratuite";
+    default:
+      return promotion.custom_message || promotion.description || promotion.title;
+  }
+
+  return promotion.title;
+};
+
+const computeItemPromotionNewPrice = (basePrice, promotion) => {
+  const oldPrice = basePrice;
+  const discountValue = toDecimal(promotion.discount_value);
+  let newPrice = oldPrice;
+
+  if (promotion.type === "percentage" && discountValue > 0) {
+    newPrice = oldPrice * (1 - discountValue / 100);
+  } else if (promotion.type === "amount" && discountValue > 0) {
+    newPrice = oldPrice - discountValue;
+  }
+
+  if (newPrice < 0) newPrice = 0;
+  return roundMoney(newPrice);
+};
+
+const isPromotionApplicableToItem = (promotion, itemId, restaurantId) => {
+  if (!promotion || !itemId) return false;
+  const normalizedItemId = String(itemId);
+  switch (promotion.scope) {
+    case "menu_item":
+      if (promotion.menu_item_id && String(promotion.menu_item_id) === normalizedItemId) {
+        return true;
+      }
+
+      if (Array.isArray(promotion.menu_items)) {
+        return promotion.menu_items.some((menuItem) => String(menuItem.id) === normalizedItemId);
+      }
+      return false;
+    case "restaurant":
+      return promotion.restaurant_id && String(promotion.restaurant_id) === String(restaurantId);
+    case "global":
+      return true;
+    default:
+      return false;
+  }
+};
+
+const getApplicableItemPromotions = (promotions, item, restaurantId) => {
+  const basePrice = toDecimal(item.prix);
+  const normalizedItemId = String(item.id);
+  return promotions
+    .filter((promotion) => isPromotionApplicableToItem(promotion, normalizedItemId, restaurantId))
+    .map((promotion) => {
+      const newPrice = computeItemPromotionNewPrice(basePrice, promotion);
+      const savings = roundMoney(Math.max(0, basePrice - newPrice));
+      const currency = promotion.currency || "DZD";
+      return {
+        id: promotion.id,
+        title: promotion.title,
+        badge_text: derivePromotionLabel(promotion, toDecimal(promotion.discount_value)),
+        description: promotion.custom_message || promotion.description,
+        type: promotion.type,
+        scope: promotion.scope,
+        currency,
+        old_price: roundMoney(basePrice),
+        new_price: newPrice,
+        discount_value: promotion.discount_value ? toDecimal(promotion.discount_value) : null,
+        saving_text: savings > 0 ? `${savings} ${currency}` : null,
+        extra: promotion.type === "buy_x_get_y" && promotion.buy_quantity && promotion.free_quantity
+          ? `Buy ${promotion.buy_quantity} get ${promotion.free_quantity}`
+          : null
+      };
+    });
+};
 
 const buildNearbyCacheKey = ({
   latitude,
@@ -727,41 +826,51 @@ export const getCategoriesWithMenuItems = async (restaurantId, clientId = null) 
     restaurantPlain.coordinates = coordinates;
   }
 
-  // Fetch all categories with their menu items
-  const categories = await FoodCategory.findAll({
-    where: { restaurant_id: restaurantId },
-    include: [{
-      model: MenuItem,
-      as: 'items', // association alias
-      where: { is_available: true },
-      required: false,
-      attributes: [
-        'id',
-        'nom',
-        'description',
-        'prix',
-        'photo_url',
-        'temps_preparation',
-        'is_available'
-      ]
-      ,
+  const [categories, promotions] = await Promise.all([
+    FoodCategory.findAll({
+      where: { restaurant_id: restaurantId },
       include: [{
-        model: Addition,
-        as: 'additions',
+        model: MenuItem,
+        as: 'items', // association alias
+        where: { is_available: true },
+        required: false,
         attributes: [
           'id',
           'nom',
           'description',
           'prix',
+          'photo_url',
+          'temps_preparation',
           'is_available'
-        ]
-      }]
-    }],
-    order: [
-      ['ordre_affichage', 'ASC'],
-      ['created_at', 'DESC'],
-      [{ model: MenuItem, as: 'items' }, 'nom', 'ASC']
-    ]
+        ],
+        include: [{
+          model: Addition,
+          as: 'additions',
+          attributes: [
+            'id',
+            'nom',
+            'description',
+            'prix',
+            'is_available'
+          ]
+        }]
+      }],
+      order: [
+        ['ordre_affichage', 'ASC'],
+        ['created_at', 'DESC'],
+        [{ model: MenuItem, as: 'items' }, 'nom', 'ASC']
+      ]
+    }),
+    listPromotions({
+      restaurant_id: restaurantId,
+      is_active: true,
+      active_on: new Date()
+    })
+  ]);
+
+  const formattedPromotions = promotions.map((promo) => {
+    const plain = typeof promo.get === "function" ? promo.get({ plain: true }) : promo;
+    return plain;
   });
 
   // If client_id is provided, get their favorites
@@ -792,32 +901,44 @@ export const getCategoriesWithMenuItems = async (restaurantId, clientId = null) 
     icone_url: category.icone_url,
     ordre_affichage: category.ordre_affichage,
     items: category.items
-      ? category.items.map(item => ({
-          id: item.id,
-          nom: item.nom,
-          description: item.description,
-          prix: parseFloat(item.prix),
-          photo_url: item.photo_url,
-          temps_preparation: item.temps_preparation,
-          is_available: item.is_available,
-          is_favorite: favoritesMap.has(item.id),
-          favorite_id: favoritesMap.get(item.id) || null,
-          additions: (item.additions || []).map(addition => ({
-            id: addition.id,
-            nom: addition.nom,
-            description: addition.description,
-            prix: parseFloat(addition.prix),
-            is_available: addition.is_available
-          })),
-          additions_count: item.additions ? item.additions.length : 0
-        }))
+      ? category.items.map(item => {
+          const basePrice = roundMoney(toDecimal(item.prix));
+          const itemPromotions = getApplicableItemPromotions(formattedPromotions, item, restaurantId);
+          const promoPrices = itemPromotions
+            .map(promo => (typeof promo.new_price === "number" ? promo.new_price : basePrice))
+            .filter(Number.isFinite);
+          const displayPrice = promoPrices.length ? Math.min(basePrice, ...promoPrices) : basePrice;
+
+          return {
+            id: item.id,
+            nom: item.nom,
+            description: item.description,
+            prix: basePrice,
+            display_price: displayPrice,
+            is_on_promotion: itemPromotions.length > 0,
+            promotion_highlight: itemPromotions[0]?.badge_text || null,
+            photo_url: item.photo_url,
+            temps_preparation: item.temps_preparation,
+            is_available: item.is_available,
+            is_favorite: favoritesMap.has(item.id),
+            favorite_id: favoritesMap.get(item.id) || null,
+            additions: (item.additions || []).map(addition => ({
+              id: addition.id,
+              nom: addition.nom,
+              description: addition.description,
+              prix: parseFloat(addition.prix),
+              is_available: addition.is_available
+            })),
+            additions_count: item.additions ? item.additions.length : 0,
+            promotions: itemPromotions
+          };
+        })
       : [],
     items_count: category.items ? category.items.length : 0
   }));
 
   return {
     restaurant_id: restaurantId,
-    restaurant_name: restaurant.name,
     restaurant: restaurantPlain,
     categories: formattedCategories,
     total_categories: formattedCategories.length,
