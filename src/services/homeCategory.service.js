@@ -1,16 +1,12 @@
-import { Op } from "sequelize";
 import HomeCategory from "../models/HomeCategory.js";
-import Restaurant from "../models/Restaurant.js";
 
 const getRestaurantsCountForSlug = async (slug) => {
   if (!slug) return 0;
-  return Restaurant.count({
-    where: {
-      categories: {
-        [Op.contains]: [slug]
-      }
-    }
+  const category = await HomeCategory.findOne({
+    where: { slug }
   });
+  if (!category) return 0;
+  return category.countRestaurants();
 };
 
 export const listHomeCategories = async (options = {}) => {

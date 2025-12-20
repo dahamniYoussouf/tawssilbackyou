@@ -13,12 +13,13 @@ import {
 } from "../validators/favoriteRestaurantValidator.js";
 import { validate } from "../middlewares/validate.js";
 import { protect, isClient } from "../middlewares/auth.js";
+import { cacheMiddleware } from "../middlewares/cache.middleware.js";
 
 const router = express.Router();
 
 router.post("/create", protect, isClient, addFavoriteRestaurantValidator, validate, addFavoriteRestaurant);
 router.delete("/delete/:favorite_uuid", protect, isClient, removeFavoriteRestaurantValidator, validate, removeFavoriteRestaurant);
-router.get("/getclientfavorites", protect, isClient, getFavoriteRestaurantsValidator, validate, getFavoriteRestaurants);
+router.get("/getclientfavorites", protect, isClient, getFavoriteRestaurantsValidator, validate, cacheMiddleware({ ttl: 30 }), getFavoriteRestaurants);
 router.patch("/updatefavorite/:favorite_uuid", protect, isClient, updateFavoriteRestaurantValidator, validate, updateFavoriteRestaurant);
 
 export default router;

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { validate } from "../middlewares/validate.js";
+import { cacheMiddleware } from "../middlewares/cache.middleware.js";
 import * as orderItemCtrl from "../controllers/orderItem.controller.js";
 import {
   createOrderItemValidator,
@@ -31,6 +32,7 @@ router.post(
 // Get all order items
 router.get(
   "/getall",
+  cacheMiddleware({ ttl: 60 }),
   orderItemCtrl.getAll
 );
 
@@ -39,6 +41,7 @@ router.get(
   "/order/:order_id",
   getOrderItemsByOrderValidator,
   validate,
+  cacheMiddleware({ ttl: 60 }),
   orderItemCtrl.getByOrderId
 );
 
@@ -47,6 +50,7 @@ router.get(
   "/:id",
   orderItemByIdValidator,
   validate,
+  cacheMiddleware({ ttl: 60 }),
   orderItemCtrl.getById
 );
 

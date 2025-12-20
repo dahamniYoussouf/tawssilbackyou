@@ -48,35 +48,41 @@ export const createPendingOrderNotification = async (orderId) => {
     }
 
     // Préparer les données
+    const clientName = order.client
+      ? `${order.client.first_name || ''} ${order.client.last_name || ''}`.trim() || 'Client inconnu'
+      : 'Client inconnu';
+    const clientPhone = order.client?.phone_number || 'Non renseigné';
+    const clientAddress = order.client?.address || order.delivery_address || 'Non renseigné';
+
+    const restaurantInfo = {
+      id: order.restaurant?.id || order.restaurant_id || null,
+      name: order.restaurant?.name || 'Restaurant inconnu',
+      address: order.restaurant?.address || 'Non renseigné',
+      phone: order.restaurant?.phone_number || 'Non renseigné',
+      email: order.restaurant?.email || 'Non renseigné'
+    };
+
     const orderDetails = {
       order_number: order.order_number,
       order_type: order.order_type,
       total_amount: parseFloat(order.total_amount || 0),
       delivery_address: order.delivery_address,
       created_at: order.created_at,
-      items: order.order_items.map(item => ({
-        name: item.menu_item.nom,
+      items: (order.order_items || []).map(item => ({
+        name: item.menu_item?.nom || 'Plat inconnu',
         quantity: item.quantite,
-        price: parseFloat(item.prix_unitaire),
-        total: parseFloat(item.prix_total)
+        price: parseFloat(item.prix_unitaire || 0),
+        total: parseFloat(item.prix_total || 0)
       })),
       client: {
-        name: `${order.client.first_name} ${order.client.last_name}`,
-        phone: order.client.phone_number,
-        address: order.client.address
+        name: clientName,
+        phone: clientPhone,
+        address: clientAddress
       }
     };
 
-    const restaurantInfo = {
-      id: order.restaurant.id,
-      name: order.restaurant.name,
-      address: order.restaurant.address,
-      phone: order.restaurant.phone_number || 'Non renseigné',
-      email: order.restaurant.email || 'Non renseigné'
-    };
-
     const message = `⚠️ Commande #${order.order_number} sans réponse depuis 3 minutes.\n` +
-                    `Restaurant: ${order.restaurant.name}\n` +
+                    `Restaurant: ${restaurantInfo.name}\n` +
                     `Montant: ${order.total_amount} DA\n` +
                     `📞 Contact restaurant: ${restaurantInfo.phone}`;
 
@@ -153,35 +159,41 @@ export const createAcceptedOrderNotification = async (orderId) => {
     }
 
     // Préparer les données
+    const clientName = order.client
+      ? `${order.client.first_name || ''} ${order.client.last_name || ''}`.trim() || 'Client inconnu'
+      : 'Client inconnu';
+    const clientPhone = order.client?.phone_number || 'Non renseigné';
+    const clientAddress = order.client?.address || order.delivery_address || 'Non renseigné';
+
+    const restaurantInfo = {
+      id: order.restaurant?.id || order.restaurant_id || null,
+      name: order.restaurant?.name || 'Restaurant inconnu',
+      address: order.restaurant?.address || 'Non renseigné',
+      phone: order.restaurant?.phone_number || 'Non renseigné',
+      email: order.restaurant?.email || 'Non renseigné'
+    };
+
     const orderDetails = {
       order_number: order.order_number,
       order_type: order.order_type,
       total_amount: parseFloat(order.total_amount || 0),
       delivery_address: order.delivery_address,
       created_at: order.created_at,
-      items: order.order_items.map(item => ({
-        name: item.menu_item.nom,
+      items: (order.order_items || []).map(item => ({
+        name: item.menu_item?.nom || 'Plat inconnu',
         quantity: item.quantite,
-        price: parseFloat(item.prix_unitaire),
-        total: parseFloat(item.prix_total)
+        price: parseFloat(item.prix_unitaire || 0),
+        total: parseFloat(item.prix_total || 0)
       })),
       client: {
-        name: `${order.client.first_name} ${order.client.last_name}`,
-        phone: order.client.phone_number,
-        address: order.client.address
+        name: clientName,
+        phone: clientPhone,
+        address: clientAddress
       }
     };
 
-    const restaurantInfo = {
-      id: order.restaurant.id,
-      name: order.restaurant.name,
-      address: order.restaurant.address,
-      phone: order.restaurant.phone_number || 'Non renseigné',
-      email: order.restaurant.email || 'Non renseigné'
-    };
-
     const message = `⚠️ Commande #${order.order_number} sans réponse depuis 3 minutes.\n` +
-                    `Restaurant: ${order.restaurant.name}\n` +
+                    `Restaurant: ${restaurantInfo.name}\n` +
                     `Montant: ${order.total_amount} DA\n` +
                     `📞 Contact restaurant: ${restaurantInfo.phone}`;
 

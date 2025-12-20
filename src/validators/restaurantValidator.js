@@ -1,6 +1,7 @@
 import { body, param, query } from "express-validator";
 
 const CATEGORY_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 /**
  * Validator for creating a restaurant
@@ -255,6 +256,32 @@ export const nearbyFilterValidator = [
       throw new Error('Categories must be a string or array');
     })
     .withMessage("Categories must be a non-empty string or array"),
+
+  // NEW: Filter by HomeCategory ids (uuid string or array, comma-separated allowed)
+  body("home_categories")
+    .optional()
+    .custom((value) => {
+      const ids = typeof value === "string"
+        ? value.split(",").map((item) => item.trim()).filter(Boolean)
+        : Array.isArray(value)
+          ? value.map((item) => String(item).trim()).filter(Boolean)
+          : null;
+
+      if (!ids) {
+        throw new Error("home_categories must be a string or array");
+      }
+
+      if (ids.length === 0) {
+        throw new Error("home_categories must be non-empty");
+      }
+
+      const invalid = ids.find((id) => !UUID_PATTERN.test(id));
+      if (invalid) {
+        throw new Error("home_categories must contain valid UUIDs");
+      }
+
+      return true;
+    }),
 
   body("page")
     .optional()

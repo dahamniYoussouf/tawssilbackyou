@@ -290,6 +290,41 @@ export function getOnlineDriversCount() {
   return driversRoom ? driversRoom.size : 0;
 }
 
+/**
+ * Get unique online counts per role (based on authenticated sockets).
+ * Returns null if Socket.IO is not initialized.
+ */
+export function getOnlineCounts() {
+  if (!io) return null;
+
+  const clients = new Set();
+  const restaurants = new Set();
+  const drivers = new Set();
+  const admins = new Set();
+
+  for (const socket of io.sockets.sockets.values()) {
+    const role = socket.userRole;
+    if (!role) continue;
+
+    if (role === 'client') {
+      clients.add(socket.clientProfileId || socket.userId || socket.id);
+    } else if (role === 'restaurant') {
+      restaurants.add(socket.restaurantProfileId || socket.userId || socket.id);
+    } else if (role === 'driver') {
+      drivers.add(socket.driverProfileId || socket.userId || socket.id);
+    } else if (role === 'admin') {
+      admins.add(socket.adminProfileId || socket.userId || socket.id);
+    }
+  }
+
+  return {
+    clients: clients.size,
+    restaurants: restaurants.size,
+    drivers: drivers.size,
+    admins: admins.size
+  };
+}
+
 export function debugRooms() {
   if (!io) {
     console.log('⚠️ Socket.IO not initialized');

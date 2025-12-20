@@ -14,6 +14,7 @@ import {
 import { validate } from "../middlewares/validate.js";
 import * as menuItemCtrl from "../controllers/menuItem.controller.js";
 import { protect, isRestaurant, isClient, authorize, isCashier  } from "../middlewares/auth.js";
+import { cacheMiddleware } from "../middlewares/cache.middleware.js";
 
 const router = Router();
 
@@ -36,6 +37,7 @@ router.get(
   isRestaurant,
   getMyMenuItemsValidator,
   validate,
+  cacheMiddleware({ ttl: 60 }),
   menuItemCtrl.getMyMenuItems
 );
 
@@ -45,6 +47,7 @@ router.get(
   isCashier,
   getMyMenuItemsValidator,
   validate,
+  cacheMiddleware({ ttl: 30 }),
   menuItemCtrl.getCashierMenuItems
 );
 
@@ -53,6 +56,7 @@ router.get(
   "/me/statistics",
   protect,
   isRestaurant,
+  cacheMiddleware({ ttl: 30 }),
   menuItemCtrl.getMyStatistics
 );
 
@@ -96,6 +100,43 @@ router.delete(
   menuItemCtrl.remove
 );
 
+// ==================== ROUTES PROTA%GA%ES - ADMIN ====================
+router.post(
+  "/admin/create",
+  protect,
+  authorize('admin'),
+  createMenuItemValidator,
+  validate,
+  menuItemCtrl.adminCreate
+);
+
+router.put(
+  "/admin/update/:id",
+  protect,
+  authorize('admin'),
+  updateMenuItemValidator,
+  validate,
+  menuItemCtrl.adminUpdate
+);
+
+router.delete(
+  "/admin/delete/:id",
+  protect,
+  authorize('admin'),
+  deleteMenuItemValidator,
+  validate,
+  menuItemCtrl.adminRemove
+);
+
+router.patch(
+  "/admin/toggle-availability/:id",
+  protect,
+  authorize('admin'),
+  toggleAvailabilityValidator,
+  validate,
+  menuItemCtrl.adminToggleAvailability
+);
+
 // ==================== ROUTES PUBLIQUES / CLIENT ====================
 
 // Get all menu items (admin)
@@ -105,6 +146,7 @@ router.get(
   authorize('admin'),
   getAllMenuItemsValidator,
   validate,
+  cacheMiddleware({ ttl: 60 }),
   menuItemCtrl.getAll
 );
 
@@ -123,6 +165,7 @@ router.get(
   "/:id",
   getMenuItemByIdValidator,
   validate,
+  cacheMiddleware({ ttl: 300 }),
   menuItemCtrl.getById
 );
 

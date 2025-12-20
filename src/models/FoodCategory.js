@@ -49,6 +49,10 @@ const FoodCategory = sequelize.define("FoodCategory", {
   underscored: true,
   createdAt: "created_at",
   updatedAt: "updated_at",
+  indexes: [
+    { fields: ["restaurant_id"] },
+    { fields: ["restaurant_id", "ordre_affichage"] }
+  ]
 });
 
 export default FoodCategory;

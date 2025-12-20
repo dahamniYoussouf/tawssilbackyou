@@ -2,6 +2,7 @@
 import express from "express";
 import { protect, isDriver, authorize } from "../middlewares/auth.js";
 import { validate } from "../middlewares/validate.js";
+import { cacheMiddleware } from "../middlewares/cache.middleware.js";
 import {
   getAll,
   getById,
@@ -25,19 +26,19 @@ import {
 const router = express.Router();
 
 // ===== PUBLIC/ADMIN ROUTES =====
-router.get("/getall", protect, getAllDriversValidator, validate, getAll);
+router.get("/getall", protect, getAllDriversValidator, validate, cacheMiddleware({ ttl: 60 }), getAll);
 
 // ===== PROTECTED ROUTES - DRIVER'S OWN PROFILE =====
-router.get("/profile/me", protect, isDriver, getProfile);
+router.get("/profile/me", protect, isDriver, cacheMiddleware({ ttl: 30 }), getProfile);
 router.put("/profile", protect, isDriver, updateDriverValidator, validate, updateProfile);
 router.patch("/status", protect, isDriver, updateStatusValidator, validate, updateStatus);
-router.get("/statistics/me", protect, isDriver, getStatistics);
+router.get("/statistics/me", protect, isDriver, cacheMiddleware({ ttl: 30 }), getStatistics);
 
 // Commandes actives du livreur
-router.get('/active-orders', protect, isDriver, getActiveOrders);
+router.get('/active-orders', protect, isDriver, cacheMiddleware({ ttl: 5 }), getActiveOrders);
 
 // ===== ROUTES WITH :id PARAMETER (Must come after specific routes) =====
-router.get("/:id", protect, getDriverByIdValidator, validate, getById);
+router.get("/:id", protect, getDriverByIdValidator, validate, cacheMiddleware({ ttl: 60 }), getById);
 
 // ===== ADMIN ROUTES =====
 router.put("/update/:id", protect, authorize('admin'), updateDriverValidator, validate, update);

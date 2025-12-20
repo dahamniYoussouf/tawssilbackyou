@@ -1,6 +1,38 @@
 import cacheService from '../services/cache.service.js';
 import crypto from 'crypto';
 
+const serializeQuery = (query = {}) => {
+  const entries = [];
+
+  Object.entries(query).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      value.forEach((item) => entries.push([key, item]));
+      return;
+    }
+
+    entries.push([key, value]);
+  });
+
+  entries.sort(([keyA, valueA], [keyB, valueB]) => {
+    const keyCompare = keyA.localeCompare(keyB);
+    if (keyCompare !== 0) return keyCompare;
+    return String(valueA ?? '').localeCompare(String(valueB ?? ''));
+  });
+
+  return entries.map(([key, value]) => `${key}=${value ?? ''}`).join('&');
+};
+
+const buildDefaultCacheKey = (req) => {
+  const pathname = `${req.baseUrl || ''}${req.path || ''}` || req.originalUrl || req.url;
+  const queryHash = crypto
+    .createHash('md5')
+    .update(serializeQuery(req.query))
+    .digest('hex');
+  const userTag = req.user?.id ? `user:${req.user.id}` : 'user:anonymous';
+
+  return `cache:${req.method}:${pathname}:${userTag}:q:${queryHash}`;
+};
+
 /**
  * Cache Middleware
  * Automatically caches GET requests based on URL and query parameters
@@ -16,7 +48,8 @@ export const cacheMiddleware = (options = {}) => {
     ttl = 300, // 5 minutes default
     skipCache = 'nocache', // Query param to skip cache
     keyGenerator = null,
-    shouldCache = null
+    shouldCache = null,
+    debugHeader = true
   } = options;
 
   return async (req, res, next) => {
@@ -40,17 +73,15 @@ export const cacheMiddleware = (options = {}) => {
     if (keyGenerator) {
       cacheKey = keyGenerator(req);
     } else {
-      // Default: use URL + query params + user ID (if authenticated)
-      const url = req.originalUrl || req.url;
-      const queryString = JSON.stringify(req.query);
-      const userId = req.user?.id || 'anonymous';
-      const keyString = `${url}:${queryString}:${userId}`;
-      cacheKey = `cache:${crypto.createHash('md5').update(keyString).digest('hex')}`;
+      cacheKey = buildDefaultCacheKey(req);
     }
 
     // Try to get from cache
     const cached = await cacheService.get(cacheKey);
     if (cached !== null) {
+      if (debugHeader) {
+        res.set('X-Cache', 'HIT');
+      }
       return res.status(200).json(cached);
     }
 
@@ -61,6 +92,9 @@ export const cacheMiddleware = (options = {}) => {
     res.json = function (data) {
       // Only cache successful responses
       if (res.statusCode >= 200 && res.statusCode < 300) {
+        if (debugHeader) {
+          res.set('X-Cache', 'MISS');
+        }
         // Cache the response asynchronously (don't block response)
         cacheService.set(cacheKey, data, ttl).catch(err => {
           console.error('Cache set error in middleware:', err);

@@ -10,6 +10,7 @@ import {
 import { validate } from "../middlewares/validate.js";
 import * as foodCategoryCtrl from "../controllers/foodCategory.controller.js";
 import { protect, isRestaurant, authorize } from "../middlewares/auth.js";
+import { cacheMiddleware } from "../middlewares/cache.middleware.js";
 
 const router = Router();
 
@@ -32,6 +33,7 @@ router.get(
   isRestaurant, 
   getMyRestaurantCategoriesValidator,
   validate,
+  cacheMiddleware({ ttl: 60 }),
   foodCategoryCtrl.getMyCategories
 );
 
@@ -58,13 +60,43 @@ router.delete(
 // ==================== ROUTES PUBLIQUES / ADMIN ====================
 
 // Get all categories (public ou admin)
-router.get("/", foodCategoryCtrl.getAll);
+router.get("/", cacheMiddleware({ ttl: 300 }), foodCategoryCtrl.getAll);
+
+// ==================== ROUTES PROTA%GA%ES - ADMIN ====================
+router.post(
+  "/admin/restaurant/:restaurantId",
+  protect,
+  authorize('admin'),
+  getRestaurantCategoriesValidator,
+  createFoodCategoryValidator,
+  validate,
+  foodCategoryCtrl.adminCreateForRestaurant
+);
+
+router.put(
+  "/admin/:id",
+  protect,
+  authorize('admin'),
+  updateFoodCategoryValidator,
+  validate,
+  foodCategoryCtrl.adminUpdate
+);
+
+router.delete(
+  "/admin/:id",
+  protect,
+  authorize('admin'),
+  deleteFoodCategoryValidator,
+  validate,
+  foodCategoryCtrl.adminRemove
+);
 
 // Get categories by restaurant ID (pour admin ou public)
 router.get(
   "/restaurant/:restaurantId", 
   getRestaurantCategoriesValidator, 
   validate, 
+  cacheMiddleware({ ttl: 300 }),
   foodCategoryCtrl.getByRestaurant
 );
 

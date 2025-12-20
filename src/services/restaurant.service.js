@@ -6,15 +6,22 @@ import MenuItem from "../models/MenuItem.js";
 import Addition from "../models/Addition.js";
 import Client from "../models/Client.js";
 import Order from "../models/Order.js";
-import { Op, literal } from "sequelize";
+import { Op, QueryTypes, literal } from "sequelize";
 import axios from "axios";
 import FavoriteMeal from "../models/FavoriteMeal.js";
 import OrderItem from "../models/OrderItem.js";
 import Driver from "../models/Driver.js";
 import User from "../models/User.js";
+import HomeCategory from "../models/HomeCategory.js";
+import { sequelize } from "../config/database.js";
 import cacheService from "./cache.service.js";
 import { normalizeCategoryList } from "../utils/slug.js";
 import { listPromotions } from "./promotion.service.js";
+import {
+  serializeHomeCategories,
+  extractHomeCategorySlugs,
+  syncRestaurantHomeCategories
+} from "./restaurantCategory.service.js";
 
 const NEARBY_CACHE_TTL = 60; // seconds
 const METERS_PER_DEGREE = 111320;
@@ -82,6 +89,18 @@ const isPromotionApplicableToItem = (promotion, itemId, restaurantId) => {
       if (Array.isArray(promotion.menu_items)) {
         return promotion.menu_items.some((menuItem) => String(menuItem.id) === normalizedItemId);
       }
+
+      // Backward compatibility: promotions created with a restaurant_id but without scope/menu items
+      // should still behave like restaurant-level promotions.
+      if (
+        promotion.restaurant_id &&
+        restaurantId &&
+        String(promotion.restaurant_id) === String(restaurantId) &&
+        !promotion.menu_item_id &&
+        (!Array.isArray(promotion.menu_items) || promotion.menu_items.length === 0)
+      ) {
+        return true;
+      }
       return false;
     case "restaurant":
       return promotion.restaurant_id && String(promotion.restaurant_id) === String(restaurantId);
@@ -125,6 +144,7 @@ const buildNearbyCacheKey = ({
   longitude,
   radius,
   categories,
+  home_categories,
   q,
   page,
   pageSize
@@ -137,6 +157,16 @@ const buildNearbyCacheKey = ({
     .filter(Boolean);
   normalizedCategories.sort();
   const categoriesKey = normalizedCategories.length ? normalizedCategories.join("|") : "all";
+
+  const homeCategoryList = Array.isArray(home_categories)
+    ? home_categories
+    : (home_categories ? [home_categories] : []);
+  const normalizedHomeCategories = homeCategoryList
+    .map((cat) => cat?.toString().trim())
+    .filter(Boolean);
+  normalizedHomeCategories.sort();
+  const homeCategoriesKey = normalizedHomeCategories.length ? normalizedHomeCategories.join("|") : "all";
+
   const queryKey = normalizeQueryKey(q) || "all";
   const tileSizeMeters = Math.max(radius, MIN_TILE_METERS);
   const tileSizeDegrees = Math.max(tileSizeMeters / METERS_PER_DEGREE, 0.0001);
@@ -150,7 +180,8 @@ const buildNearbyCacheKey = ({
     `page:${page}`,
     `pageSize:${pageSize}`,
     `query:${queryKey}`,
-    `cats:${categoriesKey}`
+    `cats:${categoriesKey}`,
+    `homeCats:${homeCategoriesKey}`
   ].join(":");
 };
 
@@ -186,13 +217,23 @@ const applyFavoritesToRestaurants = (restaurants = [], favoriteMap = new Map()) 
  */
 export const getAllRestaurants = async () => {
   const restaurants = await Restaurant.findAll({
-    order: [["created_at", "DESC"]]
+    order: [["created_at", "DESC"]],
+    include: [{
+      model: HomeCategory,
+      as: "home_categories",
+      attributes: ["id", "name", "slug", "description", "image_url", "display_order"]
+    }]
   });
 
-  return restaurants.map(r => ({
-    ...r.toJSON(),
-    is_open: r.isOpen()
-  }));
+  return restaurants.map((r) => {
+    const homeCategories = serializeHomeCategories(r.home_categories);
+    return {
+      ...r.toJSON(),
+      is_open: r.isOpen(),
+      home_categories: homeCategories,
+      categories: extractHomeCategorySlugs(homeCategories)
+    };
+  });
 };
 
 export const createRestaurant = async (payload) => {
@@ -219,9 +260,9 @@ export const createRestaurant = async (payload) => {
     throw new Error("Invalid latitude or longitude");
   }
 
-  const normalizedCategories = normalizeCategoryList(categories || ["uncategorized"]);
+  const normalizedCategories = normalizeCategoryList(categories || []);
   if (normalizedCategories.length === 0) {
-    normalizedCategories.push("other");
+    throw new Error("At least one category is required");
   }
 
   const userEmail = email || `restaurant-${Date.now()}@tawssil.local`;
@@ -248,13 +289,31 @@ export const createRestaurant = async (payload) => {
     is_active,
     is_premium,
     status,
-    opening_hours: opening_hours || null,
-    categories: normalizedCategories
+    opening_hours: opening_hours || null
+  });
+
+  await syncRestaurantHomeCategories(restaurant, normalizedCategories);
+  await restaurant.reload({
+    include: [{
+      model: HomeCategory,
+      as: "home_categories",
+      attributes: [
+        "id",
+        "name",
+        "slug",
+        "description",
+        "image_url",
+        "display_order"
+      ]
+    }]
   });
 
   const restaurantJson = restaurant.toJSON();
+  const homeCategories = serializeHomeCategories(restaurant.home_categories);
   return {
     ...restaurantJson,
+    home_categories: homeCategories,
+    categories: extractHomeCategorySlugs(homeCategories),
     uuid: restaurantJson.id,
     user_email: user.email
   };
@@ -272,9 +331,14 @@ export const filterNearbyRestaurants = async (filters) => {
     radius = 2000,
     q,
     categories,
+    home_categories,
     page = 1,
     pageSize = 20
   } = filters;
+
+  const normalizedCategoryFilter = normalizeCategoryList(
+    Array.isArray(categories) ? categories : (categories ? [categories] : [])
+  );
 
   let latitude, longitude;
 
@@ -356,6 +420,7 @@ export const filterNearbyRestaurants = async (filters) => {
     longitude,
     radius: searchRadius,
     categories,
+    home_categories,
     q,
     page: normalizedPage,
     pageSize: normalizedPageSize
@@ -371,102 +436,206 @@ export const filterNearbyRestaurants = async (filters) => {
     };
   }
 
-  const whereConditions = {
-    [Op.and]: [
-      { is_active: true },
-      { status: 'approved' },
-      literal(
-        `ST_DWithin(location, ST_GeogFromText('POINT(${longitude} ${latitude})'), ${searchRadius})`
+  const normalizedHomeCategoryIds = Array.isArray(home_categories)
+    ? home_categories.map((id) => String(id).trim()).filter(Boolean)
+    : (home_categories ? [String(home_categories).trim()].filter(Boolean) : []);
+
+  const categorySlugs = normalizedCategoryFilter;
+  const homeCategoryIds = [...new Set(normalizedHomeCategoryIds)];
+  const queryText = typeof q === "string" && q.trim() ? q.trim() : null;
+  const point = "ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography";
+  const sqlNearby = `
+    SELECT
+      r.id,
+      r.is_premium,
+      ST_Distance(r.location, ${point}) AS distance
+    FROM restaurants r
+    WHERE
+      r.is_active = true
+      AND r.status = 'approved'
+      AND ST_DWithin(r.location, ${point}, :radius)
+      AND (:q IS NULL OR r.name ILIKE '%' || :q || '%')
+      AND (
+        :hasCategorySlugFilter = false OR EXISTS (
+          SELECT 1
+          FROM restaurant_home_categories rhc
+          JOIN home_categories hc ON hc.id = rhc.home_category_id
+          WHERE rhc.restaurant_id = r.id
+            AND hc.slug = ANY(ARRAY[:categorySlugs]::text[])
+        )
       )
-    ]
-  };
+      AND (
+        :hasHomeCategoryIdFilter = false OR EXISTS (
+          SELECT 1
+          FROM restaurant_home_categories rhc
+          WHERE rhc.restaurant_id = r.id
+            AND rhc.home_category_id = ANY(ARRAY[:homeCategoryIds]::uuid[])
+        )
+      )
+    ORDER BY r.is_premium DESC, distance ASC
+    LIMIT :limit OFFSET :offset
+  `;
 
-  if (q && q.trim()) {
-    whereConditions[Op.and].push({
-      name: { [Op.iLike]: `%${q.trim()}%` }
-    });
-  }
-
-  if (categories) {
-    const categoryArray = Array.isArray(categories) ? categories : [categories];
-    whereConditions[Op.and].push({
-      categories: {
-        [Op.overlap]: categoryArray
+  const nearbyRows = await sequelize.query(sqlNearby, {
+    type: QueryTypes.SELECT,
+      replacements: {
+        lat: latitude,
+        lng: longitude,
+        radius: searchRadius,
+        q: queryText,
+        hasCategorySlugFilter: categorySlugs.length > 0,
+        hasHomeCategoryIdFilter: homeCategoryIds.length > 0,
+        categorySlugs,
+        homeCategoryIds,
+        limit,
+        offset
       }
-    });
-  }
-
-  const result = await Restaurant.findAll({
-    attributes: {
-      include: [
-        [
-          literal(`ST_Distance(location, ST_GeogFromText('POINT(${longitude} ${latitude})'))`),
-          "distance"
-        ]
-      ]
-    },
-    include: [
-      {
-        model: MenuItem,
-        as: "menu_items",
-        attributes: ["id", "nom", "description", "prix", "photo_url", "is_available", "temps_preparation"],
-        where: { is_available: true },
-        required: false,
-        separate: true,
-        limit: 2,
-        order: [["created_at", "DESC"]]
-      }
-    ],
-    where: whereConditions,
-    order: [
-      ["is_premium", "DESC"],
-      [literal("distance"), "ASC"]
-    ],
-    limit,
-    offset
   });
 
-  const formattedBase = result.map((r) => {
-    const coords = r.location?.coordinates || [];
-    const prepTime = 15;
-    const distanceMeters = r.dataValues.distance || 0;
-    const distanceKm = distanceMeters / 1000;
-    const speedKmh = 40;
-    const deliveryTimeMinutes = (distanceKm / speedKmh) * 60;
-    const deliveryTimeMin = Math.floor(deliveryTimeMinutes * 0.9);
-    const deliveryTimeMax = Math.ceil(deliveryTimeMinutes * 1.2);
+  const restaurantIds = nearbyRows.map((row) => row.id);
 
-    const sampleDishes = (r.menu_items || []).map((item) => ({
-      id: item.id,
-      name: item.nom,
-      description: item.description,
-      price: item.prix ? parseFloat(item.prix) : null,
-      image_url: item.photo_url,
-      is_available: item.is_available,
-      prep_time_minutes: item.temps_preparation
-    }));
+  if (restaurantIds.length === 0) {
+    const emptyPayload = {
+      formatted: [],
+      count: 0,
+      page: normalizedPage,
+      pageSize: normalizedPageSize,
+      radius: searchRadius,
+      center: { lat: latitude, lng: longitude },
+      searchType: address ? "address" : "coordinates"
+    };
+
+    await cacheService.set(cacheKey, emptyPayload, NEARBY_CACHE_TTL);
 
     return {
-      id: r.id,
-      name: r.name,
-      description: r.description,
-      address: r.address,
-      lat: coords[1] || null,
-      lng: coords[0] || null,
-      rating: r.rating,
-      delivery_time_min: prepTime + deliveryTimeMin,
-      delivery_time_max: prepTime + deliveryTimeMax,
-      image_url: r.image_url,
-      distance: distanceMeters,
-      is_premium: r.is_premium,
-      status: r.status,
-      is_open: r.isOpen(),
-      categories: r.categories,
-      favorite_uuid: null,
-      email: r.email || null,
-      menu_items: sampleDishes
+      ...emptyPayload,
+      formatted: [],
+      client_id: client_id || null
     };
+  }
+
+  const restaurants = await Restaurant.findAll({
+    where: { id: { [Op.in]: restaurantIds } },
+    attributes: [
+      "id",
+      "name",
+      "description",
+      "address",
+      "location",
+      "rating",
+      "image_url",
+      "is_premium",
+      "status",
+      "opening_hours",
+      "email",
+      "phone_number"
+    ],
+    include: [
+      {
+        model: HomeCategory,
+        as: "home_categories",
+        attributes: ["id", "name", "slug", "description", "image_url", "display_order"],
+        through: { attributes: [] },
+        required: false
+      }
+    ]
   });
+
+  const restaurantById = new Map(restaurants.map((restaurant) => [String(restaurant.id), restaurant]));
+
+  const sqlSamples = `
+    SELECT
+      id,
+      restaurant_id,
+      nom,
+      description,
+      prix,
+      photo_url,
+      is_available,
+      temps_preparation
+    FROM (
+      SELECT
+        id,
+        restaurant_id,
+        nom,
+        description,
+        prix,
+        photo_url,
+        is_available,
+        temps_preparation,
+        row_number() OVER (PARTITION BY restaurant_id ORDER BY created_at DESC) AS rn
+      FROM menu_items
+      WHERE restaurant_id = ANY(ARRAY[:restaurantIds]::uuid[])
+        AND is_available = true
+    ) t
+    WHERE rn <= 2
+    ORDER BY restaurant_id, rn ASC
+  `;
+
+  const sampleRows = await sequelize.query(sqlSamples, {
+    type: QueryTypes.SELECT,
+    replacements: {
+      restaurantIds
+    }
+  });
+
+  const sampleByRestaurant = new Map();
+  sampleRows.forEach((row) => {
+    const rid = String(row.restaurant_id);
+    const list = sampleByRestaurant.get(rid) || [];
+    list.push(row);
+    sampleByRestaurant.set(rid, list);
+  });
+
+  const prepTime = 15;
+  const formattedBase = nearbyRows
+    .map((row) => {
+      const restaurant = restaurantById.get(String(row.id));
+      if (!restaurant) return null;
+
+      const coords = restaurant.location?.coordinates || [];
+      const distanceMeters = toDecimal(row.distance);
+      const distanceKm = distanceMeters / 1000;
+      const speedKmh = 40;
+      const deliveryTimeMinutes = (distanceKm / speedKmh) * 60;
+      const deliveryTimeMin = Math.floor(deliveryTimeMinutes * 0.9);
+      const deliveryTimeMax = Math.ceil(deliveryTimeMinutes * 1.2);
+
+      const samples = sampleByRestaurant.get(String(restaurant.id)) || [];
+      const sampleDishes = samples.map((item) => ({
+        id: item.id,
+        name: item.nom,
+        description: item.description,
+        price: item.prix ? parseFloat(item.prix) : null,
+        image_url: item.photo_url,
+        is_available: item.is_available,
+        prep_time_minutes: item.temps_preparation
+      }));
+
+      const homeCategories = serializeHomeCategories(restaurant.home_categories);
+      return {
+        id: restaurant.id,
+        name: restaurant.name,
+        description: restaurant.description,
+        address: restaurant.address,
+        lat: coords[1] || null,
+        lng: coords[0] || null,
+        rating: restaurant.rating,
+        delivery_time_min: prepTime + deliveryTimeMin,
+        delivery_time_max: prepTime + deliveryTimeMax,
+        image_url: restaurant.image_url,
+        distance: distanceMeters,
+        is_premium: restaurant.is_premium,
+        status: restaurant.status,
+        is_open: restaurant.isOpen(),
+        home_categories: homeCategories,
+        categories: extractHomeCategorySlugs(homeCategories),
+        favorite_uuid: null,
+        email: restaurant.email || null,
+        menu_items: sampleDishes
+      };
+    })
+    .filter(Boolean);
 
   const cachePayload = {
     formatted: formattedBase,
@@ -502,6 +671,10 @@ export const filter = async (filters = {}) => {
     sort = "default"
   } = filters;
 
+  const normalizedCategoryFilter = normalizeCategoryList(
+    Array.isArray(categories) ? categories : (categories ? [categories] : [])
+  );
+
   const limit = Math.max(1, parseInt(pageSize, 10));
   const pageNum = Math.max(1, parseInt(page, 10));
   const offset = (pageNum - 1) * limit;
@@ -513,16 +686,6 @@ export const filter = async (filters = {}) => {
   if (q && q.trim()) {
     whereConditions[Op.and].push({
       name: { [Op.iLike]: `%${q.trim()}%` }
-    });
-  }
-
-  // Filter by categories
-  if (categories) {
-    const categoryArray = Array.isArray(categories) ? categories : [categories];
-    whereConditions[Op.and].push({
-      categories: {
-        [Op.overlap]: categoryArray
-      }
     });
   }
 
@@ -577,9 +740,26 @@ export const filter = async (filters = {}) => {
     ? whereConditions 
     : {};
 
+  const categoryInclude = {
+    model: HomeCategory,
+    as: "home_categories",
+    attributes: ["id", "name", "slug", "description", "image_url", "display_order"],
+    required: normalizedCategoryFilter.length > 0
+  };
+
+  if (normalizedCategoryFilter.length > 0) {
+    categoryInclude.where = {
+      slug: {
+        [Op.in]: normalizedCategoryFilter
+      }
+    };
+  }
+
   // Main query
   const { rows, count } = await Restaurant.findAndCountAll({
     where: whereClause,
+    include: [categoryInclude],
+    distinct: true,
     order,
     limit,
     offset
@@ -591,6 +771,7 @@ export const filter = async (filters = {}) => {
   // Format response
   let formatted = rows.map((r) => {
     const coords = r.location?.coordinates || [];
+    const homeCategories = serializeHomeCategories(r.home_categories);
 
     return {
       id: r.id,
@@ -610,7 +791,8 @@ export const filter = async (filters = {}) => {
       is_active: r.is_active,
       status: r.status,
       is_open: r.isOpen(),
-      categories: r.categories,
+      home_categories: homeCategories,
+      categories: extractHomeCategorySlugs(homeCategories),
       created_at: r.created_at,
       updated_at: r.updated_at
     };
@@ -793,11 +975,27 @@ export const updateRestaurant = async (id, data) => {
     is_premium,
     status,
     opening_hours,
-    ...(categories && { categories }), // Only update if provided
-    ...(email !== undefined && { email }) // Only update if provided
+    ...(email !== undefined && { email })
   });
 
-  return resto;
+  if (categories !== undefined) {
+    await syncRestaurantHomeCategories(resto, categories);
+  }
+
+  await resto.reload({
+    include: [{
+      model: HomeCategory,
+      as: "home_categories",
+      attributes: ["id", "name", "slug", "description", "image_url", "display_order"]
+    }]
+  });
+
+  const restaurantPlain = resto.get({ plain: true });
+  const homeCategories = serializeHomeCategories(resto.home_categories);
+  restaurantPlain.home_categories = homeCategories;
+  restaurantPlain.categories = extractHomeCategorySlugs(homeCategories);
+
+  return restaurantPlain;
 };
 
 /**
@@ -813,48 +1011,62 @@ export const deleteRestaurant = async (id) => {
   return deleted;
 };
 
-export const getCategoriesWithMenuItems = async (restaurantId, clientId = null) => {
+export const getCategoriesWithMenuItems = async (restaurantId, clientId = null, options = {}) => {
   // Verify restaurant exists
-  const restaurant = await Restaurant.findByPk(restaurantId);
+  const restaurant = await Restaurant.findByPk(restaurantId, {
+    include: [{
+      model: HomeCategory,
+      as: "home_categories",
+      attributes: ["id", "name", "slug", "description", "image_url", "display_order"]
+    }]
+  });
   if (!restaurant) {
     throw new Error('Restaurant not found');
   }
 
   const restaurantPlain = restaurant.get({ plain: true });
+  const homeCategories = serializeHomeCategories(restaurant.home_categories);
+  restaurantPlain.home_categories = homeCategories;
+  restaurantPlain.categories = extractHomeCategorySlugs(homeCategories);
   const coordinates = restaurant.getCoordinates();
   if (coordinates) {
     restaurantPlain.coordinates = coordinates;
   }
 
+  const includeUnavailable = options.includeUnavailable ?? false;
+  const menuItemInclude = {
+    model: MenuItem,
+    as: 'items', // association alias
+    required: false,
+    attributes: [
+      'id',
+      'nom',
+      'description',
+      'prix',
+      'photo_url',
+      'temps_preparation',
+      'is_available'
+    ],
+    include: [{
+      model: Addition,
+      as: 'additions',
+      attributes: [
+        'id',
+        'nom',
+        'description',
+        'prix',
+        'is_available'
+      ]
+    }]
+  };
+  if (!includeUnavailable) {
+    menuItemInclude.where = { is_available: true };
+  }
+
   const [categories, promotions] = await Promise.all([
     FoodCategory.findAll({
       where: { restaurant_id: restaurantId },
-      include: [{
-        model: MenuItem,
-        as: 'items', // association alias
-        where: { is_available: true },
-        required: false,
-        attributes: [
-          'id',
-          'nom',
-          'description',
-          'prix',
-          'photo_url',
-          'temps_preparation',
-          'is_available'
-        ],
-        include: [{
-          model: Addition,
-          as: 'additions',
-          attributes: [
-            'id',
-            'nom',
-            'description',
-            'prix',
-            'is_available'
-          ]
-        }]
-      }],
+      include: [menuItemInclude],
       order: [
         ['ordre_affichage', 'ASC'],
         ['created_at', 'DESC'],
@@ -1081,7 +1293,12 @@ export const getRestaurantStatistics = async (restaurantId, filters = {}) => {
  */
 export const getRestaurantProfile = async (id) => {
   const restaurant = await Restaurant.findOne({ 
-    where: { id }
+    where: { id },
+    include: [{
+      model: HomeCategory,
+      as: "home_categories",
+      attributes: ["id", "name", "slug", "description", "image_url", "display_order"]
+    }]
   });
 
   if (!restaurant) {
@@ -1089,6 +1306,8 @@ export const getRestaurantProfile = async (id) => {
   }
 
   const coords = restaurant.location?.coordinates || [];
+
+  const homeCategories = serializeHomeCategories(restaurant.home_categories);
 
   return {
     id: restaurant.id,
@@ -1110,7 +1329,8 @@ export const getRestaurantProfile = async (id) => {
     is_premium: restaurant.is_premium,
     status: restaurant.status,
     opening_hours: restaurant.opening_hours,
-    categories: restaurant.categories,
+    home_categories: homeCategories,
+    categories: extractHomeCategorySlugs(homeCategories),
     is_open: restaurant.isOpen(),
     created_at: restaurant.created_at,
     updated_at: restaurant.updated_at
@@ -1248,7 +1468,12 @@ export const getRestaurantOrdersHistory = async (restaurantId, filters = {}) => 
       {
         model: Restaurant,
         as: 'restaurant',
-        required: false
+        required: false,
+        include: [{
+          model: HomeCategory,
+          as: 'home_categories',
+          attributes: ["id", "name", "slug", "description", "image_url", "display_order"]
+        }]
       },
       {
         model: Client,
@@ -1301,6 +1526,9 @@ export const getRestaurantOrdersHistory = async (restaurantId, filters = {}) => 
   const formattedOrders = rows.map(order => {
     const restaurantCoords = order.restaurant?.location?.coordinates || [];
     const deliveryCoords = order.delivery_location?.coordinates || [];
+    const restaurantHomeCategories = order.restaurant
+      ? serializeHomeCategories(order.restaurant.home_categories)
+      : [];
 
     return {
       id: order.id,
@@ -1363,7 +1591,8 @@ export const getRestaurantOrdersHistory = async (restaurantId, filters = {}) => 
         is_premium: order.restaurant.is_premium,
         status: order.restaurant.status,
         opening_hours: order.restaurant.opening_hours,
-        categories: order.restaurant.categories,
+        home_categories: restaurantHomeCategories,
+        categories: extractHomeCategorySlugs(restaurantHomeCategories),
         created_at: order.restaurant.created_at,
         updated_at: order.restaurant.updated_at
       } : null,

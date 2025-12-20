@@ -320,6 +320,102 @@ export const update = async (req, res, next) => {
 };
 
 /**
+ * Admin: create a menu item for any restaurant category
+ */
+export const adminCreate = async (req, res, next) => {
+  try {
+    const created = await menuItemService.createMenuItem(req.body);
+    const full = await menuItemService.getMenuItemById(created.id);
+    res.status(201).json({
+      success: true,
+      data: full
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Admin: update any menu item
+ */
+export const adminUpdate = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const item = await MenuItem.findByPk(id);
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Menu item not found"
+      });
+    }
+
+    if (req.body.category_id && req.body.category_id !== item.category_id) {
+      const newCategory = await FoodCategory.findByPk(req.body.category_id);
+      if (!newCategory) {
+        return res.status(404).json({
+          success: false,
+          message: "New category not found"
+        });
+      }
+      if (String(newCategory.restaurant_id) !== String(item.restaurant_id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Cannot move menu item to a category from a different restaurant"
+        });
+      }
+    }
+
+    const updated = await menuItemService.updateMenuItem(id, req.body);
+    res.json({
+      success: true,
+      data: updated
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Admin: delete any menu item
+ */
+export const adminRemove = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const item = await MenuItem.findByPk(id);
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Menu item not found"
+      });
+    }
+
+    const result = await menuItemService.deleteMenuItem(id);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Admin: toggle availability for any menu item
+ */
+export const adminToggleAvailability = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const result = await menuItemService.toggleAvailability(id);
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
  * Toggle a menu item's availability
  * ✅ Restaurant toggle SON item
  */

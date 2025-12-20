@@ -16,6 +16,7 @@ import AdminNotification from "./AdminNotification.js";
 import SystemConfig from "./SystemConfig.js";
 import Cashier from "./Cashier.js";
 import HomeCategory from "./HomeCategory.js";
+import RestaurantHomeCategory from "./RestaurantHomeCategory.js";
 import ThematicSelection from "./ThematicSelection.js";
 import Promotion from "./Promotion.js";
 import PromotionMenuItem from "./PromotionMenuItem.js";
@@ -476,6 +477,24 @@ ThematicSelection.belongsTo(HomeCategory, {
   as: 'home_category'
 });
 
+Restaurant.belongsToMany(HomeCategory, {
+  through: RestaurantHomeCategory,
+  foreignKey: 'restaurant_id',
+  otherKey: 'home_category_id',
+  as: 'home_categories',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE'
+});
+
+HomeCategory.belongsToMany(Restaurant, {
+  through: RestaurantHomeCategory,
+  foreignKey: 'home_category_id',
+  otherKey: 'restaurant_id',
+  as: 'restaurants',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE'
+});
+
 
 // ==========================
 // ⚙️ SystemConfig & Admin
@@ -539,11 +558,12 @@ export {
   FavoriteMeal, 
   Driver,
   User,
-   Admin, 
+  Admin, 
   AdminNotification, 
   SystemConfig,
   Cashier,
   HomeCategory,
+  RestaurantHomeCategory,
   ThematicSelection,
   Promotion,
   PromotionMenuItem,

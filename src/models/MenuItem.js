@@ -44,7 +44,9 @@ const MenuItem = sequelize.define("MenuItem", {
   createdAt: "created_at",
   updatedAt: "updated_at",
   indexes: [
-    { fields: ['category_id'] }
+    { fields: ["category_id"] },
+    { fields: ["restaurant_id"] },
+    { fields: ["restaurant_id", "is_available", "created_at"] }
   ]
 });
 

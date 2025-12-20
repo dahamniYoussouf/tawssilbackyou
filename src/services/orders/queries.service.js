@@ -51,8 +51,16 @@ export async function getAllOrdersService(filters = {}) {
           },
         ],
       },
-      { model: Restaurant, as: "restaurant", attributes: ["id", "name", "image_url", "email"] },
-      { model: Client, as: "client", attributes: ["id", "first_name", "last_name", "email"] },
+      {
+        model: Restaurant,
+        as: "restaurant",
+        attributes: ["id", "name", "image_url", "email", "address", "phone_number"],
+      },
+      {
+        model: Client,
+        as: "client",
+        attributes: ["id", "first_name", "last_name", "email", "phone_number", "address"],
+      },
       { model: Driver, as: "driver", attributes: ["id", "first_name", "last_name", "phone", "current_location"] },
     ],
     order: [["created_at", "DESC"]],

@@ -49,6 +49,11 @@ export const nearbyFilter = async (req, res, next) => {
       req.body.categories = req.body.categories.split(',').map(c => c.trim());
     }
 
+    // Parse home_categories if it's a string (comma-separated UUIDs)
+    if (req.body.home_categories && typeof req.body.home_categories === 'string') {
+      req.body.home_categories = req.body.home_categories.split(',').map(c => c.trim());
+    }
+
     // ✅ Get client_id from JWT token (guaranteed to exist because of isClient middleware)
     const filters = {
       ...req.body,
@@ -63,6 +68,7 @@ export const nearbyFilter = async (req, res, next) => {
       radius: filters.radius || 2000,
       q: filters.q,
       categories: filters.categories ? (Array.isArray(filters.categories) ? filters.categories.sort().join(',') : filters.categories) : null,
+      home_categories: filters.home_categories ? (Array.isArray(filters.home_categories) ? filters.home_categories.sort().join(',') : filters.home_categories) : null,
       page: filters.page || 1,
       pageSize: filters.pageSize || 20,
       client_id: filters.client_id
@@ -306,6 +312,24 @@ export const getRestaurantMenu = async (req, res) => {
   }
 };
 
+/**
+ * Get restaurant menu with categories and items (admin)
+ */
+export const getRestaurantMenuAdmin = async (req, res, next) => {
+  try {
+    const { restaurantId } = req.params;
+    const menu = await restaurantService.getCategoriesWithMenuItems(restaurantId, null, {
+      includeUnavailable: true
+    });
+    res.status(200).json({
+      success: true,
+      data: menu
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 
 /**
  * Get restaurant statistics
@@ -399,7 +423,9 @@ export const getMyRestaurantMenu = async (req, res, next) => {
     }
 
     // Get complete menu using existing service
-    const menu = await restaurantService.getCategoriesWithMenuItems(restaurantId);
+    const menu = await restaurantService.getCategoriesWithMenuItems(restaurantId, null, {
+      includeUnavailable: true
+    });
 
     res.json({
       success: true,

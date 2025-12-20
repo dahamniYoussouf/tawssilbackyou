@@ -1,5 +1,6 @@
 import express from 'express';
 import { protect, authorize } from '../middlewares/auth.js';
+import { cacheMiddleware } from '../middlewares/cache.middleware.js';
 import * as adminCtrl from '../controllers/admin.controller.js';
 import { 
   getDeliveryConfig, 
@@ -49,6 +50,21 @@ const router = express.Router();
 
 // Toutes les routes admin nécessitent authentification + rôle admin
 router.use(protect, authorize('admin'));
+router.use(
+  cacheMiddleware({
+    ttl: 60,
+    shouldCache: (req) => {
+      const path = req.path || '';
+      if (path.startsWith('/cache')) return false;
+      if (path.startsWith('/notifications')) return false;
+      if (path === '/statistics') return false;
+      if (path === '/monitoring') return false;
+      if (path === '/config/all') return false;
+      if (path.startsWith('/top/')) return false;
+      return true;
+    }
+  })
+);
 
 // Profil
 router.get('/profile/me', adminCtrl.getProfile);

@@ -1,4 +1,5 @@
 import HomeCategory from "../src/models/HomeCategory.js";
+import RestaurantHomeCategory from "../src/models/RestaurantHomeCategory.js";
 import ThematicSelection from "../src/models/ThematicSelection.js";
 import RecommendedDish from "../src/models/RecommendedDish.js";
 import Promotion from "../src/models/Promotion.js";
@@ -7,7 +8,7 @@ import DailyDeal from "../src/models/DailyDeal.js";
 import Announcement from "../src/models/Announcement.js";
 import { slugify } from "../src/utils/slug.js";
 
-export const seedHomepageModules = async ({ restaurants, restaurantMenuMap }) => {
+export const seedHomepageModules = async ({ restaurants, restaurantMenuMap, categoryAssignments = [] }) => {
   if (!restaurants?.length) {
     return {
       homeCategoryCount: 0,
@@ -57,6 +58,29 @@ export const seedHomepageModules = async ({ restaurants, restaurantMenuMap }) =>
 
   const createdHomeCategories = await HomeCategory.bulkCreate(homeCategoryTemplates, { returning: true });
   const findHomeCategoryId = (name) => createdHomeCategories.find((cat) => cat.name === name)?.id;
+  const slugToCategory = new Map(createdHomeCategories.map((category) => [category.slug, category.id]));
+  const assignmentRows = [];
+
+  (categoryAssignments || []).forEach((assignment) => {
+    if (!assignment || !assignment.restaurantId) {
+      return;
+    }
+    const rawSlugs = Array.isArray(assignment.categories) ? assignment.categories : [];
+    const normalizedSlugs = [...new Set(rawSlugs.map((slug) => slugify(slug)).filter(Boolean))];
+    normalizedSlugs.forEach((slug) => {
+      const homeCategoryId = slugToCategory.get(slug);
+      if (homeCategoryId) {
+        assignmentRows.push({
+          restaurant_id: assignment.restaurantId,
+          home_category_id: homeCategoryId
+        });
+      }
+    });
+  });
+
+  if (assignmentRows.length > 0) {
+    await RestaurantHomeCategory.bulkCreate(assignmentRows, { ignoreDuplicates: true });
+  }
 
   const thematicTemplates = [
     {

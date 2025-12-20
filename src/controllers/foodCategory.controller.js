@@ -200,3 +200,72 @@ export const remove = async (req, res, next) => {
     next(err);
   }
 };
+
+// ==================== ADMIN HELPERS ====================
+
+export const adminCreateForRestaurant = async (req, res, next) => {
+  try {
+    const { restaurantId } = req.params;
+    const { nom, description, icone_url, ordre_affichage } = req.body;
+
+    const category = await createCategory({
+      restaurant_id: restaurantId,
+      nom,
+      description,
+      icone_url,
+      ordre_affichage
+    });
+
+    res.status(201).json({ success: true, data: category });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const adminUpdate = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { nom, description, icone_url, ordre_affichage } = req.body;
+
+    const category = await FoodCategory.findByPk(id);
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: "Food category not found"
+      });
+    }
+
+    const updated = await updateCategory(id, {
+      nom,
+      description,
+      icone_url,
+      ordre_affichage
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const adminRemove = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const category = await FoodCategory.findByPk(id);
+    if (!category) {
+      return res.status(404).json({
+        success: false,
+        message: "Food category not found"
+      });
+    }
+
+    await deleteCategory(id);
+    res.json({
+      success: true,
+      message: "Food category deleted successfully"
+    });
+  } catch (err) {
+    next(err);
+  }
+};

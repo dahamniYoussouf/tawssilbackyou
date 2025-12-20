@@ -11,7 +11,7 @@ import {
   updateMaxOrdersPerDriver 
 } from '../services/multiDeliveryService.js';
 import SystemConfig from '../models/SystemConfig.js';
-import { emit } from '../config/socket.js';
+import { emit, getOnlineCounts } from '../config/socket.js';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
@@ -1184,16 +1184,28 @@ export const getStatistics = async (req, res, next) => {
     // Try to get from cache
     const cached = await cacheService.get(cacheKey);
     if (cached !== null) {
+      const online = getOnlineCounts();
       return res.json({
         success: true,
-        data: cached,
+        data: { ...cached, online },
         cached: true
       });
     }
 
-    // Get all orders
+    // Get all orders (needed for dashboard totals + timing analytics)
     const orders = await Order.findAll({
-      attributes: ['id', 'status', 'total_amount', 'created_at']
+      attributes: [
+        'id',
+        'status',
+        'order_type',
+        'total_amount',
+        'created_at',
+        'accepted_at',
+        'preparing_started_at',
+        'assigned_at',
+        'delivering_started_at',
+        'delivered_at'
+      ]
     });
 
     // Calculate order statistics
@@ -1213,6 +1225,88 @@ export const getStatistics = async (req, res, next) => {
     const avgOrderValue = completedOrders > 0 
       ? totalRevenue / completedOrders 
       : 0;
+
+    // ====================
+    // Order pipeline timing (avg time between steps)
+    // ====================
+    const pipelinePeriodDays = 7;
+    const pipelineSince = new Date(Date.now() - pipelinePeriodDays * 24 * 60 * 60 * 1000);
+    const deliveredRecent = orders.filter((o) => {
+      if (o.status !== 'delivered') return false;
+      if (!o.created_at) return false;
+      return new Date(o.created_at) >= pipelineSince;
+    });
+
+    const durations = {
+      pending_to_accepted: [],
+      accepted_to_preparing: [],
+      preparing_to_assigned: [],
+      assigned_to_delivering: [],
+      delivering_to_delivered: [],
+      created_to_delivered: []
+    };
+
+    const pushDuration = (arr, fromDate, toDate) => {
+      if (!fromDate || !toDate) return;
+      const fromMs = new Date(fromDate).getTime();
+      const toMs = new Date(toDate).getTime();
+      if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) return;
+      const diff = toMs - fromMs;
+      if (diff < 0) return;
+      arr.push(diff);
+    };
+
+    deliveredRecent.forEach((order) => {
+      pushDuration(durations.pending_to_accepted, order.created_at, order.accepted_at);
+      pushDuration(durations.accepted_to_preparing, order.accepted_at, order.preparing_started_at);
+      pushDuration(durations.preparing_to_assigned, order.preparing_started_at, order.assigned_at);
+      pushDuration(durations.assigned_to_delivering, order.assigned_at, order.delivering_started_at);
+      pushDuration(durations.delivering_to_delivered, order.delivering_started_at, order.delivered_at);
+      pushDuration(durations.created_to_delivered, order.created_at, order.delivered_at);
+    });
+
+    const averageMs = (arr) =>
+      arr.length ? arr.reduce((sum, val) => sum + val, 0) / arr.length : 0;
+
+    const toMinutes = (ms) => Number((ms / 60000).toFixed(1));
+
+    const pipeline = {
+      period_days: pipelinePeriodDays,
+      sample_size: deliveredRecent.length,
+      total_avg_minutes: toMinutes(averageMs(durations.created_to_delivered)),
+      steps: [
+        {
+          key: 'pending_to_accepted',
+          label: "Validation → Acceptation",
+          avg_minutes: toMinutes(averageMs(durations.pending_to_accepted)),
+          samples: durations.pending_to_accepted.length
+        },
+        {
+          key: 'accepted_to_preparing',
+          label: "Acceptation → Préparation",
+          avg_minutes: toMinutes(averageMs(durations.accepted_to_preparing)),
+          samples: durations.accepted_to_preparing.length
+        },
+        {
+          key: 'preparing_to_assigned',
+          label: "Préparation → Assignation",
+          avg_minutes: toMinutes(averageMs(durations.preparing_to_assigned)),
+          samples: durations.preparing_to_assigned.length
+        },
+        {
+          key: 'assigned_to_delivering',
+          label: "Assignation → Départ",
+          avg_minutes: toMinutes(averageMs(durations.assigned_to_delivering)),
+          samples: durations.assigned_to_delivering.length
+        },
+        {
+          key: 'delivering_to_delivered',
+          label: "Départ → Livré",
+          avg_minutes: toMinutes(averageMs(durations.delivering_to_delivered)),
+          samples: durations.delivering_to_delivered.length
+        }
+      ]
+    };
 
     // Get restaurant statistics
     const restaurants = await Restaurant.findAll({
@@ -1287,15 +1381,17 @@ export const getStatistics = async (req, res, next) => {
         active: activeClients,
         verified: verifiedClients
       },
-      notifications: notificationStats
+      notifications: notificationStats,
+      pipeline
     };
 
     // Cache for 2 minutes (120 seconds)
     await cacheService.set(cacheKey, statistics, 120);
 
+    const online = getOnlineCounts();
     res.json({
       success: true,
-      data: statistics,
+      data: { ...statistics, online },
       cached: false
     });
   } catch (err) {

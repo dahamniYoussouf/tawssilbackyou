@@ -1,7 +1,6 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../config/database.js";
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
-import { normalizeCategoryList, slugify } from "../utils/slug.js";
 
 const isTestEnv = process.env.NODE_ENV === "test";
 
@@ -23,11 +22,6 @@ if (!isTestEnv) {
       fields: ['location'],
       using: 'gist',
       name: 'restaurants_location_gix'
-    },
-    {
-      fields: ['categories'],
-      using: 'gin',
-      name: 'restaurants_categories_gin'
     }
   );
 }
@@ -129,28 +123,6 @@ const Restaurant = sequelize.define('Restaurant', {
     allowNull: true,
     comment: "Opening hours per day, e.g.: { Mon: {open: 9:00 a.m., close: 6:00 p.m.}, Tue: {...} }"
   }, 
-  categories: {
-    type: isTestEnv
-      ? DataTypes.JSON
-      : DataTypes.ARRAY(DataTypes.STRING),
-    allowNull: false,
-    defaultValue: [],
-    validate: {
-      isValidArray(value) {
-        if (!Array.isArray(value)) {
-          throw new Error('Categories must be an array');
-        }
-        if (value.length === 0) {
-          throw new Error('Restaurant must have at least one category');
-        }
-        const normalized = normalizeCategoryList(value);
-        if (normalized.length === 0) {
-          throw new Error('Categories must contain valid slugs');
-        }
-      }
-    },
-    comment: "Restaurant categories (can have multiple)"
-  },
 }, {
   tableName: 'restaurants',
   timestamps: true,
@@ -170,14 +142,6 @@ const Restaurant = sequelize.define('Restaurant', {
     }
   },
   indexes: restaurantIndexes
-});
-
-const sanitizeCategories = (values) => normalizeCategoryList(values);
-
-Restaurant.beforeValidate((restaurant) => {
-  if (restaurant.categories) {
-    restaurant.categories = sanitizeCategories(restaurant.categories);
-  }
 });
 
 // Helper methods
@@ -210,28 +174,6 @@ Restaurant.prototype.isOpen = function () {
   if (!todayHours) return false;
 
   return currentTime >= todayHours.open && currentTime <= todayHours.close;
-};
-
-Restaurant.prototype.hasCategory = function(category) {
-  const slug = slugify(category);
-  return !!slug && Array.isArray(this.categories) && this.categories.includes(slug);
-};
-
-Restaurant.prototype.addCategory = function(category) {
-  const slug = slugify(category);
-  if (!slug) return;
-  if (!Array.isArray(this.categories)) {
-    this.categories = [];
-  }
-  if (!this.categories.includes(slug)) {
-    this.categories.push(slug);
-  }
-};
-
-Restaurant.prototype.removeCategory = function(category) {
-  const slug = slugify(category);
-  if (!slug || !Array.isArray(this.categories)) return;
-  this.categories = this.categories.filter((cat) => cat !== slug);
 };
 
 export default Restaurant;

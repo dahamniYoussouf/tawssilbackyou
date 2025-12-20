@@ -1,6 +1,8 @@
 import { body } from 'express-validator';
 import { normalizePhoneNumber } from '../utils/phoneNormalizer.js';
 
+const CATEGORY_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 // Request OTP validator
 export const requestOTPValidator = [
   body('phone_number')
@@ -141,13 +143,20 @@ export const registerValidator = [
     .isArray({ min: 1 })
     .withMessage('Categories must be an array with at least one item')
     .custom((value) => {
-      const validCategories = ['pizza', 'burger', 'tacos', 'sandwish'];
-      const isValid = value.every(cat => validCategories.includes(cat));
-      if (!isValid) {
-        throw new Error('Invalid category. Must be one of: pizza, burger, tacos, sandwish');
+      if (!Array.isArray(value)) {
+        throw new Error('Categories must be an array');
+      }
+      const allValid = value.every((cat) => typeof cat === 'string' && CATEGORY_SLUG_PATTERN.test(cat));
+      if (!allValid) {
+        throw new Error('Each category must be a slug (lowercase letters, numbers, hyphens)');
       }
       return true;
     }),
+  body('categories.*')
+    .if(body('type').equals('restaurant'))
+    .trim()
+    .matches(CATEGORY_SLUG_PATTERN)
+    .withMessage('Each category must be a slug (lowercase letters, numbers, hyphens)'),
   
   body('address')
     .if(body('type').equals('restaurant'))

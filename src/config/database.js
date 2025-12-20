@@ -1,5 +1,4 @@
 import { Sequelize } from "sequelize";
-
 let sequelize;
 
 if (process.env.NODE_ENV === "test") {
@@ -29,7 +28,6 @@ if (process.env.NODE_ENV === "test") {
         },
       },
       logging: false,
-      
       // Retry logic pour gérer les connexions échouées
       retry: {
         max: 3  // Réessayer 3 fois en cas d'échec
@@ -40,7 +38,6 @@ if (process.env.NODE_ENV === "test") {
 
 export { sequelize };
 export default sequelize;
-
 
 // import { Sequelize } from "sequelize";
 
@@ -53,4 +50,6 @@ export default sequelize;
 // });
 
 // export default sequelize;
-// export { sequelize }
+// export { sequelize };
+
+//A£Ns1^Q]6Ow9L9v6uU,eRoa-1v.WOo-cVXJ4Q:Df`2>z-,+

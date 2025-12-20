@@ -10,6 +10,7 @@ import {
   registerCashier        
 } from '../controllers/auth.controller.js';
 import { protect, authorize } from '../middlewares/auth.js';
+import { cacheMiddleware } from '../middlewares/cache.middleware.js';
 import { validate } from '../middlewares/validate.js';
 import {
   requestOTPValidator,
@@ -62,7 +63,7 @@ router.post('/logout', logoutValidator, validate, logout);
  * Retrieve the current authenticated user's profile.
  * Requires a valid bearer token.
  */
-router.get('/profile', protect, getProfile);
+router.get('/profile', protect, cacheMiddleware({ ttl: 30 }), getProfile);
 
 /**
  * Register a new cashier account.

@@ -27,6 +27,7 @@ import Cashier from "../src/models/Cashier.js";
 import { seedHomepageModules } from "./homepageSeeder.js";
 
 import bcrypt from "bcryptjs";
+import { randomUUID } from "crypto";
 
 // ===============================
 //   Données de base
@@ -177,10 +178,9 @@ const seedDatabase = async () => {
   try {
     console.log("🌱 Starting massive database seeding...");
 
-    await sequelize.sync({ force: true });
+    await sequelize.sync({ force: true, cascade: true });
 
     console.log("🗑️  Clearing existing data...");
-    await sequelize.query('SET CONSTRAINTS ALL DEFERRED');
     await sequelize.truncate({ cascade: true, restartIdentity: true });
 
     // ✅ Hash password once
@@ -425,7 +425,6 @@ const seedDatabase = async () => {
         is_active: Math.random() > 0.1,
         is_premium: Math.random() > 0.7,
         status: Math.random() > 0.9 ? "suspended" : "approved",
-        categories: model.categories,
         opening_hours: {
           mon: { open: 1000, close: 2200 },
           tue: { open: 1000, close: 2200 },
@@ -441,6 +440,10 @@ const seedDatabase = async () => {
     }
 
     const restaurants = await Restaurant.bulkCreate(restaurantList, { returning: true });
+    const categoryAssignments = restaurants.map((restaurant, index) => ({
+      restaurantId: restaurant.id,
+      categories: restaurantModels[index % restaurantModels.length].categories
+    }));
     console.log(`✅ ${restaurants.length} restaurants created`);
 
 
@@ -528,14 +531,16 @@ const seedDatabase = async () => {
 
     for (let i = 0; i < restaurants.length; i++) {
       const restaurant = restaurants[i];
+      const model = restaurantModels[i % restaurantModels.length];
+      const parentCategories = Array.isArray(model.categories) ? model.categories : [];
       
-      for (const categoryType of restaurant.categories) {
+      for (const categoryType of parentCategories) {
         const category = await FoodCategory.create({
           restaurant_id: restaurant.id,
           nom: categoryType.charAt(0).toUpperCase() + categoryType.slice(1),
           description: `${restaurant.name}'s ${categoryType} selection`,
           icone_url: "https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=200",
-          ordre_affichage: restaurant.categories.indexOf(categoryType) + 1
+          ordre_affichage: parentCategories.indexOf(categoryType) + 1
         });
 
         const items = menuItemsByCategory[categoryType] || [];
@@ -560,6 +565,7 @@ const seedDatabase = async () => {
           const shuffledExtras = [...additionTemplates].sort(() => 0.5 - Math.random()).slice(0, extrasCount);
           const createdExtras = await Addition.bulkCreate(
             shuffledExtras.map(extra => ({
+              id: randomUUID(),
               menu_item_id: menuItem.id,
               nom: extra.nom,
               description: extra.description,
@@ -580,7 +586,8 @@ const seedDatabase = async () => {
 
     await seedHomepageModules({
       restaurants,
-      restaurantMenuMap
+      restaurantMenuMap,
+      categoryAssignments
     });
 
     // ----------------------------

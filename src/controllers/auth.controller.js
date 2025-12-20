@@ -5,9 +5,15 @@ import Driver from '../models/Driver.js';
 import Restaurant from '../models/Restaurant.js';
 import Admin from '../models/Admin.js';
 import Cashier from '../models/Cashier.js';
+import HomeCategory from '../models/HomeCategory.js';
 import { normalizeCategoryList } from '../utils/slug.js';
 import { CASHIER_STATUS_VALUES } from "../validators/cashierValidator.js";
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
+import {
+  serializeHomeCategories,
+  extractHomeCategorySlugs,
+  syncRestaurantHomeCategories
+} from '../services/restaurantCategory.service.js';
 import * as favoriteAddressService from '../services/favoriteAddress.service.js';
 
 
@@ -394,9 +400,23 @@ export const register = async (req, res) => {
           is_active: isActive,
           is_premium: isPremium,
           status: 'pending',
-          opening_hours: profileData.opening_hours || null,
-          categories: categories
+          opening_hours: profileData.opening_hours || null
         });
+
+        await syncRestaurantHomeCategories(profile, categories);
+        await profile.reload({
+          include: [{
+            model: HomeCategory,
+            as: "home_categories",
+            attributes: ["id", "name", "slug", "description", "image_url", "display_order"]
+          }]
+        });
+
+        const homeCategories = serializeHomeCategories(profile.home_categories);
+        const profilePlain = profile.get({ plain: true });
+        profilePlain.home_categories = homeCategories;
+        profilePlain.categories = extractHomeCategorySlugs(homeCategories);
+        profile = profilePlain;
         break;
       }
     }

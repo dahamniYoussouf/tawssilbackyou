@@ -82,6 +82,36 @@ const fetchMenuItemsAndValidate = async (ids = [], restaurantId) => {
   return menuItems;
 };
 
+const resolveRestaurantIdFromMenuItem = (menuItem) => {
+  if (!menuItem) return null;
+  const restaurantId = menuItem.restaurant_id ?? menuItem.category?.restaurant_id ?? null;
+  if (!restaurantId) {
+    return null;
+  }
+  const normalized = String(restaurantId).trim();
+  return normalized ? normalized : null;
+};
+
+const deriveRestaurantIdFromMenuItems = (menuItems = []) => {
+  const unique = new Set();
+  menuItems.forEach((menuItem) => {
+    const restaurantId = resolveRestaurantIdFromMenuItem(menuItem);
+    if (restaurantId) {
+      unique.add(restaurantId);
+    }
+  });
+
+  if (unique.size === 0) {
+    return null;
+  }
+
+  if (unique.size > 1) {
+    throw new Error("All menu items must belong to the same restaurant");
+  }
+
+  return Array.from(unique)[0];
+};
+
 const computeMenuItemIdsFromPayload = (payload) => {
   const ids = new Set(payload.menu_item_ids || []);
   if (payload.menu_item_id) {
@@ -186,18 +216,26 @@ const ensureRestaurant = async (restaurantId) => {
 };
 
 export const createPromotion = async (payload) => {
-  await ensureRestaurant(payload.restaurant_id);
-  const promotionPayload = {
-    ...payload,
-    badge_text: deriveBadgeText(payload)
-  };
-
   const menuItemIds = computeMenuItemIdsFromPayload(payload);
   let menuItems = [];
+  let resolvedRestaurantId = payload.restaurant_id;
   if (menuItemIds.length) {
     menuItems = await fetchMenuItemsAndValidate(menuItemIds, payload.restaurant_id);
+    resolvedRestaurantId = payload.restaurant_id || deriveRestaurantIdFromMenuItems(menuItems);
     await ensureMenuItemsAreNotInOtherPromotions(menuItems);
   }
+
+  await ensureRestaurant(resolvedRestaurantId);
+
+  const resolvedScope =
+    payload.scope ?? (menuItems.length ? "menu_item" : resolvedRestaurantId ? "restaurant" : "global");
+
+  const promotionPayload = {
+    ...payload,
+    restaurant_id: resolvedRestaurantId,
+    scope: resolvedScope,
+    badge_text: deriveBadgeText(payload)
+  };
 
   const promotion = await Promotion.create(promotionPayload);
   if (menuItems.length) {
@@ -257,10 +295,6 @@ export const updatePromotion = async (id, payload) => {
   const promotion = await Promotion.findByPk(id);
   if (!promotion) return null;
 
-  if (payload.restaurant_id) {
-    await ensureRestaurant(payload.restaurant_id);
-  }
-
   const updatedPayload = {
     ...payload
   };
@@ -272,12 +306,36 @@ export const updatePromotion = async (id, payload) => {
   const shouldUpdateMenuItems =
     payload.menu_item_ids !== undefined || payload.menu_item_id !== undefined;
   let menuItems = [];
+  let resolvedRestaurantId = payload.restaurant_id ?? promotion.restaurant_id ?? null;
   if (shouldUpdateMenuItems) {
     const menuItemIds = computeMenuItemIdsFromPayload(payload);
     if (menuItemIds.length) {
       const targetRestaurantId = payload.restaurant_id || promotion.restaurant_id;
       menuItems = await fetchMenuItemsAndValidate(menuItemIds, targetRestaurantId);
+      if (!payload.restaurant_id) {
+        resolvedRestaurantId = deriveRestaurantIdFromMenuItems(menuItems) ?? resolvedRestaurantId;
+        if (resolvedRestaurantId) {
+          updatedPayload.restaurant_id = resolvedRestaurantId;
+        }
+      }
       await ensureMenuItemsAreNotInOtherPromotions(menuItems, promotion.id);
+    }
+  }
+
+  await ensureRestaurant(resolvedRestaurantId);
+
+  if (payload.scope === undefined) {
+    if (shouldUpdateMenuItems && menuItems.length) {
+      updatedPayload.scope = "menu_item";
+    } else if (
+      promotion.scope === "menu_item" &&
+      !promotion.menu_item_id &&
+      (payload.restaurant_id || promotion.restaurant_id)
+    ) {
+      const linkedCount = await PromotionMenuItem.count({ where: { promotion_id: promotion.id } });
+      if (linkedCount === 0) {
+        updatedPayload.scope = "restaurant";
+      }
     }
   }
 
