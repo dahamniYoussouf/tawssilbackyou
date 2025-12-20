@@ -154,10 +154,16 @@ export const getTop10Restaurants = async () => {
             rating: { [Op.not]: null },
             status: 'delivered'
           },
-          attributes: ['rating']
+          attributes: ['rating', 'client_id']
         });
 
         const ratings = orders.map(o => parseFloat(o.rating)).filter(r => !isNaN(r));
+        const ratersCount = new Set(
+          orders
+            .map((order) => order.client_id)
+            .filter((value) => value !== null && value !== undefined)
+            .map((value) => String(value))
+        ).size;
         const avgOrderRating = ratings.length > 0
           ? ratings.reduce((sum, r) => sum + r, 0) / ratings.length
           : 0;
@@ -183,6 +189,7 @@ export const getTop10Restaurants = async () => {
           total_orders: totalOrders,
           average_rating: parseFloat(finalRating.toFixed(1)),
           total_ratings: ratings.length,
+          raters_count: ratersCount,
           score: favoriteCount * 2 + finalRating * 3 + totalOrders * 0.1 // Weighted score
         };
       })
@@ -268,4 +275,3 @@ export const getTop10Drivers = async () => {
     throw error;
   }
 };
-

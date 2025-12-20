@@ -9,6 +9,7 @@ import Addition from "../../models/Addition.js";
 import MenuItem from "../../models/MenuItem.js";
 import calculateRouteTime from "../routingService.js";
 import { canDriverAcceptOrder } from "../multiDeliveryService.js";
+import { hydrateOrderItemsWithActivePromotions } from "./orderEnrichment.helper.js";
 
 export const getNearbyOrders = async (driverId, filters = {}) => {
   const { radius = 5000, status = ["preparing", "accepted"], page = 1, pageSize = 20, min_fee, max_distance } = filters;
@@ -56,6 +57,7 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
   const offset = (parseInt(page, 10) - 1) * limit;
 
   const { count, rows } = await Order.findAndCountAll({
+    distinct: true,
     attributes: {
       include: [
         [literal(`ST_Distance(delivery_location, ST_GeogFromText('POINT(${longitude} ${latitude})'))`), "distance"]
@@ -82,6 +84,8 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
     limit,
     offset
   });
+
+  await hydrateOrderItemsWithActivePromotions(rows);
 
   // ✅ CALCULER LES ROUTES POUR CHAQUE COMMANDE ET FILTRER SELON LES CONDITIONS D'ASSIGNATION
   const formatted = await Promise.all(rows.map(async (order) => {
@@ -234,6 +238,24 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
         instructions_speciales: item.instructions_speciales,
         created_at: item.created_at,
         updated_at: item.updated_at,
+        additions: (item.additions || []).map((add) => ({
+          id: add.id,
+          order_item_id: add.order_item_id,
+          addition_id: add.addition_id,
+          quantite: add.quantite,
+          prix_unitaire: parseFloat(add.prix_unitaire),
+          prix_total: parseFloat(add.prix_total),
+          addition: add.addition
+            ? {
+                id: add.addition.id,
+                nom: add.addition.nom,
+                description: add.addition.description,
+                prix: parseFloat(add.addition.prix),
+                is_available: add.addition.is_available,
+                menu_item_id: add.addition.menu_item_id
+              }
+            : null
+        })),
         menu_item: item.menu_item ? {
           id: item.menu_item.id,
           nom: item.menu_item.nom,
@@ -242,7 +264,9 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
           photo_url: item.menu_item.photo_url,
           temps_preparation: item.menu_item.temps_preparation,
           is_available: item.menu_item.is_available,
-          category_id: item.menu_item.category_id
+          category_id: item.menu_item.category_id,
+          primary_promotions: item.menu_item.primary_promotions || [],
+          promotions: item.menu_item.promotions || []
         } : null
       })),
 

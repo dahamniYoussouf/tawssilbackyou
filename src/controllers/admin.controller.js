@@ -15,7 +15,7 @@ import { emit, getOnlineCounts } from '../config/socket.js';
 import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
-import { Op } from "sequelize";
+import { Op, Sequelize } from "sequelize";
 import * as topRatedService from "../services/topRated.service.js";
 import cacheService from '../services/cache.service.js';
 import { cacheHelpers } from '../middlewares/cache.middleware.js';
@@ -1874,14 +1874,43 @@ export const getMapRestaurants = async (req, res, next) => {
       }
     });
 
+    const ratingRows = restaurants.length
+      ? await Order.findAll({
+          attributes: [
+            'restaurant_id',
+            [Sequelize.fn('COUNT', Sequelize.col('Order.id')), 'rating_count'],
+            [Sequelize.fn('COUNT', Sequelize.fn('DISTINCT', Sequelize.col('client_id'))), 'raters_count']
+          ],
+          where: {
+            restaurant_id: { [Op.in]: restaurants.map((restaurant) => restaurant.id) },
+            rating: { [Op.not]: null }
+          },
+          group: ['restaurant_id'],
+          raw: true
+        })
+      : [];
+
+    const ratingMap = new Map(
+      ratingRows.map((row) => [
+        String(row.restaurant_id),
+        {
+          rating_count: Number(row.rating_count) || 0,
+          raters_count: Number(row.raters_count) || 0
+        }
+      ])
+    );
+
     const formatted = restaurants.map((r) => {
       const coords = r.location?.coordinates || [];
+      const ratingStats = ratingMap.get(String(r.id)) || { rating_count: 0, raters_count: 0 };
       return {
         id: r.id,
         name: r.name,
         address: r.address,
         image_url: r.image_url,
         rating: r.rating ? parseFloat(r.rating) : null,
+        rating_count: ratingStats.rating_count,
+        raters_count: ratingStats.raters_count,
         is_premium: r.is_premium,
         lat: coords[1] || null,
         lng: coords[0] || null

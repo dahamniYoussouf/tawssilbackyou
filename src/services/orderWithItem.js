@@ -11,6 +11,7 @@ import Promotion from "../models/Promotion.js";
 import calculateRouteTime from "../services/routingService.js";
 import { emit } from "../config/socket.js";
 import { scheduleAdminNotification } from "../services/order.service.js";
+import { hydrateOrderItemsWithActivePromotions } from "./orders/orderEnrichment.helper.js";
 
 // Helper to notify
 function notify(type, id, data) {
@@ -625,6 +626,8 @@ export async function getOrdersByRestaurant(restaurantId, filters = {}) {
       ],
       order: [['created_at', 'DESC']]
     });
+
+    await hydrateOrderItemsWithActivePromotions(orders);
 
     return orders;
 

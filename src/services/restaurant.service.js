@@ -6,10 +6,11 @@ import MenuItem from "../models/MenuItem.js";
 import Addition from "../models/Addition.js";
 import Client from "../models/Client.js";
 import Order from "../models/Order.js";
-import { Op, QueryTypes, literal } from "sequelize";
+import { Op, QueryTypes, literal, Sequelize } from "sequelize";
 import axios from "axios";
 import FavoriteMeal from "../models/FavoriteMeal.js";
 import OrderItem from "../models/OrderItem.js";
+import OrderItemAddition from "../models/OrderItemAddition.js";
 import Driver from "../models/Driver.js";
 import User from "../models/User.js";
 import HomeCategory from "../models/HomeCategory.js";
@@ -22,6 +23,7 @@ import {
   extractHomeCategorySlugs,
   syncRestaurantHomeCategories
 } from "./restaurantCategory.service.js";
+import { hydrateOrderItemsWithActivePromotions } from "./orders/orderEnrichment.helper.js";
 
 const NEARBY_CACHE_TTL = 60; // seconds
 const METERS_PER_DEGREE = 111320;
@@ -36,6 +38,36 @@ const toDecimal = (value) => {
     return 0;
   }
   return Number(value);
+};
+
+const buildRestaurantRatingMap = async (restaurantIds = []) => {
+  const ids = (restaurantIds || []).map((id) => String(id).trim()).filter(Boolean);
+  if (ids.length === 0) {
+    return new Map();
+  }
+
+  const rows = await Order.findAll({
+    attributes: [
+      "restaurant_id",
+      [Sequelize.fn("COUNT", Sequelize.col("Order.id")), "rating_count"],
+      [Sequelize.fn("COUNT", Sequelize.fn("DISTINCT", Sequelize.col("client_id"))), "raters_count"]
+    ],
+    where: {
+      restaurant_id: { [Op.in]: ids },
+      rating: { [Op.not]: null }
+    },
+    group: ["restaurant_id"],
+    raw: true
+  });
+
+  const map = new Map();
+  rows.forEach((row) => {
+    map.set(String(row.restaurant_id), {
+      rating_count: Number(row.rating_count) || 0,
+      raters_count: Number(row.raters_count) || 0
+    });
+  });
+  return map;
 };
 
 const derivePromotionLabel = (promotion, discountValue) => {
@@ -225,11 +257,16 @@ export const getAllRestaurants = async () => {
     }]
   });
 
+  const ratingMap = await buildRestaurantRatingMap(restaurants.map((restaurant) => restaurant.id));
+
   return restaurants.map((r) => {
     const homeCategories = serializeHomeCategories(r.home_categories);
+    const ratingStats = ratingMap.get(String(r.id)) || { rating_count: 0, raters_count: 0 };
     return {
       ...r.toJSON(),
       is_open: r.isOpen(),
+      rating_count: ratingStats.rating_count,
+      raters_count: ratingStats.raters_count,
       home_categories: homeCategories,
       categories: extractHomeCategorySlugs(homeCategories)
     };
@@ -572,12 +609,15 @@ export const filterNearbyRestaurants = async (filters) => {
     ORDER BY restaurant_id, rn ASC
   `;
 
-  const sampleRows = await sequelize.query(sqlSamples, {
-    type: QueryTypes.SELECT,
-    replacements: {
-      restaurantIds
-    }
-  });
+  const [sampleRows, ratingMap] = await Promise.all([
+    sequelize.query(sqlSamples, {
+      type: QueryTypes.SELECT,
+      replacements: {
+        restaurantIds
+      }
+    }),
+    buildRestaurantRatingMap(restaurantIds)
+  ]);
 
   const sampleByRestaurant = new Map();
   sampleRows.forEach((row) => {
@@ -613,6 +653,7 @@ export const filterNearbyRestaurants = async (filters) => {
       }));
 
       const homeCategories = serializeHomeCategories(restaurant.home_categories);
+      const ratingStats = ratingMap.get(String(restaurant.id)) || { rating_count: 0, raters_count: 0 };
       return {
         id: restaurant.id,
         name: restaurant.name,
@@ -621,6 +662,8 @@ export const filterNearbyRestaurants = async (filters) => {
         lat: coords[1] || null,
         lng: coords[0] || null,
         rating: restaurant.rating,
+        rating_count: ratingStats.rating_count,
+        raters_count: ratingStats.raters_count,
         delivery_time_min: prepTime + deliveryTimeMin,
         delivery_time_max: prepTime + deliveryTimeMax,
         image_url: restaurant.image_url,
@@ -767,11 +810,13 @@ export const filter = async (filters = {}) => {
 
   // ✅ IMPORTANT: Sauvegarder le count AVANT filtrage is_open
   const totalCount = count;
+  const ratingMap = await buildRestaurantRatingMap(rows.map((restaurant) => restaurant.id));
 
   // Format response
   let formatted = rows.map((r) => {
     const coords = r.location?.coordinates || [];
     const homeCategories = serializeHomeCategories(r.home_categories);
+    const ratingStats = ratingMap.get(String(r.id)) || { rating_count: 0, raters_count: 0 };
 
     return {
       id: r.id,
@@ -781,6 +826,8 @@ export const filter = async (filters = {}) => {
       lat: coords[1] ?? null,
       lng: coords[0] ?? null,
       rating: r.rating,
+      rating_count: ratingStats.rating_count,
+      raters_count: ratingStats.raters_count,
       delivery_time_min: null,
       delivery_time_max: null,
       image_url: r.image_url,
@@ -1464,6 +1511,7 @@ export const getRestaurantOrdersHistory = async (restaurantId, filters = {}) => 
   // ==================== QUERY WITH COMPLETE INCLUDES ====================
   const { count, rows } = await Order.findAndCountAll({
     where,
+    distinct: true,
     include: [
       {
         model: Restaurant,
@@ -1489,17 +1537,33 @@ export const getRestaurantOrdersHistory = async (restaurantId, filters = {}) => 
         model: OrderItem,
         as: 'order_items',
         required: false,
-        include: [{
-          model: MenuItem,
-          as: 'menu_item',
-          required: false
-        }]
+        include: [
+          {
+            model: MenuItem,
+            as: 'menu_item',
+            required: false
+          },
+          {
+            model: OrderItemAddition,
+            as: 'additions',
+            required: false,
+            include: [
+              {
+                model: Addition,
+                as: 'addition',
+                required: false
+              }
+            ]
+          }
+        ]
       }
     ],
     order: [['created_at', 'DESC']],
     limit: parseInt(limit, 10),
     offset
   });
+
+  await hydrateOrderItemsWithActivePromotions(rows);
 
   // ==================== CALCULATE SUMMARY ====================
   const allOrders = await Order.findAll({
@@ -1652,6 +1716,24 @@ export const getRestaurantOrdersHistory = async (restaurantId, filters = {}) => 
         instructions_speciales: item.instructions_speciales,
         created_at: item.created_at,
         updated_at: item.updated_at,
+        additions: (item.additions || []).map((add) => ({
+          id: add.id,
+          order_item_id: add.order_item_id,
+          addition_id: add.addition_id,
+          quantite: add.quantite,
+          prix_unitaire: parseFloat(add.prix_unitaire),
+          prix_total: parseFloat(add.prix_total),
+          addition: add.addition
+            ? {
+                id: add.addition.id,
+                nom: add.addition.nom,
+                description: add.addition.description,
+                prix: parseFloat(add.addition.prix),
+                is_available: add.addition.is_available,
+                menu_item_id: add.addition.menu_item_id
+              }
+            : null
+        })),
         menu_item: item.menu_item ? {
           id: item.menu_item.id,
           category_id: item.menu_item.category_id,
@@ -1661,6 +1743,8 @@ export const getRestaurantOrdersHistory = async (restaurantId, filters = {}) => 
           photo_url: item.menu_item.photo_url,
           is_available: item.menu_item.is_available,
           temps_preparation: item.menu_item.temps_preparation,
+          primary_promotions: item.menu_item.primary_promotions || [],
+          promotions: item.menu_item.promotions || [],
           created_at: item.menu_item.created_at,
           updated_at: item.menu_item.updated_at
         } : null

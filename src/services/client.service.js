@@ -5,7 +5,10 @@ import Order from "../models/Order.js";
 import Restaurant from "../models/Restaurant.js";
 import Driver from "../models/Driver.js";
 import OrderItem from "../models/OrderItem.js";
+import OrderItemAddition from "../models/OrderItemAddition.js";
+import Addition from "../models/Addition.js";
 import MenuItem from "../models/MenuItem.js";
+import { hydrateOrderItemsWithActivePromotions } from "./orders/orderEnrichment.helper.js";
 
 
 
@@ -199,6 +202,7 @@ export const getClientOrdersWithFilters = async (filters) => {
   // ==================== QUERY WITH INCLUDES ====================
   const { count, rows } = await Order.findAndCountAll({
     where,
+    distinct: true,
     include: [
       {
         model: Restaurant,
@@ -214,17 +218,33 @@ export const getClientOrdersWithFilters = async (filters) => {
       {
         model: OrderItem,
         as: 'order_items',
-        include: [{
-          model: MenuItem,
-          as: 'menu_item',
-          attributes: ['id', 'nom', 'photo_url', 'prix']
-        }]
+        include: [
+          {
+            model: MenuItem,
+            as: 'menu_item',
+            attributes: ['id', 'nom', 'photo_url', 'prix']
+          },
+          {
+            model: OrderItemAddition,
+            as: 'additions',
+            required: false,
+            include: [
+              {
+                model: Addition,
+                as: 'addition',
+                required: false
+              }
+            ]
+          }
+        ]
       }
     ],
     order: [['created_at', 'DESC']],
     limit: parseInt(limit, 10),
     offset
   });
+
+  await hydrateOrderItemsWithActivePromotions(rows);
 
   // ==================== CALCULATE SUMMARY ====================
   const allOrders = await Order.findAll({
@@ -263,6 +283,40 @@ export const getClientOrdersWithFilters = async (filters) => {
       name: item.menu_item.nom,
       quantity: item.quantite,
       photo_url: item.menu_item.photo_url
+    })),
+    order_items: order.order_items.map((item) => ({
+      id: item.id,
+      order_id: item.order_id,
+      menu_item_id: item.menu_item_id,
+      quantite: item.quantite,
+      prix_unitaire: parseFloat(item.prix_unitaire),
+      prix_total: parseFloat(item.prix_total),
+      instructions_speciales: item.instructions_speciales,
+      additions: (item.additions || []).map((add) => ({
+        id: add.id,
+        order_item_id: add.order_item_id,
+        addition_id: add.addition_id,
+        quantite: add.quantite,
+        prix_unitaire: parseFloat(add.prix_unitaire),
+        prix_total: parseFloat(add.prix_total),
+        addition: add.addition
+          ? {
+              id: add.addition.id,
+              nom: add.addition.nom,
+              prix: parseFloat(add.addition.prix)
+            }
+          : null
+      })),
+      menu_item: item.menu_item
+        ? {
+            id: item.menu_item.id,
+            nom: item.menu_item.nom,
+            photo_url: item.menu_item.photo_url,
+            prix: parseFloat(item.menu_item.prix),
+            primary_promotions: item.menu_item.primary_promotions || [],
+            promotions: item.menu_item.promotions || []
+          }
+        : null
     })),
     subtotal: parseFloat(order.subtotal || 0),
     delivery_fee: parseFloat(order.delivery_fee || 0),

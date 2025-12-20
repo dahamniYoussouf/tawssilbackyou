@@ -7,6 +7,7 @@ import OrderItem from "../../models/OrderItem.js";
 import OrderItemAddition from "../../models/OrderItemAddition.js";
 import Addition from "../../models/Addition.js";
 import MenuItem from "../../models/MenuItem.js";
+import { hydrateOrderItemsWithActivePromotions } from "./orderEnrichment.helper.js";
 
 export async function getAllOrdersService(filters = {}) {
   const {
@@ -38,6 +39,7 @@ export async function getAllOrdersService(filters = {}) {
 
   const { count, rows } = await Order.findAndCountAll({
     where,
+    distinct: true,
     include: [
       {
         model: OrderItem,
@@ -67,6 +69,8 @@ export async function getAllOrdersService(filters = {}) {
     limit: +limit,
     offset: +offset,
   });
+
+  await hydrateOrderItemsWithActivePromotions(rows);
 
   return {
     orders: rows,
@@ -106,6 +110,8 @@ export async function getOrderByIdService(id) {
 
   if (!order) throw { status: 404, message: "Order not found" };
 
+  await hydrateOrderItemsWithActivePromotions(order);
+
   const result = order.toJSON();
 
   if (order.status === "delivering" && order.driver) {
@@ -131,6 +137,7 @@ export async function getClientOrdersService(clientId, filters = {}) {
 
   const { count, rows } = await Order.findAndCountAll({
     where,
+    distinct: true,
     include: [
       { model: Restaurant, as: "restaurant", attributes: ["id", "name", "image_url", "rating", "email"] },
       { model: Driver, as: "driver", attributes: ["id", "first_name", "last_name", "phone"] },
@@ -151,6 +158,8 @@ export async function getClientOrdersService(clientId, filters = {}) {
     limit: +limit,
     offset: +offset,
   });
+
+  await hydrateOrderItemsWithActivePromotions(rows);
 
   return {
     orders: rows,

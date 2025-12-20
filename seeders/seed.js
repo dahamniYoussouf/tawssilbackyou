@@ -178,6 +178,25 @@ const seedDatabase = async () => {
   try {
     console.log("🌱 Starting massive database seeding...");
 
+    const getEnvInt = (key, fallback) => {
+      const parsed = Number.parseInt(process.env[key] ?? "", 10);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    const seedConfig = {
+      clients: Math.max(1, getEnvInt("SEED_CLIENTS", 10)),
+      drivers: Math.max(1, getEnvInt("SEED_DRIVERS", 10)),
+      restaurants: Math.max(1, getEnvInt("SEED_RESTAURANTS", 10)),
+      orders: Math.max(1, getEnvInt("SEED_ORDERS", 10)),
+      favoritesClients: Math.max(0, getEnvInt("SEED_FAVORITES_CLIENTS", 10)),
+      cashiersPerRestaurant: Math.max(0, getEnvInt("SEED_CASHIERS_PER_RESTAURANT", 2)),
+      cashiersRestaurantLimit: Math.max(0, getEnvInt("SEED_CASHIERS_RESTAURANT_LIMIT", 100))
+    };
+
+    console.log(
+      `📊 Seed counts: clients=${seedConfig.clients}, drivers=${seedConfig.drivers}, restaurants=${seedConfig.restaurants}, orders=${seedConfig.orders}`
+    );
+
     await sequelize.sync({ force: true, cascade: true });
 
     console.log("🗑️  Clearing existing data...");
@@ -290,11 +309,11 @@ const seedDatabase = async () => {
     console.log("✅ 10 system configurations initialized");
 
     // ----------------------------
-    // 2️⃣ Clients (1000)
+    // 2️⃣ Clients
     // ----------------------------
-    console.log("👥 Creating 1000 clients...");
+    console.log(`👥 Creating ${seedConfig.clients} clients...`);
     const clientUsers = [];
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < seedConfig.clients; i++) {
       clientUsers.push({
         email: `client${i + 1}@example.com`,
         password: hashedPassword,
@@ -308,7 +327,7 @@ const seedDatabase = async () => {
     const clientUsersCreated = await User.bulkCreate(clientUsers, { returning: true });
     
     const clients = [];
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < seedConfig.clients; i++) {
       const name = getRandomName();
       const location = getRandomLocation();
       
@@ -334,11 +353,11 @@ const seedDatabase = async () => {
     console.log(`✅ ${createdClients.length} clients created`);
 
     // ----------------------------
-    // 3️⃣ Drivers (1000)
+    // 3️⃣ Drivers
     // ----------------------------
-    console.log("🚗 Creating 1000 drivers...");
+    console.log(`🚗 Creating ${seedConfig.drivers} drivers...`);
     const driverUsers = [];
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < seedConfig.drivers; i++) {
       driverUsers.push({
         email: `driver${i + 1}@example.com`,
         password: hashedPassword,
@@ -354,7 +373,7 @@ const seedDatabase = async () => {
     const drivers = [];
     const statuses = ['available', 'busy', 'offline'];
     
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < seedConfig.drivers; i++) {
       const name = getRandomName();
       const location = getRandomLocation();
       const status = statuses[Math.floor(Math.random() * statuses.length)];
@@ -390,11 +409,11 @@ const seedDatabase = async () => {
     console.log(`✅ ${createdDrivers.length} drivers created (capacity: 5 orders each)`);
 
     // ----------------------------
-    // 4️⃣ Restaurants (1000)
+    // 4️⃣ Restaurants
     // ----------------------------
-    console.log("🍽️  Creating 1000 restaurants...");
+    console.log(`🍽️  Creating ${seedConfig.restaurants} restaurants...`);
     const restaurantUsers = [];
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < seedConfig.restaurants; i++) {
       restaurantUsers.push({
         email: `restaurant${i + 1}@example.com`,
         password: hashedPassword,
@@ -408,7 +427,7 @@ const seedDatabase = async () => {
     const restaurantUsersCreated = await User.bulkCreate(restaurantUsers, { returning: true });
 
     const restaurantList = [];
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < seedConfig.restaurants; i++) {
       const model = restaurantModels[i % restaurantModels.length];
       const location = getRandomLocation();
       
@@ -450,71 +469,81 @@ const seedDatabase = async () => {
 
 
     // ----------------------------
-    // 4.5️⃣ Cashiers (200 caissiers pour les 100 premiers restaurants)
+    // 4.5️⃣ Cashiers
     // ----------------------------
-    console.log("💰 Creating 200 cashiers (2 per restaurant for first 100 restaurants)...");
-    const cashierUsers = [];
-    
-    // Créer 200 users pour les caissiers
-    for (let i = 0; i < 200; i++) {
-      cashierUsers.push({
-        email: `cashier${i + 1}@example.com`,
-        password: hashedPassword,
-        role: "cashier",
-        is_active: true,
-        last_login: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000)
-      });
-      
-      if ((i + 1) % 50 === 0) console.log(`➡️  ${i + 1} cashier users created...`);
+    const cashierRestaurantCount = Math.min(restaurants.length, seedConfig.cashiersRestaurantLimit);
+    const cashierCount = cashierRestaurantCount * seedConfig.cashiersPerRestaurant;
+
+    console.log(
+      `💰 Creating ${cashierCount} cashiers (${seedConfig.cashiersPerRestaurant} per restaurant for first ${cashierRestaurantCount} restaurants)...`
+    );
+
+    let createdCashiers = [];
+    if (cashierCount > 0) {
+      const cashierUsers = [];
+
+      for (let i = 0; i < cashierCount; i++) {
+        cashierUsers.push({
+          email: `cashier${i + 1}@example.com`,
+          password: hashedPassword,
+          role: "cashier",
+          is_active: true,
+          last_login: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000)
+        });
+
+        if ((i + 1) % 50 === 0) console.log(`➡️  ${i + 1} cashier users created...`);
+      }
+
+      const cashierUsersCreated = await User.bulkCreate(cashierUsers, { returning: true });
+
+      const cashiers = [];
+      const cashierStatuses = ['active', 'on_break', 'offline'];
+
+      for (let i = 0; i < cashierCount; i++) {
+        const restaurantIndex = Math.floor(i / seedConfig.cashiersPerRestaurant);
+        const restaurant = restaurants[restaurantIndex];
+        const name = cashierNames[i % cashierNames.length];
+
+        const cashierStatus = cashierStatuses[Math.floor(Math.random() * cashierStatuses.length)];
+        const isOnShift = cashierStatus === 'active' || cashierStatus === 'on_break';
+
+        cashiers.push({
+          user_id: cashierUsersCreated[i].id,
+          restaurant_id: restaurant.id,
+          cashier_code: `CSH-${String(i + 1).padStart(4, '0')}`,
+          first_name: name.first,
+          last_name: name.last,
+          phone: getUniquePhone("771", i), // ✅ Numéros uniques pour cashiers
+          email: `cashier${i + 1}@example.com`,
+          profile_image_url: `https://i.pravatar.cc/150?img=${i + 50}`,
+          is_active: Math.random() > 0.05,
+          status: cashierStatus,
+          shift_start: isOnShift ? new Date(Date.now() - Math.random() * 8 * 60 * 60 * 1000) : null,
+          shift_end: cashierStatus === 'offline' && Math.random() > 0.5 
+            ? new Date(Date.now() - Math.random() * 2 * 60 * 60 * 1000) 
+            : null,
+          total_orders_processed: Math.floor(Math.random() * 500) + 50,
+          total_sales_amount: parseFloat((50000 + Math.random() * 200000).toFixed(2)),
+          last_active_at: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000),
+          notes: i % 15 === 0 ? `Excellent cashier, very efficient` : null,
+          permissions: {
+            can_create_orders: true,
+            can_cancel_orders: i % 5 === 0, // 20% peuvent annuler
+            can_apply_discounts: i % 4 === 0, // 25% peuvent faire des réductions
+            can_process_refunds: i % 10 === 0, // 10% peuvent faire des remboursements
+            can_view_reports: i % 3 === 0 // 33% peuvent voir les rapports
+          }
+        });
+
+        if ((i + 1) % 50 === 0) console.log(`➡️  ${i + 1} cashiers created...`);
+      }
+
+      createdCashiers = await Cashier.bulkCreate(cashiers, { returning: true });
     }
-    
-    const cashierUsersCreated = await User.bulkCreate(cashierUsers, { returning: true });
-    
-    const cashiers = [];
-    const cashierStatuses = ['active', 'on_break', 'offline'];
-    
-    // 2 caissiers par restaurant (pour les 100 premiers restaurants)
-    for (let i = 0; i < 200; i++) {
-      const restaurantIndex = Math.floor(i / 2); // 2 cashiers per restaurant
-      const restaurant = restaurants[restaurantIndex];
-      const name = cashierNames[i % cashierNames.length];
-      
-      const cashierStatus = cashierStatuses[Math.floor(Math.random() * cashierStatuses.length)];
-      const isOnShift = cashierStatus === 'active' || cashierStatus === 'on_break';
-      
-      cashiers.push({
-        user_id: cashierUsersCreated[i].id,
-        restaurant_id: restaurant.id,
-        cashier_code: `CSH-${String(i + 1).padStart(4, '0')}`,
-        first_name: name.first,
-        last_name: name.last,
-        phone: getUniquePhone("771", i), // ✅ Numéros uniques pour cashiers
-        email: `cashier${i + 1}@example.com`,
-        profile_image_url: `https://i.pravatar.cc/150?img=${i + 50}`,
-        is_active: Math.random() > 0.05,
-        status: cashierStatus,
-        shift_start: isOnShift ? new Date(Date.now() - Math.random() * 8 * 60 * 60 * 1000) : null,
-        shift_end: cashierStatus === 'offline' && Math.random() > 0.5 
-          ? new Date(Date.now() - Math.random() * 2 * 60 * 60 * 1000) 
-          : null,
-        total_orders_processed: Math.floor(Math.random() * 500) + 50,
-        total_sales_amount: parseFloat((50000 + Math.random() * 200000).toFixed(2)),
-        last_active_at: new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000),
-        notes: i % 15 === 0 ? `Excellent cashier, very efficient` : null,
-        permissions: {
-          can_create_orders: true,
-          can_cancel_orders: i % 5 === 0, // 20% peuvent annuler
-          can_apply_discounts: i % 4 === 0, // 25% peuvent faire des réductions
-          can_process_refunds: i % 10 === 0, // 10% peuvent faire des remboursements
-          can_view_reports: i % 3 === 0 // 33% peuvent voir les rapports
-        }
-      });
-      
-      if ((i + 1) % 50 === 0) console.log(`➡️  ${i + 1} cashiers created...`);
-    }
-    
-    const createdCashiers = await Cashier.bulkCreate(cashiers, { returning: true });
-    console.log(`✅ ${createdCashiers.length} cashiers created (2 per restaurant for first 100 restaurants)`);
+
+    console.log(
+      `✅ ${createdCashiers.length} cashiers created (${seedConfig.cashiersPerRestaurant} per restaurant for first ${cashierRestaurantCount} restaurants)`
+    );
 
 
 
@@ -591,23 +620,31 @@ const seedDatabase = async () => {
     });
 
     // ----------------------------
-    // 6️⃣ Orders (1000)
+    // 6️⃣ Orders
     // ----------------------------
     // ----------------------------
     // ✅ MODIFIER LA SECTION 6️⃣ Orders pour lier certaines commandes aux caissiers
     // ----------------------------
-    console.log("📦 Creating 1000 orders...");
+    console.log(`📦 Creating ${seedConfig.orders} orders...`);
     const orders = [];
+    const guaranteedDeliveredRecent = Math.min(seedConfig.orders, 6);
     
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < seedConfig.orders; i++) {
       const client = createdClients[i % createdClients.length];
       const restaurant = restaurants[i % restaurants.length];
-      const driver = i % 3 === 0 ? createdDrivers[i % createdDrivers.length] : null;
-      const status = orderStatuses[Math.floor(Math.random() * orderStatuses.length)];
+      const forcePipelineDelivered = i < guaranteedDeliveredRecent;
+      const driver = forcePipelineDelivered
+        ? createdDrivers[i % createdDrivers.length]
+        : (i % 3 === 0 ? createdDrivers[i % createdDrivers.length] : null);
+      const status = forcePipelineDelivered
+        ? 'delivered'
+        : orderStatuses[Math.floor(Math.random() * orderStatuses.length)];
       
       // ✅ 30% des commandes sont créées via POS (pickup) par un caissier
-      const isFromPOS = Math.random() < 0.3;
-      const orderType = isFromPOS ? 'pickup' : (Math.random() > 0.2 ? 'delivery' : 'pickup');
+      const isFromPOS = forcePipelineDelivered ? false : Math.random() < 0.3;
+      const orderType = forcePipelineDelivered
+        ? 'delivery'
+        : (isFromPOS ? 'pickup' : (Math.random() > 0.2 ? 'delivery' : 'pickup'));
       
       // ✅ Si c'est une commande POS, assigner un caissier du restaurant
       let cashierId = null;
@@ -622,7 +659,9 @@ const seedDatabase = async () => {
       const deliveryFee = orderType === 'delivery' ? 150 + Math.floor(Math.random() * 150) : 0;
       const totalAmount = subtotal + deliveryFee;
       
-      const createdAt = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000);
+      const createdAt = forcePipelineDelivered
+        ? new Date(Date.now() - Math.random() * 6 * 24 * 60 * 60 * 1000)
+        : new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000);
       let acceptedAt = null;
       let preparingStartedAt = null;
       let assignedAt = null;
@@ -797,7 +836,8 @@ const seedDatabase = async () => {
     const favoriteRestaurants = [];
     const favoriteMeals = [];
     
-    for (let i = 0; i < 100; i++) {
+    const favoritesClientSample = Math.min(createdClients.length, seedConfig.favoritesClients);
+    for (let i = 0; i < favoritesClientSample; i++) {
       const client = createdClients[i];
       const favCount = Math.floor(Math.random() * 5) + 1;
       
@@ -813,10 +853,12 @@ const seedDatabase = async () => {
       }
     }
     
-    await FavoriteRestaurant.bulkCreate(favoriteRestaurants, { ignoreDuplicates: true });
+    if (favoriteRestaurants.length) {
+      await FavoriteRestaurant.bulkCreate(favoriteRestaurants, { ignoreDuplicates: true });
+    }
     console.log(`✅ ${favoriteRestaurants.length} favorite restaurants created`);
     
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < favoritesClientSample; i++) {
       const client = createdClients[i];
       const favCount = Math.floor(Math.random() * 10) + 1;
       
@@ -834,7 +876,9 @@ const seedDatabase = async () => {
       }
     }
     
-    await FavoriteMeal.bulkCreate(favoriteMeals, { ignoreDuplicates: true });
+    if (favoriteMeals.length) {
+      await FavoriteMeal.bulkCreate(favoriteMeals, { ignoreDuplicates: true });
+    }
     console.log(`✅ ${favoriteMeals.length} favorite meals created`);
 
     // ----------------------------
@@ -879,6 +923,124 @@ const seedDatabase = async () => {
       });
     }
     
+    // ƒo. Add more notification types for admin UI testing (even when there are no pending orders).
+    const pickOne = (list) => (Array.isArray(list) && list.length ? list[Math.floor(Math.random() * list.length)] : null);
+    const findRestaurant = (order) => restaurants.find((r) => r.id === order.restaurant_id);
+    const findClient = (order) => (order.client_id ? createdClients.find((c) => c.id === order.client_id) : null);
+    const buildOrderDetails = (order) => {
+      const client = findClient(order);
+      return {
+        order_number: order.order_number,
+        order_type: order.order_type,
+        total_amount: parseFloat(order.total_amount),
+        delivery_address: order.delivery_address,
+        created_at: order.created_at,
+        client: client
+          ? {
+              name: `${client.first_name} ${client.last_name}`,
+              phone: client.phone_number,
+              address: client.address
+            }
+          : null
+      };
+    };
+    const buildRestaurantInfo = (restaurant) =>
+      restaurant
+        ? {
+            id: restaurant.id,
+            name: restaurant.name,
+            address: restaurant.address,
+            phone: restaurant.phone_number
+          }
+        : null;
+
+    // Ensure at least a few notifications exist even with 0 pending orders.
+    if (notifications.length === 0 && createdOrders.length) {
+      const fallbackOrders = createdOrders.slice(0, Math.min(createdOrders.length, 6));
+      for (const order of fallbackOrders) {
+        const restaurant = findRestaurant(order);
+        notifications.push({
+          order_id: order.id,
+          restaurant_id: order.restaurant_id,
+          type: 'pending_order_timeout',
+          message:
+            `ALERTE: Commande #${order.order_number} en attente de validation.\n` +
+            `Restaurant: ${restaurant?.name ?? 'N/A'}\n` +
+            `Montant: ${order.total_amount} DA`,
+          order_details: buildOrderDetails(order),
+          restaurant_info: buildRestaurantInfo(restaurant),
+          is_read: Math.random() > 0.6,
+          is_resolved: false
+        });
+      }
+    }
+
+    // Restaurant unresponsive notifications
+    const restaurantTargets = createdOrders
+      .filter((order) => ['pending', 'accepted', 'preparing'].includes(order.status))
+      .slice(0, 4);
+
+    for (const order of restaurantTargets) {
+      const restaurant = findRestaurant(order);
+      const shouldResolve = Math.random() > 0.7;
+      notifications.push({
+        order_id: order.id,
+        restaurant_id: order.restaurant_id,
+        type: 'restaurant_unresponsive',
+        message:
+          `ALERTE: Restaurant sans rAcponse pour la commande #${order.order_number}.\n` +
+          `Restaurant: ${restaurant?.name ?? 'N/A'}\n` +
+          `Action: contacter le restaurant.`,
+        order_details: buildOrderDetails(order),
+        restaurant_info: buildRestaurantInfo(restaurant),
+        is_read: shouldResolve || Math.random() > 0.4,
+        is_resolved: shouldResolve,
+        resolved_by: shouldResolve ? pickOne(admins)?.id ?? null : null,
+        resolved_at: shouldResolve ? new Date(Date.now() - Math.random() * 12 * 60 * 60 * 1000) : null,
+        admin_action: shouldResolve ? 'contacted_restaurant' : null,
+        admin_notes: shouldResolve ? 'Restaurant contactAc, prise en charge confirmAce.' : null
+      });
+    }
+
+    // Driver unresponsive notifications
+    const driverOrderTargets = createdOrders
+      .filter((order) => order.livreur_id && ['assigned', 'delivering'].includes(order.status))
+      .slice(0, 4);
+
+    for (const order of driverOrderTargets) {
+      const restaurant = findRestaurant(order);
+      notifications.push({
+        order_id: order.id,
+        restaurant_id: order.restaurant_id,
+        driver_id: order.livreur_id,
+        type: 'driver_unresponsive',
+        message:
+          `ALERTE: Livreur injoignable pour la commande #${order.order_number}.\n` +
+          `Action: vAcrifier la position et contacter le livreur.`,
+        order_details: buildOrderDetails(order),
+        restaurant_info: buildRestaurantInfo(restaurant),
+        is_read: Math.random() > 0.5,
+        is_resolved: false
+      });
+    }
+
+    // Driver excessive cancellations notifications (no order required)
+    const driversSample = createdDrivers.slice(0, Math.min(createdDrivers.length, 3));
+    for (const driver of driversSample) {
+      const shouldResolve = Math.random() > 0.5;
+      notifications.push({
+        driver_id: driver.id,
+        type: 'driver_excessive_cancellations',
+        message: `ALERTE: Livreur ${driver.first_name ?? ''} ${driver.last_name ?? ''} a dAcpassAc le seuil d'annulations.`,
+        is_read: shouldResolve || Math.random() > 0.7,
+        is_resolved: shouldResolve,
+        resolved_by: shouldResolve ? pickOne(admins)?.id ?? null : null,
+        resolved_at: shouldResolve ? new Date(Date.now() - Math.random() * 24 * 60 * 60 * 1000) : null,
+        admin_action: shouldResolve ? 'none' : null,
+        admin_notes: shouldResolve ? 'Avertissement envoyAc au livreur.' : null
+      });
+    }
+
     await AdminNotification.bulkCreate(notifications);
     console.log(`✅ ${notifications.length} admin notifications created`);
 
@@ -892,7 +1054,9 @@ const seedDatabase = async () => {
     console.log(`✅ ${createdClients.length} clients`);
     console.log(`✅ ${createdDrivers.length} drivers (capacity: 5 orders each)`);
     console.log(`✅ ${restaurants.length} restaurants`);
-    console.log(`✅ ${createdCashiers.length} cashiers (2 per restaurant for first 100)`); // ✅ NOUVEAU
+    console.log(
+      `✅ ${createdCashiers.length} cashiers (${seedConfig.cashiersPerRestaurant} per restaurant for first ${cashierRestaurantCount})`
+    );
     console.log(`✅ ${allMenuItems.length} menu items`);
     console.log(`✅ ${createdOrders.length} orders (${orders.filter(o => o.created_by_cashier_id).length} from POS)`); // ✅ MODIFIÉ
     console.log(`✅ ${orderItems.length} order items`);
@@ -922,14 +1086,18 @@ const seedDatabase = async () => {
     console.log("  • admin2@example.com (Admin) / password123");
     console.log("  • admin3@example.com (Moderator) / password123");
     console.log("\nCLIENTS:");
-    console.log("  • client1@example.com → client1000@example.com / password123");
+    console.log(`  • client1@example.com → client${createdClients.length}@example.com / password123`);
     console.log("\nDRIVERS:");
-    console.log("  • driver1@example.com → driver1000@example.com / password123");
+    console.log(`  • driver1@example.com → driver${createdDrivers.length}@example.com / password123`);
     console.log("\nRESTAURANTS:");
-    console.log("  • restaurant1@example.com → restaurant1000@example.com / password123");
-    console.log("\n💰 CASHIERS:"); // ✅ NOUVEAU
-    console.log("  • cashier1@example.com → cashier200@example.com / password123");
-    console.log("  • 2 cashiers per restaurant (first 100 restaurants)");
+    console.log(`  • restaurant1@example.com → restaurant${restaurants.length}@example.com / password123`);
+    console.log("\n💰 CASHIERS:");
+    if (createdCashiers.length) {
+      console.log(`  • cashier1@example.com → cashier${createdCashiers.length}@example.com / password123`);
+      console.log(`  • ${seedConfig.cashiersPerRestaurant} cashiers per restaurant (first ${cashierRestaurantCount} restaurants)`);
+    } else {
+      console.log("  • (no cashiers seeded)");
+    }
     console.log("  • Various permission levels for testing");
     console.log("─".repeat(60));
     
