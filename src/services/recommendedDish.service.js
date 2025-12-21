@@ -3,13 +3,15 @@ import RecommendedDish from "../models/RecommendedDish.js";
 import Restaurant from "../models/Restaurant.js";
 import FoodCategory from "../models/FoodCategory.js";
 
+const createHttpError = (message, status) => Object.assign(new Error(message), { status });
+
 const ensurePremiumRestaurant = async (restaurant_id) => {
   const restaurant = await Restaurant.findByPk(restaurant_id);
   if (!restaurant) {
-    throw new Error("Restaurant not found");
+    throw createHttpError("Restaurant not found", 404);
   }
   if (!restaurant.is_premium) {
-    throw new Error("Recommended dishes can only be created for premium restaurants");
+    throw createHttpError("Recommended dishes can only be created for premium restaurants", 403);
   }
   return restaurant;
 };
@@ -25,14 +27,14 @@ const ensureMenuItemMatchesRestaurant = async (menu_item_id, restaurant_id) => {
     ]
   });
   if (!menuItem) {
-    throw new Error("Menu item not found");
+    throw createHttpError("Menu item not found", 404);
   }
 
   const itemRestaurantId =
     menuItem.restaurant_id ?? menuItem.category?.restaurant_id ?? null;
 
   if (restaurant_id && String(itemRestaurantId) !== String(restaurant_id)) {
-    throw new Error("Menu item does not belong to the provided restaurant");
+    throw createHttpError("Menu item does not belong to the provided restaurant", 400);
   }
 
   return menuItem;

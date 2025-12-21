@@ -9,6 +9,7 @@ export function errorHandler(err, req, res, next) {
   if (status === 500 && process.env.NODE_ENV === "production") {
     return res.status(500).json({ 
       success: false,
+      message: "Internal Server Error",
       error: "Internal Server Error" 
     });
   }
@@ -16,11 +17,16 @@ export function errorHandler(err, req, res, next) {
   // Retourner l'erreur avec le code de statut approprié
   res.status(status).json({
     success: false,
+    message,
     error: message,
     ...(process.env.NODE_ENV !== "production" && { stack: err.stack })
   });
 }
 
 export function notFoundHandler(req, res) {
-  res.status(404).json({ error: "Route not found" });
+  res.status(404).json({
+    success: false,
+    message: "Route not found",
+    error: "Route not found"
+  });
 }

@@ -141,10 +141,13 @@ export const createPromotionValidator = [
   body()
     .custom((_, { req }) => {
       const type = req.body.type;
+      const hasMenuItemTarget =
+        Boolean(req.body.menu_item_id) ||
+        (Array.isArray(req.body.menu_item_ids) && req.body.menu_item_ids.length > 0);
       if (type === "buy_x_get_y" && !req.body.menu_item_id) {
         throw new Error("menu_item_id is required for buy_x_get_y promotions");
       }
-      if ((type === "percentage" || type === "amount") && !req.body.restaurant_id && !req.body.menu_item_ids?.length) {
+      if ((type === "percentage" || type === "amount") && !req.body.restaurant_id && !hasMenuItemTarget) {
         throw new Error("Provide at least one menu_item_id or a restaurant_id for percentage/amount promotions");
       }
       if ((type === "percentage" || type === "amount") && !req.body.discount_value) {
