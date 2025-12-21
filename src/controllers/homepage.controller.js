@@ -1,3 +1,4 @@
+// src/controllers/homepage.controller.js
 import * as restaurantService from "../services/restaurant.service.js";
 import { getHomepageModules } from "../services/homepage.service.js";
 
@@ -74,12 +75,77 @@ const buildNearbyResponse = (nearby) => ({
   data: nearby.formatted
 });
 
-const buildHomepagePayload = (modules, nearby) => {
-  const restaurantItems = nearby.formatted ?? [];
+/**
+ * ✅ Filter homepage modules to show only items from nearby restaurants
+ */
+const filterModulesByNearbyRestaurants = (modules, nearbyRestaurantIds) => {
+  if (!nearbyRestaurantIds || nearbyRestaurantIds.length === 0) {
+    return {
+      homeCategories: modules.homeCategories || [],
+      thematicSelections: modules.thematicSelections || [],
+      recommendedDishes: [],
+      dailyDeals: [],
+      promotions: [],
+      announcements: []
+    };
+  }
+
+  const restaurantIdSet = new Set(nearbyRestaurantIds.map(id => String(id)));
+
+  // Filter recommended dishes
+  const recommendedDishes = (modules.recommendedDishes || []).filter(dish => {
+    return dish.restaurant_id && restaurantIdSet.has(String(dish.restaurant_id));
+  });
+
+  // Filter daily deals
+  const dailyDeals = (modules.dailyDeals || []).filter(deal => {
+    const promotionRestaurantId = deal.promotion?.restaurant_id;
+    return promotionRestaurantId && restaurantIdSet.has(String(promotionRestaurantId));
+  });
+
+  // Filter promotions
+  const promotions = (modules.promotions || []).filter(promo => {
+    // Include global promotions (no restaurant_id)
+    if (!promo.restaurant_id && promo.scope === 'global') return true;
+    
+    // Include promotions from nearby restaurants
+    if (promo.restaurant_id && restaurantIdSet.has(String(promo.restaurant_id))) return true;
+    
+    return false;
+  });
+
+  // Filter announcements
+  const announcements = (modules.announcements || []).filter(announcement => {
+    // Include global announcements (no restaurant_id)
+    if (!announcement.restaurant_id) return true;
+    
+    // Include announcements from nearby restaurants
+    if (announcement.restaurant_id && restaurantIdSet.has(String(announcement.restaurant_id))) {
+      return true;
+    }
+    
+    return false;
+  });
+
   return {
-    ...modules,
-    offers: modules.dailyDeals ?? [],
-    restaurants: restaurantItems,
+    homeCategories: modules.homeCategories || [],
+    thematicSelections: modules.thematicSelections || [],
+    recommendedDishes,
+    dailyDeals,
+    promotions,
+    announcements
+  };
+};
+
+const buildHomepagePayload = (modules, nearby) => {
+  // Extract nearby restaurant IDs
+  const nearbyRestaurantIds = (nearby.formatted || []).map(restaurant => restaurant.id);
+  
+  // Filter modules to show only items from nearby restaurants
+  const filteredModules = filterModulesByNearbyRestaurants(modules, nearbyRestaurantIds);
+  
+  return {
+    ...filteredModules,
     nearby: buildNearbyResponse(nearby)
   };
 };
