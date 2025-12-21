@@ -12,11 +12,31 @@ const parseBoolean = (value) => {
   return null;
 };
 
-const databaseUrl = process.env.DATABASE_URL;
+const resolveDatabaseUrl = () => {
+  const direct = process.env.DATABASE_URL;
+  if (direct) return direct;
+
+  const host = process.env.DB_PG_HOST;
+  const name = process.env.DB_PG_NAME;
+  const user = process.env.DB_PG_USER;
+  const password = process.env.DB_PG_PASSWORD;
+  const port = process.env.DB_PG_PORT;
+
+  if (!host || !name || !user) return null;
+
+  const encodedUser = encodeURIComponent(user);
+  const encodedPassword = password ? encodeURIComponent(password) : null;
+  const auth = encodedPassword ? `${encodedUser}:${encodedPassword}` : encodedUser;
+  const portSuffix = port ? `:${port}` : "";
+
+  return `postgresql://${auth}@${host}${portSuffix}/${name}`;
+};
+
+const databaseUrl = resolveDatabaseUrl();
 
 if (!isTestEnv && !databaseUrl) {
   throw new Error(
-    "DATABASE_URL is not set. Put it in `tawssilbackyou/.env` or your environment variables."
+    "Database config missing. Set DATABASE_URL (recommended) or DB_PG_HOST/DB_PG_NAME/DB_PG_USER/DB_PG_PASSWORD (optional DB_PG_PORT)."
   );
 }
 
@@ -52,4 +72,3 @@ const sequelize = isTestEnv
 
 export { sequelize };
 export default sequelize;
-
