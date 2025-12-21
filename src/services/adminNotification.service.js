@@ -4,6 +4,7 @@ import Restaurant from "../models/Restaurant.js";
 import Client from "../models/Client.js";
 import OrderItem from "../models/OrderItem.js";
 import MenuItem from "../models/MenuItem.js";
+import SystemConfig from "../models/SystemConfig.js";
 import { emit } from "../config/socket.js";
 
 /**
@@ -81,7 +82,14 @@ export const createPendingOrderNotification = async (orderId) => {
       }
     };
 
-    const message = `⚠️ Commande #${order.order_number} sans réponse depuis 3 minutes.\n` +
+    const configuredTimeout = await SystemConfig.get('pending_order_timeout', 3);
+    const parsedTimeout = Number.parseInt(String(configuredTimeout), 10);
+    const timeoutMinutes = Number.isFinite(parsedTimeout)
+      ? Math.min(60, Math.max(1, parsedTimeout))
+      : 3;
+    const timeoutUnit = timeoutMinutes === 1 ? 'minute' : 'minutes';
+
+    const message = `⚠️ Commande #${order.order_number} sans réponse depuis ${timeoutMinutes} ${timeoutUnit}.\n` +
                     `Restaurant: ${restaurantInfo.name}\n` +
                     `Montant: ${order.total_amount} DA\n` +
                     `📞 Contact restaurant: ${restaurantInfo.phone}`;

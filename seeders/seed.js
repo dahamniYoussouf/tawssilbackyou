@@ -249,64 +249,43 @@ const seedDatabase = async () => {
       description: 'Maximum distance (in meters) between restaurants for multi-delivery',
       updated_by: admins[0].id
     });
-    
+
     await SystemConfig.create({
-      config_key: 'driver_search_radius',
-      config_value: 5000,
-      description: 'Default search radius (in meters) for finding nearby drivers',
+      config_key: 'client_restaurant_search_radius',
+      config_value: 2000,
+      description: 'Default search radius (in meters) for clients to find nearby restaurants',
       updated_by: admins[0].id
     });
-    
-    await SystemConfig.create({
-      config_key: 'pending_order_timeout',
-      config_value: 3,
-      description: 'Time in minutes before notifying admin about pending order',
-      updated_by: admins[0].id
-    });
-    
-    await SystemConfig.create({
-      config_key: 'default_delivery_fee',
-      config_value: 200,
-      description: 'Default delivery fee in DA',
-      updated_by: admins[0].id
-    });
-    
-    await SystemConfig.create({
-      config_key: 'delivery_fee_per_km',
-      config_value: 50,
-      description: 'Additional delivery fee per kilometer in DA',
-      updated_by: admins[0].id
-    });
-    
-    await SystemConfig.create({
-      config_key: 'max_delivery_distance',
-      config_value: 15,
-      description: 'Maximum delivery distance in kilometers',
-      updated_by: admins[0].id
-    });
-    
+
     await SystemConfig.create({
       config_key: 'default_preparation_time',
       config_value: 15,
-      description: 'Default order preparation time in minutes',
+      description: 'Default preparation time (in minutes) used when not provided by a restaurant',
       updated_by: admins[0].id
     });
-    
+
     await SystemConfig.create({
-      config_key: 'platform_commission_rate',
-      config_value: 15,
-      description: 'Platform commission rate in percentage',
+      config_key: 'pending_order_timeout',
+      config_value: 3,
+      description: 'Delay (in minutes) before notifying admins about a pending order without response',
       updated_by: admins[0].id
     });
-    
+
+    await SystemConfig.create({
+      config_key: 'default_delivery_fee',
+      config_value: 200,
+      description: 'Default delivery fee (in DA) applied when not provided for delivery orders',
+      updated_by: admins[0].id
+    });
+
     await SystemConfig.create({
       config_key: 'max_driver_cancellations',
       config_value: 3,
-      description: 'Maximum number of cancellations before driver notification',
+      description: 'Maximum cancellations allowed before notifying admins about a driver',
       updated_by: admins[0].id
     });
-    
-    console.log("✅ 10 system configurations initialized");
+
+    console.log("✅ 7 system configurations initialized");
 
     // ----------------------------
     // 2️⃣ Clients
@@ -1063,19 +1042,16 @@ const seedDatabase = async () => {
     console.log(`✅ ${favoriteRestaurants.length} favorite restaurants`);
     console.log(`✅ ${favoriteMeals.length} favorite meals`);
     console.log(`✅ ${notifications.length} admin notifications`);
-    console.log(`✅ 10 system configurations`);
+    console.log(`✅ 7 system configurations`);
     
     console.log("\n⚙️  SYSTEM CONFIGURATIONS:");
     console.log("─".repeat(60));
     console.log("✓ max_orders_per_driver: 5");
     console.log("✓ max_distance_between_restaurants: 500m");
-    console.log("✓ driver_search_radius: 5000m");
-    console.log("✓ pending_order_timeout: 3 minutes");
+    console.log("✓ client_restaurant_search_radius: 2000m");
+    console.log("✓ default_preparation_time: 15 min");
+    console.log("✓ pending_order_timeout: 3 min");
     console.log("✓ default_delivery_fee: 200 DA");
-    console.log("✓ delivery_fee_per_km: 50 DA");
-    console.log("✓ max_delivery_distance: 15 km");
-    console.log("✓ default_preparation_time: 15 minutes");
-    console.log("✓ platform_commission_rate: 15%");
     console.log("✓ max_driver_cancellations: 3");
     console.log("─".repeat(60));
     

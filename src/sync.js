@@ -25,24 +25,32 @@ import "./models/AdminNotification.js";
 import "./models/SystemConfig.js";
 import "./models/Cashier.js";
 
-
-
 // Import associations
 import "./models/index.js";
 
 (async () => {
   try {
     await sequelize.authenticate();
-    console.log("✅ Database connected");
+    console.log("Database connected");
 
-    // This will create the missing tables
-    await sequelize.sync({ force: true }); 
-    // Or { force: true } if you want to drop & recreate (⚠️ will delete data!)
+    const requestedMode = (process.env.DB_SYNC_MODE || "safe").toLowerCase();
+    const allowedModes = new Set(["safe", "alter", "force"]);
+    const syncMode = allowedModes.has(requestedMode) ? requestedMode : "safe";
 
-    console.log("✅ Database synchronized");
+    if (syncMode !== requestedMode) {
+      console.warn(`Unknown DB_SYNC_MODE="${requestedMode}", defaulting to "safe"`);
+    }
+
+    const syncOptions =
+      syncMode === "force" ? { force: true } : syncMode === "alter" ? { alter: true } : undefined;
+
+    await sequelize.sync(syncOptions);
+    console.log(`Database synchronized (mode: ${syncMode})`);
+
     process.exit(0);
   } catch (error) {
-    console.error("❌ Sync failed:", error);
+    console.error("Sync failed:", error);
     process.exit(1);
   }
 })();
+

@@ -21,44 +21,29 @@ const initializeConfiguration = async () => {
         description: 'Maximum distance (in meters) between restaurants for multi-delivery'
       },
       {
-        key: 'driver_search_radius',
-        value: 5000,
-        description: 'Default search radius (in meters) for finding nearby drivers'
-      },
-      {
-        key: 'pending_order_timeout',
-        value: 3,
-        description: 'Time in minutes before notifying admin about pending order'
-      },
-      {
-        key: 'default_delivery_fee',
-        value: 200,
-        description: 'Default delivery fee in DA'
-      },
-      {
-        key: 'delivery_fee_per_km',
-        value: 50,
-        description: 'Additional delivery fee per kilometer in DA'
-      },
-      {
-        key: 'max_delivery_distance',
-        value: 15,
-        description: 'Maximum delivery distance in kilometers'
+        key: 'client_restaurant_search_radius',
+        value: 2000,
+        description: 'Default search radius (in meters) for clients to find nearby restaurants'
       },
       {
         key: 'default_preparation_time',
         value: 15,
-        description: 'Default order preparation time in minutes'
+        description: 'Default preparation time (in minutes) used when not provided by a restaurant'
       },
       {
-        key: 'platform_commission_rate',
-        value: 15,
-        description: 'Platform commission rate in percentage'
+        key: 'pending_order_timeout',
+        value: 3,
+        description: 'Delay (in minutes) before notifying admins about a pending order without response'
+      },
+      {
+        key: 'default_delivery_fee',
+        value: 200,
+        description: 'Default delivery fee (in DA) applied when not provided for delivery orders'
       },
       {
         key: 'max_driver_cancellations',
         value: 3,
-        description: 'Maximum number of cancellations before driver notification'
+        description: 'Maximum cancellations allowed before notifying admins about a driver'
       }
     ];
 

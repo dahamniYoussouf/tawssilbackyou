@@ -60,12 +60,14 @@ export const nearbyFilter = async (req, res, next) => {
       client_id: req.user.client_id
     };
 
+    filters.radius = await restaurantService.resolveClientRestaurantSearchRadius(filters.radius);
+
     // Generate cache key based on filters
     const cacheKeyData = {
       lat: filters.lat,
       lng: filters.lng,
       address: filters.address,
-      radius: filters.radius || 2000,
+      radius: filters.radius,
       q: filters.q,
       categories: filters.categories ? (Array.isArray(filters.categories) ? filters.categories.sort().join(',') : filters.categories) : null,
       home_categories: filters.home_categories ? (Array.isArray(filters.home_categories) ? filters.home_categories.sort().join(',') : filters.home_categories) : null,

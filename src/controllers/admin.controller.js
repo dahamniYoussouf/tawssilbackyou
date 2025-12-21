@@ -28,6 +28,46 @@ import * as adminHomepageService from '../services/adminHomepage.service.js';
 const DEFAULT_CLIENT_LAT = 36.75;
 const DEFAULT_CLIENT_LNG = 3.05;
 
+const SYSTEM_CONFIG_DEFAULTS = [
+  {
+    key: 'max_orders_per_driver',
+    value: 5,
+    description: 'Maximum number of orders a driver can handle simultaneously'
+  },
+  {
+    key: 'max_distance_between_restaurants',
+    value: 500,
+    description: 'Maximum distance (in meters) between restaurants for multi-delivery'
+  },
+  {
+    key: 'client_restaurant_search_radius',
+    value: 2000,
+    description: 'Default search radius (in meters) for clients to find nearby restaurants'
+  },
+  {
+    key: 'default_preparation_time',
+    value: 15,
+    description: 'Default preparation time (in minutes) used when not provided by a restaurant'
+  },
+  {
+    key: 'pending_order_timeout',
+    value: 3,
+    description: 'Delay (in minutes) before notifying admins about a pending order without response'
+  },
+  {
+    key: 'default_delivery_fee',
+    value: 200,
+    description: 'Default delivery fee (in DA) applied when not provided for delivery orders'
+  },
+  {
+    key: 'max_driver_cancellations',
+    value: 3,
+    description: 'Maximum cancellations allowed before notifying admins about a driver'
+  }
+];
+
+const SUPPORTED_SYSTEM_CONFIG_KEYS = new Set(SYSTEM_CONFIG_DEFAULTS.map((config) => config.key));
+
 const normalizeCategoriesParam = (value) => {
   if (!value) return undefined;
   if (Array.isArray(value)) return value.filter(Boolean);
@@ -611,12 +651,16 @@ export const getDeliveryConfig = async (req, res, next) => {
   try {
     const maxOrders = await getMaxOrdersPerDriver();
     const maxDistance = await SystemConfig.get('max_distance_between_restaurants', 500);
+    const clientRestaurantSearchRadius = await SystemConfig.get('client_restaurant_search_radius', 2000);
+    const defaultDeliveryFee = await SystemConfig.get('default_delivery_fee', 200);
 
     res.json({
       success: true,
       data: {
         max_orders_per_driver: maxOrders,
-        max_distance_between_restaurants: maxDistance
+        max_distance_between_restaurants: maxDistance,
+        client_restaurant_search_radius: clientRestaurantSearchRadius,
+        default_delivery_fee: defaultDeliveryFee
       }
     });
   } catch (err) {
@@ -630,7 +674,7 @@ export const getDeliveryConfig = async (req, res, next) => {
  */
 export const getAllConfigs = async (req, res, next) => {
   try {
-    const cacheKey = 'admin:configs:all';
+    const cacheKey = 'admin:configs:all:v4';
     
     // Try to get from cache
     const cached = await cacheService.get(cacheKey);
@@ -642,9 +686,31 @@ export const getAllConfigs = async (req, res, next) => {
       });
     }
 
+    const allowedKeys = Array.from(SUPPORTED_SYSTEM_CONFIG_KEYS);
+
     const allConfigs = await SystemConfig.findAll({
+      where: { config_key: { [Op.in]: allowedKeys } },
       order: [['config_key', 'ASC']]
     });
+
+    const defaultConfigs = SYSTEM_CONFIG_DEFAULTS;
+
+    const configByKey = new Map(allConfigs.map((config) => [config.config_key, config]));
+    const mergedConfigs = allConfigs.slice();
+
+    defaultConfigs.forEach((defaults) => {
+      if (configByKey.has(defaults.key)) return;
+
+      mergedConfigs.push({
+        config_key: defaults.key,
+        config_value: defaults.value,
+        description: defaults.description,
+        updated_at: null,
+        updated_by: null
+      });
+    });
+
+    mergedConfigs.sort((a, b) => String(a.config_key).localeCompare(String(b.config_key)));
 
     // Organiser par catégories
     const configsByCategory = {
@@ -656,7 +722,7 @@ export const getAllConfigs = async (req, res, next) => {
       platform: []
     };
 
-    allConfigs.forEach(config => {
+    mergedConfigs.forEach(config => {
       const key = config.config_key;
       const value = config.config_value;
       const description = config.description || '';
@@ -672,12 +738,12 @@ export const getAllConfigs = async (req, res, next) => {
       // Catégoriser les configurations (ordre important pour éviter les doublons)
       if (key.includes('max_orders') || key.includes('max_distance') || key.includes('search_radius') || key.includes('delivery_distance')) {
         configsByCategory.delivery.push(configItem);
-      } else if (key.includes('preparation_time') || (key.includes('timeout') && !key.includes('notification'))) {
+      } else if (key.includes('notification') || key.includes('pending_order_timeout')) {
+        configsByCategory.notifications.push(configItem);
+      } else if (key.includes('preparation_time') || key.includes('timeout')) {
         configsByCategory.orders.push(configItem);
       } else if (key.includes('fee') || key.includes('commission')) {
         configsByCategory.fees.push(configItem);
-      } else if (key.includes('notification')) {
-        configsByCategory.notifications.push(configItem);
       } else if (key.includes('driver') || key.includes('cancellation')) {
         configsByCategory.drivers.push(configItem);
       } else {
@@ -688,7 +754,7 @@ export const getAllConfigs = async (req, res, next) => {
     const response = {
       success: true,
       data: configsByCategory,
-      all: allConfigs.map(c => ({
+      all: mergedConfigs.map(c => ({
         key: c.config_key,
         value: c.config_value,
         description: c.description,
@@ -733,18 +799,22 @@ export const updateConfig = async (req, res, next) => {
       });
     }
 
+    if (!SUPPORTED_SYSTEM_CONFIG_KEYS.has(key)) {
+      return res.status(400).json({
+        success: false,
+        message: "Unsupported configuration key"
+      });
+    }
+
     // Validation spécifique selon la clé
     const validations = {
       'max_orders_per_driver': { min: 1, max: 10, type: 'number' },
       'max_distance_between_restaurants': { min: 100, max: 5000, type: 'number' },
-      'driver_search_radius': { min: 1000, max: 20000, type: 'number' },
+      'client_restaurant_search_radius': { min: 100, max: 50000, type: 'number' },
+      'default_preparation_time': { min: 5, max: 120, type: 'number' },
       'pending_order_timeout': { min: 1, max: 60, type: 'number' },
       'default_delivery_fee': { min: 0, max: 10000, type: 'number' },
-      'delivery_fee_per_km': { min: 0, max: 1000, type: 'number' },
-      'max_delivery_distance': { min: 1, max: 100, type: 'number' },
-      'default_preparation_time': { min: 5, max: 120, type: 'number' },
-      'platform_commission_rate': { min: 0, max: 50, type: 'number' },
-      'max_driver_cancellations': { min: 1, max: 20, type: 'number' }
+      'max_driver_cancellations': { min: 1, max: 20, type: 'number' },
     };
 
     const validation = validations[key];
@@ -805,6 +875,9 @@ export const updateConfig = async (req, res, next) => {
 
     // Invalidate config cache
     await cacheService.del('admin:configs:all');
+    await cacheService.del('admin:configs:all:v2');
+    await cacheService.del('admin:configs:all:v3');
+    await cacheService.del('admin:configs:all:v4');
     await cacheService.del(`admin:config:${key}`);
 
     console.log(`✅ Config ${key} updated to ${value} by admin ${adminId}`);

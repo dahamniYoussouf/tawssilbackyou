@@ -1,6 +1,7 @@
 import * as orderService from "../services/order.service.js";
 import { createOrderWithItems, getOrdersByRestaurant } from "../services/orderWithItem.js";
 import Cashier from '../models/Cashier.js';
+import SystemConfig from "../models/SystemConfig.js";
 
 
 // ==================== ORDER CRUD ====================
@@ -632,6 +633,17 @@ export const driverCancelOrder = async (req, res, next) => {
     }
     
     const result = await orderService.driverCancelOrder(id, driverId, reason);
+
+    let maxDriverCancellations = 3;
+    try {
+      const configuredMax = await SystemConfig.get('max_driver_cancellations', 3);
+      const parsedMax = Number.parseInt(String(configuredMax), 10);
+      if (Number.isFinite(parsedMax) && parsedMax >= 1 && parsedMax <= 20) {
+        maxDriverCancellations = parsedMax;
+      }
+    } catch (error) {
+      console.error("❌ Error reading max_driver_cancellations config:", error);
+    }
     
     res.json({
       success: true,
@@ -643,7 +655,7 @@ export const driverCancelOrder = async (req, res, next) => {
           status: result.order.status
         },
         driver: result.driver,
-        warning: result.driver.cancellation_count >= 3 
+        warning: result.driver.cancellation_count >= maxDriverCancellations 
           ? "Warning: Multiple cancellations detected. Admin has been notified."
           : null
       }

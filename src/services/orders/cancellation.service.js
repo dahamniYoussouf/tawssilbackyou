@@ -4,6 +4,7 @@ import Restaurant from "../../models/Restaurant.js";
 import Client from "../../models/Client.js";
 import Driver from "../../models/Driver.js";
 import AdminNotification from "../../models/AdminNotification.js";
+import SystemConfig from "../../models/SystemConfig.js";
 import { emit, notifyNearbyDrivers } from "../../config/socket.js";
 import { notify } from "./notify.helper.js";
 
@@ -70,7 +71,18 @@ export async function driverCancelOrder(orderId, driverId, reason) {
       ).catch((err) => console.error("Error notifying nearby drivers:", err));
     }
 
-    if (newCancellationCount >= 3) {
+    let maxDriverCancellations = 3;
+    try {
+      const configuredMax = await SystemConfig.get('max_driver_cancellations', 3);
+      const parsedMax = Number.parseInt(String(configuredMax), 10);
+      if (Number.isFinite(parsedMax) && parsedMax >= 1 && parsedMax <= 20) {
+        maxDriverCancellations = parsedMax;
+      }
+    } catch (error) {
+      console.error("❌ Error reading max_driver_cancellations config:", error);
+    }
+
+    if (newCancellationCount >= maxDriverCancellations) {
       createDriverCancellationNotification(driverId, newCancellationCount, order.id, order.restaurant_id).catch((err) =>
         console.error("Error creating admin notification:", err)
       );

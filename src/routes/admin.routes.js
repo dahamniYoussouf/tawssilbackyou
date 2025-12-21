@@ -59,7 +59,7 @@ router.use(
       if (path.startsWith('/notifications')) return false;
       if (path === '/statistics') return false;
       if (path === '/monitoring') return false;
-      if (path === '/config/all') return false;
+      if (path.startsWith('/config')) return false;
       if (path.startsWith('/top/')) return false;
       return true;
     }

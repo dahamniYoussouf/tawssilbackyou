@@ -3,6 +3,7 @@ import Order from "../../models/Order.js";
 import Restaurant from "../../models/Restaurant.js";
 import Client from "../../models/Client.js";
 import Driver from "../../models/Driver.js";
+import SystemConfig from "../../models/SystemConfig.js";
 import { notifyNearbyDrivers } from "../../config/socket.js";
 import calculateRouteTime from "../routingService.js";
 import { canDriverAcceptOrder } from "../multiDeliveryService.js";
@@ -19,7 +20,16 @@ export async function acceptOrder(orderId, userId, data = {}) {
     throw { status: 400, message: `Cannot accept order in ${order.status} status` };
   }
 
-  const preparationMinutes = data?.preparation_time || 15;
+  let preparationMinutes = Number.parseInt(String(data?.preparation_time ?? ''), 10);
+  if (!Number.isFinite(preparationMinutes) || preparationMinutes <= 0) {
+    const configuredDefault = await SystemConfig.get('default_preparation_time', 15);
+    const parsedConfigured = Number.parseInt(String(configuredDefault), 10);
+    preparationMinutes = Number.isFinite(parsedConfigured)
+      ? Math.min(120, Math.max(5, parsedConfigured))
+      : 15;
+  } else {
+    preparationMinutes = Math.min(120, Math.max(5, preparationMinutes));
+  }
 
   // Calcul du temps de livraison : preparation_time + temps de trajet restaurant -> client
   let deliveryTimeMinutes = preparationMinutes;

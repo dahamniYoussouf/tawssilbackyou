@@ -5,6 +5,7 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import { readFileSync } from 'fs';
 import { initSocket } from "./config/socket.js";
+import sequelize from "./config/database.js";
 
 const swaggerOutput = JSON.parse(readFileSync('./swagger-output.json', 'utf8'));
 
@@ -57,6 +58,21 @@ app.use(securityMiddlewares);
 
 app.get("/health", (_, res) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() });
+});
+
+app.get("/health/db", async (_, res) => {
+  try {
+    await sequelize.query("SELECT 1");
+    res.json({ status: "OK", database: "OK", timestamp: new Date().toISOString() });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    res.status(503).json({
+      status: "ERROR",
+      database: "DOWN",
+      timestamp: new Date().toISOString(),
+      ...(process.env.NODE_ENV !== "production" && { error: message })
+    });
+  }
 });
 
 // Routes

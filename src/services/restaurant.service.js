@@ -14,6 +14,7 @@ import OrderItemAddition from "../models/OrderItemAddition.js";
 import Driver from "../models/Driver.js";
 import User from "../models/User.js";
 import HomeCategory from "../models/HomeCategory.js";
+import SystemConfig from "../models/SystemConfig.js";
 import { sequelize } from "../config/database.js";
 import cacheService from "./cache.service.js";
 import { normalizeCategoryList } from "../utils/slug.js";
@@ -28,10 +29,69 @@ import { hydrateOrderItemsWithActivePromotions } from "./orders/orderEnrichment.
 const NEARBY_CACHE_TTL = 60; // seconds
 const METERS_PER_DEGREE = 111320;
 const MIN_TILE_METERS = 500;
+const CLIENT_RESTAURANT_SEARCH_RADIUS_KEY = "client_restaurant_search_radius";
+const DEFAULT_CLIENT_RESTAURANT_SEARCH_RADIUS = 2000;
+const CLIENT_RESTAURANT_SEARCH_RADIUS_MIN = 100;
+const CLIENT_RESTAURANT_SEARCH_RADIUS_MAX = 50000;
+const CLIENT_RESTAURANT_SEARCH_RADIUS_CACHE_TTL_MS = 60_000;
+
+let clientRestaurantSearchRadiusCache = {
+  value: DEFAULT_CLIENT_RESTAURANT_SEARCH_RADIUS,
+  expiresAt: 0
+};
 
 const normalizeQueryKey = (value) => (typeof value === "string" ? value.trim().toLowerCase() : "");
 
 const roundMoney = (value) => Number(Number(value ?? 0).toFixed(2));
+
+const normalizeRadiusMeters = (value) => {
+  if (value === null || value === undefined) return null;
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+export const resolveClientRestaurantSearchRadius = async (requestedRadius) => {
+  const parsedRequest = normalizeRadiusMeters(requestedRadius);
+
+  if (parsedRequest !== null) {
+    if (
+      parsedRequest < CLIENT_RESTAURANT_SEARCH_RADIUS_MIN ||
+      parsedRequest > CLIENT_RESTAURANT_SEARCH_RADIUS_MAX
+    ) {
+      const error = new Error(
+        `Radius must be between ${CLIENT_RESTAURANT_SEARCH_RADIUS_MIN} and ${CLIENT_RESTAURANT_SEARCH_RADIUS_MAX} meters`
+      );
+      error.status = 400;
+      throw error;
+    }
+    return parsedRequest;
+  }
+
+  const now = Date.now();
+  if (now < clientRestaurantSearchRadiusCache.expiresAt) {
+    return clientRestaurantSearchRadiusCache.value;
+  }
+
+  const configured = await SystemConfig.get(
+    CLIENT_RESTAURANT_SEARCH_RADIUS_KEY,
+    DEFAULT_CLIENT_RESTAURANT_SEARCH_RADIUS
+  );
+
+  const parsedConfigured = normalizeRadiusMeters(configured);
+  const resolved =
+    parsedConfigured !== null &&
+    parsedConfigured >= CLIENT_RESTAURANT_SEARCH_RADIUS_MIN &&
+    parsedConfigured <= CLIENT_RESTAURANT_SEARCH_RADIUS_MAX
+      ? parsedConfigured
+      : DEFAULT_CLIENT_RESTAURANT_SEARCH_RADIUS;
+
+  clientRestaurantSearchRadiusCache = {
+    value: resolved,
+    expiresAt: now + CLIENT_RESTAURANT_SEARCH_RADIUS_CACHE_TTL_MS
+  };
+
+  return resolved;
+};
 
 const toDecimal = (value) => {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
@@ -365,7 +425,7 @@ export const filterNearbyRestaurants = async (filters) => {
     address,
     lat,
     lng,
-    radius = 2000,
+    radius,
     q,
     categories,
     home_categories,
@@ -446,7 +506,7 @@ export const filterNearbyRestaurants = async (filters) => {
     throw error;
   }
 
-  const searchRadius = parseInt(radius, 10);
+  const searchRadius = await resolveClientRestaurantSearchRadius(radius);
   const normalizedPage = Math.max(1, parseInt(page, 10) || 1);
   const normalizedPageSize = Math.max(1, parseInt(pageSize, 10) || 20);
   const limit = normalizedPageSize;
@@ -627,7 +687,11 @@ export const filterNearbyRestaurants = async (filters) => {
     sampleByRestaurant.set(rid, list);
   });
 
-  const prepTime = 15;
+  const configuredPreparationTime = await SystemConfig.get('default_preparation_time', 15);
+  const parsedPreparationTime = Number.parseInt(String(configuredPreparationTime), 10);
+  const prepTime = Number.isFinite(parsedPreparationTime)
+    ? Math.min(120, Math.max(5, parsedPreparationTime))
+    : 15;
   const formattedBase = nearbyRows
     .map((row) => {
       const restaurant = restaurantById.get(String(row.id));
@@ -866,7 +930,7 @@ export const filter = async (filters = {}) => {
  * Get nearby restaurant names only
  */
 export const getNearbyRestaurantNames = async (filters) => {
-  const { address, lat, lng, radius = 2000 } = filters;
+  const { address, lat, lng, radius } = filters;
 
   let latitude, longitude;
 
@@ -942,7 +1006,7 @@ export const getNearbyRestaurantNames = async (filters) => {
     throw error;
   }
 
-  const searchRadius = parseInt(radius, 10);
+  const searchRadius = await resolveClientRestaurantSearchRadius(radius);
 
   const restaurants = await Restaurant.findAll({
     attributes: [

@@ -1,9 +1,8 @@
 import "./processHandlers.js";
-import dotenv from "dotenv";
+import "./src/config/env.js";
 import { server } from "./src/app.js"; // ⚡ Import server instead of app
 import { sequelize } from "./src/config/database.js";
 
-dotenv.config();
 
 const port = process.env.PORT || 3000;
 

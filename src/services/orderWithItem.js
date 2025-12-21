@@ -8,6 +8,7 @@ import Addition from "../models/Addition.js";
 import Restaurant from "../models/Restaurant.js";
 import Client from "../models/Client.js";
 import Promotion from "../models/Promotion.js";
+import SystemConfig from "../models/SystemConfig.js";
 import calculateRouteTime from "../services/routingService.js";
 import { emit } from "../config/socket.js";
 import { scheduleAdminNotification } from "../services/order.service.js";
@@ -171,7 +172,7 @@ export async function createOrderWithItems(data) {
     delivery_address,
     lat,
     lng,
-    delivery_fee = 0,
+    delivery_fee,
     payment_method,
     delivery_instructions,
     estimated_delivery_time,
@@ -198,7 +199,7 @@ export async function createOrderWithItems(data) {
   const additionIds = items.flatMap(i => (i.additions || []).map(a => a.addition_id)).filter(Boolean);
 
   // Restaurant validation (always required)
-  const [restaurant, menuItems, additions] = await Promise.all([
+  const [restaurant, menuItems, additions, configuredPreparationTime, configuredDefaultDeliveryFee] = await Promise.all([
     Restaurant.findByPk(restaurant_id, {
       attributes: ['id', 'location'],
       raw: true
@@ -212,7 +213,9 @@ export async function createOrderWithItems(data) {
           where: { id: additionIds },
           attributes: ['id', 'menu_item_id', 'nom', 'prix', 'is_available']
         })
-      : Promise.resolve([])
+      : Promise.resolve([]),
+    SystemConfig.get('default_preparation_time', 15),
+    SystemConfig.get('default_delivery_fee', 200)
   ]);
 
   if (!restaurant) throw { status: 404, message: "Restaurant not found" };
@@ -225,6 +228,32 @@ export async function createOrderWithItems(data) {
       raw: true
     });
     if (!client) throw { status: 404, message: "Client not found" };
+  }
+
+  const parsedPreparationTime = Number.parseInt(String(configuredPreparationTime), 10);
+  const defaultPreparationMinutes = Number.isFinite(parsedPreparationTime)
+    ? Math.min(120, Math.max(5, parsedPreparationTime))
+    : 15;
+
+  const parsedDefaultDeliveryFee = Number.parseFloat(String(configuredDefaultDeliveryFee));
+  const defaultDeliveryFee = Number.isFinite(parsedDefaultDeliveryFee)
+    ? Math.min(10000, Math.max(0, parsedDefaultDeliveryFee))
+    : 200;
+
+  if (order_type === 'delivery') {
+    const parsedRequestedDeliveryFee =
+      delivery_fee === undefined || delivery_fee === null
+        ? null
+        : Number.parseFloat(String(delivery_fee));
+
+    delivery_fee =
+      parsedRequestedDeliveryFee === null ||
+      !Number.isFinite(parsedRequestedDeliveryFee) ||
+      parsedRequestedDeliveryFee <= 0
+        ? defaultDeliveryFee
+        : Math.min(10000, Math.max(defaultDeliveryFee, parsedRequestedDeliveryFee));
+  } else {
+    delivery_fee = 0;
   }
 
   const menuMap = new Map(menuItems.map(m => [m.id, m]));
@@ -374,7 +403,7 @@ export async function createOrderWithItems(data) {
 
 
 // Calculate delivery time estimate
-  const prepTime = 15;
+  const prepTime = defaultPreparationMinutes;
   let calculatedEstimatedTime = estimated_delivery_time;
   let deliveryDurationMinutes = null;
   let distanceKm = null;
