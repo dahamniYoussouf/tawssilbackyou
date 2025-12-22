@@ -25,6 +25,114 @@ import cacheService from "./cache.service.js";
 const HOMEPAGE_MODULES_CACHE_KEY = "homepage:modules:v2"; // Incremented version
 const HOMEPAGE_MODULES_CACHE_TTL = 60; // seconds
 
+
+const enrichThematicSelectionsWithRestaurants = async (thematicSelections) => {
+  if (!thematicSelections || thematicSelections.length === 0) {
+    return [];
+  }
+
+  // Import Restaurant model dynamically to avoid circular dependencies
+  const { default: Restaurant } = await import("../models/Restaurant.js");
+  const { serializeHomeCategories, extractHomeCategorySlugs } = await import("./restaurantCategory.service.js");
+  const { default: HomeCategory } = await import("../models/HomeCategory.js");
+
+  // Get all unique home_category_ids from thematic selections
+  const categoryIds = [...new Set(
+    thematicSelections
+      .map(selection => selection.home_category_id)
+      .filter(Boolean)
+  )];
+
+  if (categoryIds.length === 0) {
+    return thematicSelections;
+  }
+
+  // Fetch restaurants for each category
+  const restaurantsByCategoryPromises = categoryIds.map(async (categoryId) => {
+    const restaurants = await Restaurant.findAll({
+      attributes: [
+        'id',
+        'name',
+        'description',
+        'address',
+        'location',
+        'rating',
+        'image_url',
+        'is_premium',
+        'status',
+        'opening_hours',
+        'email',
+        'phone_number'
+      ],
+      include: [
+        {
+          model: HomeCategory,
+          as: "home_categories",
+          where: { id: categoryId },
+          attributes: ["id", "name", "slug", "description", "image_url", "display_order"],
+          through: { attributes: [] }
+        }
+      ],
+      where: {
+        is_active: true,
+        status: 'approved'
+      },
+      limit: 10, // Limit restaurants per thematic selection
+      order: [
+        ['is_premium', 'DESC'],
+        ['rating', 'DESC']
+      ]
+    });
+
+    return {
+      categoryId,
+      restaurants: restaurants.map(restaurant => {
+        // ✅ Convert to plain JSON to avoid circular references
+        const restaurantJson = restaurant.toJSON();
+        const coords = restaurantJson.location?.coordinates || [];
+        const homeCategories = serializeHomeCategories(restaurantJson.home_categories || []);
+        
+        return {
+          id: restaurantJson.id,
+          name: restaurantJson.name,
+          description: restaurantJson.description,
+          address: restaurantJson.address,
+          lat: coords[1] || null,
+          lng: coords[0] || null,
+          rating: restaurantJson.rating ? parseFloat(restaurantJson.rating) : 0,
+          image_url: restaurantJson.image_url,
+          is_premium: restaurantJson.is_premium,
+          status: restaurantJson.status,
+          is_open: typeof restaurant.isOpen === 'function' ? restaurant.isOpen() : true,
+          home_categories: homeCategories,
+          categories: extractHomeCategorySlugs(homeCategories),
+          email: restaurantJson.email || null,
+          phone_number: restaurantJson.phone_number || null
+        };
+      })
+    };
+  });
+
+  const restaurantsByCategory = await Promise.all(restaurantsByCategoryPromises);
+
+  // Create a map for quick lookup
+  const restaurantsMap = new Map(
+    restaurantsByCategory.map(({ categoryId, restaurants }) => [categoryId, restaurants])
+  );
+
+  // Enrich thematic selections with restaurants
+  // ✅ Convert selections to plain JSON to avoid circular references
+  return thematicSelections.map(selection => {
+    const selectionJson = typeof selection.toJSON === 'function' ? selection.toJSON() : selection;
+    
+    return {
+      ...selectionJson,
+      restaurants: restaurantsMap.get(selectionJson.home_category_id) || [],
+      restaurants_count: (restaurantsMap.get(selectionJson.home_category_id) || []).length
+    };
+  });
+};
+
 /**
  * Get homepage modules with optional location for featured restaurants
  * @param {Object} options - Configuration options
@@ -81,14 +189,17 @@ export const getHomepageModules = async (options = {}) => {
     })
   ]);
 
+  // ✅ Enrich thematic selections with restaurants
+  const enrichedThematicSelections = await enrichThematicSelectionsWithRestaurants(thematicSelections);
+
   const modules = {
     homeCategories,
-    thematicSelections,
+    thematicSelections: enrichedThematicSelections,
     recommendedDishes,
     dailyDeals,
     promotions,
     announcements,
-    featuredRestaurants // ✅ NEW: Featured premium restaurants
+    featuredRestaurants
   };
 
   // Cache with shorter TTL if location-based (featured restaurants are randomized)
