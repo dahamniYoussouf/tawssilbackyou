@@ -31,6 +31,7 @@ import geocodeRoutes from "./routes/geocode.js";
 import auth from "./routes/auth.route.js";
 import admin from "./routes/admin.routes.js"; 
 import cashier from "./routes/cashier.routes.js";
+import HomeCategory from "./routes/homeCategory.route.js";
 import homepage from "./routes/homepage.route.js";
 import homepageV2 from "./routes/homepage.v2.route.js";
 
@@ -89,6 +90,7 @@ app.use("/favoritemeal", favoriteMeal);
 app.use("/addition", addition);
 app.use("/driver", driver);
 app.use("/admin", admin);
+app.use("/home-category", HomeCategory);
 app.use("/api", uploadRoutes);
 app.use("/api", geocodeRoutes);
 app.use("/cashier", cashier);
