@@ -86,7 +86,8 @@ const filterModulesByNearbyRestaurants = (modules, nearbyRestaurantIds) => {
       recommendedDishes: [],
       dailyDeals: [],
       promotions: [],
-      announcements: []
+      announcements: [],
+      featuredRestaurants: [] // ✅ Also filter featured restaurants
     };
   }
 
@@ -127,13 +128,19 @@ const filterModulesByNearbyRestaurants = (modules, nearbyRestaurantIds) => {
     return false;
   });
 
+  // ✅ Filter featured restaurants to only show nearby ones
+  const featuredRestaurants = (modules.featuredRestaurants || []).filter(restaurant => {
+    return restaurantIdSet.has(String(restaurant.id));
+  });
+
   return {
     homeCategories: modules.homeCategories || [],
     thematicSelections: modules.thematicSelections || [],
     recommendedDishes,
     dailyDeals,
     promotions,
-    announcements
+    announcements,
+    featuredRestaurants // ✅ NEW: Filtered featured restaurants
   };
 };
 
@@ -150,6 +157,10 @@ const buildHomepagePayload = (modules, nearby) => {
   };
 };
 
+/**
+ * ✅ UPDATED: Get homepage overview with featured restaurants
+ * POST /api/homepage/overview
+ */
 export const getHomepageOverview = async (req, res, next) => {
   try {
     const body = {
@@ -165,7 +176,20 @@ export const getHomepageOverview = async (req, res, next) => {
       });
     }
 
-    const modulesPromise = getHomepageModules();
+    // Parse location for featured restaurants
+    const lat = parseNumberParam(body.lat);
+    const lng = parseNumberParam(body.lng);
+    const featuredRadius = parseIntegerParam(body.featuredRadius) || 10000; // 10km default
+    const featuredLimit = parseIntegerParam(body.featuredLimit) || 6;
+
+    // Fetch modules with location for featured restaurants
+    const modulesPromise = getHomepageModules({
+      lat,
+      lng,
+      featuredRadius,
+      featuredLimit
+    });
+
     const nearbyPromise = restaurantService.filterNearbyRestaurants(body);
 
     const [modules, nearby] = await Promise.all([modulesPromise, nearbyPromise]);
@@ -181,7 +205,19 @@ export const getHomepageOverview = async (req, res, next) => {
 
 const respondWithModules = async (filters, res, next) => {
   try {
-    const modules = await getHomepageModules();
+    // Parse location for featured restaurants
+    const lat = parseNumberParam(filters.lat);
+    const lng = parseNumberParam(filters.lng);
+    const featuredRadius = parseIntegerParam(filters.featuredRadius) || 10000;
+    const featuredLimit = parseIntegerParam(filters.featuredLimit) || 6;
+
+    const modules = await getHomepageModules({
+      lat,
+      lng,
+      featuredRadius,
+      featuredLimit
+    });
+
     const nearbyFilters = buildNearbyFilters(filters);
     const nearby = await restaurantService.filterNearbyRestaurants(nearbyFilters);
 
