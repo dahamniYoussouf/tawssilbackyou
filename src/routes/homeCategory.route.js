@@ -23,8 +23,6 @@ router.get(
 
 router.get(
   "/:id", 
-  homeCategoryIdValidator, 
-  validate, 
   cacheMiddleware({ ttl: 300 }), 
   homeCategoryCtrl.getById
 );
