@@ -1,4 +1,4 @@
-import { body, param } from "express-validator";
+import { body, param, query } from "express-validator";
 
 const slugPattern = /^[a-z0-9_-]+$/;
 
@@ -76,4 +76,18 @@ export const deleteHomeCategoryValidator = [
   param("id")
     .isUUID()
     .withMessage("Invalid category UUID"),
+];
+export const listHomeCategoriesValidator = [
+  query("activeOnly")
+    .optional()
+    .isBoolean()
+    .withMessage("activeOnly must be a boolean value")
+];
+
+export const homeCategoryIdValidator = [
+  param("id")
+    .notEmpty()
+    .withMessage("Category ID is required")
+    .isInt({ min: 1 })
+    .withMessage("Category ID must be a valid positive integer")
 ];

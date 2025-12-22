@@ -18,13 +18,7 @@ router.get(
   listHomeCategoriesValidator, 
   validate, 
   cacheMiddleware({ ttl: 300 }), 
-  homeCategoryCtrl.list
-);
-
-router.get(
-  "/:id", 
-  cacheMiddleware({ ttl: 300 }), 
-  homeCategoryCtrl.getById
+  homeCategoryCtrl.getCategories
 );
 
 // ✅ Admin routes
@@ -34,7 +28,7 @@ router.post(
   authorize('admin'), 
   createHomeCategoryValidator, 
   validate, 
-  homeCategoryCtrl.create
+  homeCategoryCtrl.createCategory
 );
 
 router.put(
@@ -44,7 +38,7 @@ router.put(
   homeCategoryIdValidator, 
   updateHomeCategoryValidator, 
   validate, 
-  homeCategoryCtrl.update
+  homeCategoryCtrl.updateCategory
 );
 
 router.delete(
@@ -53,7 +47,7 @@ router.delete(
   authorize('admin'), 
   homeCategoryIdValidator, 
   validate, 
-  homeCategoryCtrl.remove
+  homeCategoryCtrl.removeCategory
 );
 
 export default router;
