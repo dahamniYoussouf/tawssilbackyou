@@ -10,6 +10,30 @@ import { canDriverAcceptOrder } from "../multiDeliveryService.js";
 import { notify } from "./notify.helper.js";
 import { scheduleAdminNotificationDriver, addExtraPreparationTime } from "./scheduling.service.js";
 
+// ✅ Award loyalty points to client (1 point per 100 DZD)
+async function awardLoyaltyPoints(clientId, orderTotal, orderId) {
+  try {
+    if (!clientId || !orderTotal) return;
+    
+    const client = await Client.findByPk(clientId);
+    if (!client) return;
+    
+    // 1 point for every 100 DZD spent
+    const points = Math.floor(parseFloat(orderTotal) / 100);
+    
+    if (points <= 0) return;
+    
+    const newTotal = (client.loyalty_points || 0) + points;
+    await client.update({ loyalty_points: newTotal });
+    
+    console.log(`✅ Awarded ${points} loyalty points to client ${clientId} (Order: ${orderId}). New total: ${newTotal}`);
+    
+    return newTotal;
+  } catch (error) {
+    console.error('Error awarding loyalty points:', error);
+  }
+}
+
 export async function acceptOrder(orderId, userId, data = {}) {
   const order = await Order.findByPk(orderId, {
     include: [{ model: Client, as: "client" }, { model: Restaurant, as: "restaurant" }],
@@ -31,12 +55,10 @@ export async function acceptOrder(orderId, userId, data = {}) {
     preparationMinutes = Math.min(120, Math.max(5, preparationMinutes));
   }
 
-  // Calcul du temps de livraison : preparation_time + temps de trajet restaurant -> client
   let deliveryTimeMinutes = preparationMinutes;
   let deliveryDistanceKm = order.delivery_distance;
   let estimatedDeliveryTime = new Date(Date.now() + preparationMinutes * 60 * 1000);
 
-  // Si c'est une livraison, calculer le temps de trajet depuis le restaurant jusqu'au client
   if (order.order_type === "delivery") {
     const restaurantCoords = order.restaurant?.getCoordinates?.();
     const deliveryCoords = order.delivery_location?.coordinates;
@@ -50,10 +72,9 @@ export async function acceptOrder(orderId, userId, data = {}) {
           restaurantCoords.latitude,
           deliveryLng,
           deliveryLat,
-          40 // Vitesse moyenne: 40 km/h
+          40
         );
 
-        // Temps total = temps de préparation + temps de trajet
         deliveryTimeMinutes = preparationMinutes + route.timeMax;
         deliveryDistanceKm = route.distanceKm;
         estimatedDeliveryTime = new Date(Date.now() + deliveryTimeMinutes * 60 * 1000);
@@ -62,8 +83,7 @@ export async function acceptOrder(orderId, userId, data = {}) {
         console.log(`⏱️ Temps total: ${preparationMinutes} min (préparation) + ${route.timeMax} min (trajet) = ${deliveryTimeMinutes} min`);
       } catch (error) {
         console.error('❌ Erreur calcul route restaurant→client:', error.message);
-        // En cas d'erreur, utiliser une estimation par défaut pour le trajet
-        const defaultDeliveryTime = 20; // 20 minutes par défaut pour le trajet
+        const defaultDeliveryTime = 20;
         deliveryTimeMinutes = preparationMinutes + defaultDeliveryTime;
         estimatedDeliveryTime = new Date(Date.now() + deliveryTimeMinutes * 60 * 1000);
         console.warn(`⚠️ Utilisation estimation par défaut: ${defaultDeliveryTime} min pour le trajet`);
@@ -81,7 +101,6 @@ export async function acceptOrder(orderId, userId, data = {}) {
     ...(deliveryDistanceKm && { delivery_distance: deliveryDistanceKm }),
   });
 
-  // Préparer le message avec les temps calculés
   let message = `${order.restaurant.name} accepted your order.`;
   if (order.order_type === "delivery") {
     message += ` Estimated delivery time: ${deliveryTimeMinutes} min (${preparationMinutes} min preparation + ${deliveryTimeMinutes - preparationMinutes} min delivery)`;
@@ -103,7 +122,6 @@ export async function acceptOrder(orderId, userId, data = {}) {
     })
   });
 
-  // ✅ FIX 4: Notification des drivers avec meilleure gestion d'erreurs
   if (order.order_type === "delivery") {
     const coords = order.delivery_location?.coordinates;
     
@@ -124,10 +142,10 @@ export async function acceptOrder(orderId, userId, data = {}) {
             restaurantAddress: order.restaurant.address,
             deliveryAddress: order.delivery_address,
             fee: parseFloat(order.delivery_fee || 0),
-            estimatedTime: estimatedDeliveryTime, // ✅ Utiliser le temps calculé avec preparation_time + trajet
+            estimatedTime: estimatedDeliveryTime,
             totalAmount: parseFloat(order.total_amount || 0),
           },
-          5 // ✅ FIX 5: Radius en km (sera converti en mètres dans la fonction)
+          5
         );
         
         if (notifiedDrivers.length === 0) {
@@ -136,7 +154,6 @@ export async function acceptOrder(orderId, userId, data = {}) {
         
       } catch (error) {
         console.error(`❌ Error notifying drivers for order ${order.order_number}:`, error);
-        // Ne pas bloquer l'acceptation de la commande si la notification échoue
       }
       
     } else {
@@ -150,8 +167,6 @@ export async function acceptOrder(orderId, userId, data = {}) {
 
   return order;
 }
-
-
 
 export async function startPreparing(orderId) {
   const transaction = await sequelize.transaction();
@@ -181,9 +196,14 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
   });
   if (!order) throw { status: 404, message: "Order not found" };
 
-  // PICKUP => complete directly
   if (order.order_type === "pickup") {
     await order.update({ status: "delivered", livreur_id: null, delivered_at: new Date() });
+    
+    // ✅ Award loyalty points for pickup orders
+    if (order.client_id && order.total_amount) {
+      await awardLoyaltyPoints(order.client_id, order.total_amount, order.id);
+    }
+    
     notify("client", order.client_id, {
       type: "order_ready",
       orderId: order.id,
@@ -192,7 +212,6 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
     return order;
   }
 
-  // DELIVERY
   if (order.livreur_id) throw { status: 400, message: "Order already assigned" };
 
   const driver = await Driver.findByPk(driverId);
@@ -204,7 +223,6 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
     throw { status: 400, message: canAccept.reason || "Driver cannot accept this order" };
   }
 
-  // ✅ CALCULER LA DISTANCE ET LE TEMPS ENTRE RESTAURANT ET DRIVER
   let routeInfo = null;
   
   try {
@@ -217,13 +235,12 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
         driverCoords.latitude,
         restaurantCoords.longitude,
         restaurantCoords.latitude,
-        40 // Vitesse moyenne: 40 km/h
+        40
       );
       
       routeInfo = {
         distance_km: route.distanceKm,
-        estimated_time_min: route.timeMin  // ✅ Renommé pour cohérence
-
+        estimated_time_min: route.timeMin
       };
       
       console.log(`📍 Route Driver→Restaurant: ${route.distanceKm} km, ~${route.timeMax} min`);
@@ -232,13 +249,11 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
     }
   } catch (error) {
     console.error('Route calculation failed:', error.message);
-    // Continue même si le calcul échoue
   }
 
   await order.update({ status: "assigned", livreur_id: driverId });
   await driver.addActiveOrder(orderId);
 
-  // ✅ Notification client avec noms cohérents
   notify("client", order.client_id, {
     type: "driver_assigned",
     orderId: order.id,
@@ -248,12 +263,11 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
       vehicle: driver.vehicle_type,
       ...(routeInfo && { 
         distance_to_restaurant_km: routeInfo.distance_km,
-        estimated_arrival_min: routeInfo.estimated_time_min  // ✅ Cohérent
+        estimated_arrival_min: routeInfo.estimated_time_min
       })
     },
   });
 
-  // ✅ Notification driver avec noms cohérents
   notify("driver", driverId, {
     type: "order_assigned",
     orderId: order.id,
@@ -269,7 +283,6 @@ export async function assignDriverOrComplete(orderId, driverId = null) {
     })
   });
 
-  // ✅ RETOURNER L'ORDER AVEC LES INFOS DE ROUTE (noms cohérents)
   return {
     ...order.toJSON(),
     driver_to_restaurant_distance_km: routeInfo?.distance_km,          
@@ -331,11 +344,16 @@ export async function completeDelivery(orderId) {
   if (!order.canTransitionTo("delivered")) {
     throw { status: 400, message: `Cannot complete from ${order.status} status` };
   }
+  
   const driverId = order.livreur_id;
-  // mark delivered + unassign
+  
   await order.update({ status: "delivered", livreur_id: null, delivered_at: new Date() });
 
-  // If there was a driver, update their active orders
+  // ✅ Award loyalty points for delivery orders
+  if (order.client_id && order.total_amount) {
+    await awardLoyaltyPoints(order.client_id, order.total_amount, order.id);
+  }
+
   if (driverId) {
     const driver = await Driver.findByPk(driverId);
     if (driver) {
