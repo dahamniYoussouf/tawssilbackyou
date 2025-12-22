@@ -84,29 +84,25 @@ export const remove = async (req, res, next) => {
 };
 
 // ✅ NEW: Get authenticated client's profile
+import { getClientProfileByUserId } from "../services/client.service.js";
+
 export const getProfile = async (req, res, next) => {
   try {
-    // Get client profile from user_id in JWT
-    const client = await Client.findOne({ 
-      where: { user_id: req.user.id },
-      attributes: { exclude: [] } // Include all fields
-    });
-    
-    if (!client) {
-      return res.status(404).json({
-        success: false,
-        message: "Client profile not found"
-      });
-    }
+    // Get client profile with favorite addresses from user_id in JWT
+    const profile = await getClientProfileByUserId(req.user.id);
 
     res.json({ 
       success: true, 
-      data: {
-        ...client.toJSON(),
-        full_name: client.getFullName()
-      }
+      data: profile
     });
   } catch (err) {
+    // Handle 404 specifically
+    if (err.status === 404) {
+      return res.status(404).json({
+        success: false,
+        message: err.message
+      });
+    }
     next(err);
   }
 };

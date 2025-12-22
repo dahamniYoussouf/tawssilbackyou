@@ -6,12 +6,107 @@ import Restaurant from "../models/Restaurant.js";
 import Driver from "../models/Driver.js";
 import OrderItem from "../models/OrderItem.js";
 import OrderItemAddition from "../models/OrderItemAddition.js";
+import FavoriteAddress from "../models/FavoriteAddress.js";
 import Addition from "../models/Addition.js";
 import MenuItem from "../models/MenuItem.js";
 import { hydrateOrderItemsWithActivePromotions } from "./orders/orderEnrichment.helper.js";
 
 
+export const getClientProfileByUserId = async (user_id) => {
+  // Find client by user_id
+  const client = await Client.findOne({
+    where: { user_id },
+    attributes: [
+      'id',
+      'user_id',
+      'first_name',
+      'last_name',
+      'email',
+      'phone_number',
+      'address',
+      'location',
+      'profile_image_url',
+      'loyalty_points',
+      'is_verified',
+      'is_active',
+      'status',
+      'created_at',
+      'updated_at'
+    ]
+  });
 
+  if (!client) {
+    throw { status: 404, message: "Client profile not found" };
+  }
+
+  // Get favorite addresses
+  const favoriteAddresses = await FavoriteAddress.findAll({
+    where: { client_id: client.id },
+    order: [
+      ['is_default', 'DESC'],
+      ['createdAt', 'DESC']
+    ],
+    attributes: [
+      'id',
+      'client_id',
+      'name',
+      'address',
+      'lat',
+      'lng',
+      'location',
+      'is_default',
+      'createdAt',
+      'updatedAt'
+    ]
+  });
+
+  // Format client data
+  const clientJson = client.toJSON();
+  const coords = clientJson.location?.coordinates || [];
+
+  // Format favorite addresses
+  const formattedAddresses = favoriteAddresses.map(addr => {
+    const addrJson = addr.toJSON();
+    const addrCoords = addrJson.location?.coordinates || [];
+    
+    return {
+      id: addrJson.id,
+      name: addrJson.name,
+      address: addrJson.address,
+      lat: addrJson.lat || (addrCoords[1] || null),
+      lng: addrJson.lng || (addrCoords[0] || null),
+      is_default: addrJson.is_default,
+      created_at: addrJson.createdAt,
+      updated_at: addrJson.updatedAt
+    };
+  });
+
+  return {
+    id: clientJson.id,
+    user_id: clientJson.user_id,
+    first_name: clientJson.first_name,
+    last_name: clientJson.last_name,
+    full_name: client.getFullName(),
+    email: clientJson.email,
+    phone_number: clientJson.phone_number,
+    address: clientJson.address,
+    location: coords.length === 2 ? {
+      type: 'Point',
+      coordinates: coords,
+      lat: coords[1],
+      lng: coords[0]
+    } : null,
+    profile_image_url: clientJson.profile_image_url,
+    loyalty_points: clientJson.loyalty_points || 0,
+    is_verified: clientJson.is_verified,
+    is_active: clientJson.is_active,
+    status: clientJson.status,
+    created_at: clientJson.created_at,
+    updated_at: clientJson.updated_at,
+    favorite_addresses: formattedAddresses,
+    favorite_addresses_count: formattedAddresses.length
+  };
+};
 // Get all with pagination
 export const getAllClients = async (filters = {}) => {
   const {
