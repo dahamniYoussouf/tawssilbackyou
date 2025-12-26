@@ -40,7 +40,7 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
     [Op.and]: [
       { order_type: "delivery" },
       { livreur_id: null },
-      literal(`ST_DWithin(delivery_location, ST_GeogFromText('POINT(${longitude} ${latitude})'), ${searchRadius})`)
+      literal(`ST_DWithin((SELECT location FROM restaurants WHERE id = restaurant_id), ST_GeogFromText('POINT(${longitude} ${latitude})'), ${searchRadius})`)
     ]
   };
 
@@ -60,7 +60,7 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
     distinct: true,
     attributes: {
       include: [
-        [literal(`ST_Distance(delivery_location, ST_GeogFromText('POINT(${longitude} ${latitude})'))`), "distance"]
+        [literal(`ST_Distance((SELECT location FROM restaurants WHERE id = restaurant_id), ST_GeogFromText('POINT(${longitude} ${latitude})'))`), "distance"]
       ]
     },
     where: whereConditions,
@@ -91,10 +91,10 @@ export const getNearbyOrders = async (driverId, filters = {}) => {
   const formatted = await Promise.all(rows.map(async (order) => {
     const restaurantCoords = order.restaurant.location?.coordinates || [];
     const deliveryCoords = order.delivery_location?.coordinates || [];
-    const distanceDriverToDelivery = parseFloat(order.dataValues.distance);
+    const distanceDriverToRestaurant = parseFloat(order.dataValues.distance);
 
     // Filtrer par distance maximale si spécifiée
-    if (max_distance && distanceDriverToDelivery > max_distance) return null;
+    if (max_distance && distanceDriverToRestaurant > max_distance) return null;
 
     // ✅ Vérifier si le driver peut accepter cette commande (mêmes conditions que assignDriverOrComplete)
     try {

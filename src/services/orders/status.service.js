@@ -123,13 +123,13 @@ export async function acceptOrder(orderId, userId, data = {}) {
   });
 
   if (order.order_type === "delivery") {
-    const coords = order.delivery_location?.coordinates;
+    const restaurantCoords = order.restaurant?.getCoordinates?.();
     
-    if (coords?.length === 2) {
-      const [lng, lat] = coords;
+    if (restaurantCoords) {
+      const { latitude: lat, longitude: lng } = restaurantCoords;
       
       console.log(`🚀 Notifying drivers for order ${order.order_number}`);
-      console.log(`📍 Delivery location: [${lat}, ${lng}]`);
+      console.log(`📍 Restaurant location: [${lat}, ${lng}]`);
       
       try {
         const notifiedDrivers = await notifyNearbyDrivers(
@@ -157,7 +157,7 @@ export async function acceptOrder(orderId, userId, data = {}) {
       }
       
     } else {
-      console.warn(`⚠️ No valid delivery coordinates for order ${orderId}`);
+      console.warn(`⚠️ No valid restaurant coordinates for order ${orderId}`);
     }
   }
 

@@ -211,6 +211,12 @@ export const createFavoriteAddress = async (req, res, next) => {
     const fav = await favoriteAddressService.createFavoriteAddress(clientId, req.body);
     res.status(201).json({ success: true, data: fav });
   } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({
+        success: false,
+        message: err.message
+      });
+    }
     next(err);
   }
 };

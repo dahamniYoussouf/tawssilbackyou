@@ -51,24 +51,27 @@ export async function driverCancelOrder(orderId, driverId, reason) {
       reason,
     });
 
-    if (previousStatus === "delivering" && order.delivery_location?.coordinates) {
-      const [lng, lat] = order.delivery_location.coordinates;
-      notifyNearbyDrivers(
-        lat,
-        lng,
-        {
-          orderId: order.id,
-          orderNumber: order.order_number,
-          restaurant: order.restaurant.name,
-          restaurantAddress: order.restaurant.address,
-          deliveryAddress: order.delivery_address,
-          fee: parseFloat(order.delivery_fee || 0),
-          estimatedTime: order.estimated_delivery_time,
-          totalAmount: parseFloat(order.total_amount || 0),
-          urgent: true,
-        },
-        10
-      ).catch((err) => console.error("Error notifying nearby drivers:", err));
+    if (previousStatus === "delivering") {
+      const restaurantCoords = order.restaurant?.getCoordinates?.();
+      if (restaurantCoords) {
+        const { latitude: lat, longitude: lng } = restaurantCoords;
+        notifyNearbyDrivers(
+          lat,
+          lng,
+          {
+            orderId: order.id,
+            orderNumber: order.order_number,
+            restaurant: order.restaurant.name,
+            restaurantAddress: order.restaurant.address,
+            deliveryAddress: order.delivery_address,
+            fee: parseFloat(order.delivery_fee || 0),
+            estimatedTime: order.estimated_delivery_time,
+            totalAmount: parseFloat(order.total_amount || 0),
+            urgent: true,
+          },
+          10
+        ).catch((err) => console.error("Error notifying nearby drivers:", err));
+      }
     }
 
     let maxDriverCancellations = 3;
