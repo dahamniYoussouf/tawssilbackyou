@@ -1260,10 +1260,41 @@ export const getCategoriesWithMenuItems = async (restaurantId, clientId = null, 
     items_count: category.items ? category.items.length : 0
   }));
 
+  const buyXGetYItems = new Map();
+  formattedCategories.forEach((category) => {
+    (category.items || []).forEach((item) => {
+      const hasBuyXGetY = Array.isArray(item.promotions)
+        && item.promotions.some((promo) => promo.type === "buy_x_get_y");
+      if (hasBuyXGetY) {
+        buyXGetYItems.set(String(item.id), item);
+      }
+    });
+  });
+
+  const promotionCategories = [];
+  if (buyXGetYItems.size > 0) {
+    const promoItems = Array.from(buyXGetYItems.values());
+    promotionCategories.push({
+      id: `promo-buyxgety-${restaurantId}`,
+      nom: "1 achete = 1 offert",
+      description: "Plats avec offre acheter X obtenir Y",
+      icone_url: null,
+      ordre_affichage: -1,
+      is_promotion_category: true,
+      promotion_type: "buy_x_get_y",
+      items: promoItems,
+      items_count: promoItems.length
+    });
+  }
+
+  const categoriesWithPromotions = promotionCategories.length > 0
+    ? [...promotionCategories, ...formattedCategories]
+    : formattedCategories;
+
   return {
     restaurant_id: restaurantId,
     restaurant: restaurantPlain,
-    categories: formattedCategories,
+    categories: categoriesWithPromotions,
     total_categories: formattedCategories.length,
     total_items: formattedCategories.reduce((sum, cat) => sum + cat.items_count, 0)
   };

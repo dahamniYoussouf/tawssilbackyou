@@ -1,6 +1,17 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../config/database.js";
 
+const isAssetPath = (value) => /^\/?assets\/[A-Za-z0-9._/-]+$/.test(value);
+
+const isHttpUrl = (value) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
 const FavoriteAddress = sequelize.define("FavoriteAddress", {
   id: {
     type: DataTypes.UUID,
@@ -24,9 +35,11 @@ const FavoriteAddress = sequelize.define("FavoriteAddress", {
     type: DataTypes.STRING,
     allowNull: true,
     validate: {
-      isUrl: {
-        msg: "Icon URL is not valid",
-      },
+      isValidIconUrl(value) {
+        if (!value) return;
+        if (isHttpUrl(value) || isAssetPath(value)) return;
+        throw new Error("Icon URL is not valid");
+      }
     },
     comment: "URL de l'icone",
   },

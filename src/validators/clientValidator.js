@@ -1,6 +1,19 @@
 import { body, param, query } from "express-validator";
 import { normalizePhoneNumber } from "../utils/phoneNormalizer.js";
 
+const isAssetPath = (value) => /^\/?assets\/[A-Za-z0-9._/-]+$/.test(value);
+
+const isHttpUrl = (value) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+const isValidIconUrl = (value) => isHttpUrl(value) || isAssetPath(value);
+
 // ----------------------------
 // Validator for creating a client
 // ----------------------------
@@ -268,7 +281,13 @@ export const getMyOrdersValidator = [
 export const favoriteAddressCreateValidator = [
   body("name").notEmpty().withMessage("Le nom de l'adresse est requis"),
   body("address").notEmpty().withMessage("L'adresse est requise"),
-  body("icon_url").optional().isURL().withMessage("icon_url doit etre une URL valide"),
+  body("icon_url")
+    .optional()
+    .custom((value) => {
+      if (!value) return true;
+      if (isValidIconUrl(value)) return true;
+      throw new Error("icon_url doit etre une URL valide ou un chemin assets/...");
+    }),
   body("lat").isFloat({ min: -90, max: 90 }).withMessage("Latitude invalide"),
   body("lng").isFloat({ min: -180, max: 180 }).withMessage("Longitude invalide"),
   body("is_default").optional().isBoolean().withMessage("is_default doit être un booléen"),
@@ -277,7 +296,13 @@ export const favoriteAddressCreateValidator = [
 export const favoriteAddressUpdateValidator = [
   body("name").optional().isString(),
   body("address").optional().isString(),
-  body("icon_url").optional().isURL().withMessage("icon_url doit etre une URL valide"),
+  body("icon_url")
+    .optional()
+    .custom((value) => {
+      if (!value) return true;
+      if (isValidIconUrl(value)) return true;
+      throw new Error("icon_url doit etre une URL valide ou un chemin assets/...");
+    }),
   body("lat").optional().isFloat({ min: -90, max: 90 }).withMessage("Latitude invalide"),
   body("lng").optional().isFloat({ min: -180, max: 180 }).withMessage("Longitude invalide"),
   body("is_default").optional().isBoolean().withMessage("is_default doit être un booléen"),
