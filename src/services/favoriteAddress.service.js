@@ -9,7 +9,7 @@ export async function listFavoriteAddresses(clientId) {
 }
 
 export async function createFavoriteAddress(clientId, payload) {
-  const { name, address, lat, lng, is_default } = payload;
+  const { name, address, icon_url, lat, lng, is_default } = payload;
 
   if (is_default) {
     await FavoriteAddress.update(
@@ -22,6 +22,7 @@ export async function createFavoriteAddress(clientId, payload) {
     client_id: clientId,
     name,
     address,
+    icon_url,
     lat,
     lng,
     is_default: !!is_default,
@@ -41,7 +42,7 @@ export async function updateFavoriteAddress(clientId, id, payload) {
   });
   if (!fav) return null;
 
-  const { name, address, lat, lng, is_default } = payload;
+  const { name, address, icon_url, lat, lng, is_default } = payload;
 
   if (is_default) {
     await FavoriteAddress.update(
@@ -52,6 +53,7 @@ export async function updateFavoriteAddress(clientId, id, payload) {
 
   if (name !== undefined) fav.name = name;
   if (address !== undefined) fav.address = address;
+  if (icon_url !== undefined) fav.icon_url = icon_url;
   if (lat !== undefined) fav.lat = lat;
   if (lng !== undefined) fav.lng = lng;
   if (is_default !== undefined) fav.is_default = !!is_default;

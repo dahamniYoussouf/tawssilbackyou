@@ -30,7 +30,7 @@ router.get(
 );
 
 // Favorite addresses
-router.get("/favorite-addresses", protect, isClient, cacheMiddleware({ ttl: 30 }), clientCtrl.listFavoriteAddresses);
+router.get("/favorite-addresses", protect, isClient, clientCtrl.listFavoriteAddresses);
 router.post("/favorite-addresses", protect, isClient, favoriteAddressCreateValidator, validate, clientCtrl.createFavoriteAddress);
 router.put("/favorite-addresses/:id", protect, isClient, favoriteAddressIdValidator, favoriteAddressUpdateValidator, validate, clientCtrl.updateFavoriteAddress);
 router.delete("/favorite-addresses/:id", protect, isClient, favoriteAddressIdValidator, validate, clientCtrl.deleteFavoriteAddress);

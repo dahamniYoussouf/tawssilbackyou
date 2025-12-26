@@ -20,6 +20,16 @@ const FavoriteAddress = sequelize.define("FavoriteAddress", {
     type: DataTypes.TEXT,
     allowNull: false,
   },
+  icon_url: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    validate: {
+      isUrl: {
+        msg: "Icon URL is not valid",
+      },
+    },
+    comment: "URL de l'icone",
+  },
   location:
     process.env.NODE_ENV === "test"
       ? { type: DataTypes.JSON, allowNull: true }

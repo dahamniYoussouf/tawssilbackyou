@@ -268,6 +268,7 @@ export const getMyOrdersValidator = [
 export const favoriteAddressCreateValidator = [
   body("name").notEmpty().withMessage("Le nom de l'adresse est requis"),
   body("address").notEmpty().withMessage("L'adresse est requise"),
+  body("icon_url").optional().isURL().withMessage("icon_url doit etre une URL valide"),
   body("lat").isFloat({ min: -90, max: 90 }).withMessage("Latitude invalide"),
   body("lng").isFloat({ min: -180, max: 180 }).withMessage("Longitude invalide"),
   body("is_default").optional().isBoolean().withMessage("is_default doit être un booléen"),
@@ -276,6 +277,7 @@ export const favoriteAddressCreateValidator = [
 export const favoriteAddressUpdateValidator = [
   body("name").optional().isString(),
   body("address").optional().isString(),
+  body("icon_url").optional().isURL().withMessage("icon_url doit etre une URL valide"),
   body("lat").optional().isFloat({ min: -90, max: 90 }).withMessage("Latitude invalide"),
   body("lng").optional().isFloat({ min: -180, max: 180 }).withMessage("Longitude invalide"),
   body("is_default").optional().isBoolean().withMessage("is_default doit être un booléen"),
