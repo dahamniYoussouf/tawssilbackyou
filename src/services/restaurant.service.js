@@ -93,6 +93,113 @@ export const resolveClientRestaurantSearchRadius = async (requestedRadius) => {
   return resolved;
 };
 
+const geocodeProviders = [
+  {
+    name: "pluscodes",
+    url: "https://plus.codes/api",
+    enabled: (address) => address.includes("+"),
+    params: (address) => ({ address }),
+    extract: (data) => {
+      const plus = data?.plus_code;
+      const location = plus?.geometry?.location;
+      if (!location?.lat || !location?.lng) return null;
+      return {
+        lat: location.lat,
+        lng: location.lng,
+        display_name: plus.global_code || plus.compound_code || null
+      };
+    }
+  },
+  {
+    name: "nominatim",
+    url: "https://nominatim.openstreetmap.org/search",
+    params: (address) => ({ q: address, format: "json", limit: 1 }),
+    extract: (data) => {
+      if (!Array.isArray(data) || !data.length) return null;
+      const [first] = data;
+      if (!first?.lat || !first?.lon) return null;
+      return {
+        lat: first.lat,
+        lng: first.lon,
+        display_name: first.display_name || null
+      };
+    }
+  },
+  {
+    name: "photon",
+    url: "https://api.photon.komoot.io/api/",
+    params: (address) => ({ q: address, limit: 1 }),
+    extract: (data) => {
+      const feature = data?.features?.[0];
+      if (!feature?.geometry?.coordinates) return null;
+      const [lon, lat] = feature.geometry.coordinates;
+      return {
+        lat,
+        lng: lon,
+        display_name: feature.properties?.name || feature.properties?.city || feature.properties?.state || null
+      };
+    }
+  },
+  {
+    name: "mapsco",
+    url: "https://geocode.maps.co/search",
+    params: (address) => ({ q: address, limit: 1 }),
+    extract: (data) => {
+      const [first] = Array.isArray(data) ? data : [];
+      if (!first?.lat || !first?.lon) return null;
+      return {
+        lat: first.lat,
+        lng: first.lon,
+        display_name: first.display_name || first.name || null
+      };
+    }
+  }
+];
+
+const geocodeWithFallback = async (address) => {
+  let lastError = null;
+  let hadNoResult = false;
+
+  for (const provider of geocodeProviders) {
+    if (provider.enabled && !provider.enabled(address)) {
+      continue;
+    }
+    try {
+      const response = await axios.get(provider.url, {
+        params: provider.params(address),
+        headers: { "User-Agent": "food-delivery-app" },
+        timeout: 10000
+      });
+
+      const location = provider.extract(response.data);
+      if (location) {
+        return { location, provider: provider.name };
+      }
+      hadNoResult = true;
+      lastError = null;
+    } catch (error) {
+      const status = error?.response?.status || error?.status;
+      if (status === 401 || status === 403) {
+        const authError = new Error("Geocoding service unavailable (authorization).");
+        authError.status = 503;
+        lastError = authError;
+        continue;
+      }
+      if (status === 400 || status === 404) {
+        hadNoResult = true;
+        lastError = null;
+        continue;
+      }
+      lastError = error;
+    }
+  }
+
+  if (hadNoResult) {
+    return { location: null, error: null };
+  }
+  return { location: null, error: lastError };
+};
+
 const toDecimal = (value) => {
   if (value === null || value === undefined || Number.isNaN(Number(value))) {
     return 0;
@@ -442,25 +549,22 @@ export const filterNearbyRestaurants = async (filters) => {
   // Handle address-based search (geocoding)
   if (address && address.trim()) {
     try {
-      const response = await axios.get("https://nominatim.openstreetmap.org/search", {
-        params: { q: address, format: "json", limit: 1 },
-        headers: { "User-Agent": "food-delivery-app" },
-        timeout: 10000
-      });
+      const { location, error } = await geocodeWithFallback(address);
 
-      if (response.data.length === 0) {
-        const error = new Error("Address not found");
-        error.status = 404;
-        throw error;
+      if (!location) {
+        if (error) throw error;
+        const notFoundError = new Error("Address not found");
+        notFoundError.status = 404;
+        throw notFoundError;
       }
 
-      latitude = parseFloat(response.data[0].lat);
-      longitude = parseFloat(response.data[0].lon);
+      latitude = parseFloat(location.lat);
+      longitude = parseFloat(location.lng);
 
       if (isNaN(latitude) || isNaN(longitude)) {
-        const error = new Error("Invalid coordinates returned from geocoding service");
-        error.status = 502;
-        throw error;
+        const coordError = new Error("Invalid coordinates returned from geocoding service");
+        coordError.status = 502;
+        throw coordError;
       }
     } catch (error) {
       if (error.status) {
@@ -937,25 +1041,22 @@ export const getNearbyRestaurantNames = async (filters) => {
   // Geocode if address provided
   if (address && address.trim()) {
     try {
-      const response = await axios.get("https://nominatim.openstreetmap.org/search", {
-        params: { q: address, format: "json", limit: 1 },
-        headers: { "User-Agent": "food-delivery-app" },
-        timeout: 10000 // 10 secondes timeout
-      });
+      const { location, error } = await geocodeWithFallback(address);
 
-      if (response.data.length === 0) {
-        const error = new Error("Address not found");
-        error.status = 404;
-        throw error;
+      if (!location) {
+        if (error) throw error;
+        const notFoundError = new Error("Address not found");
+        notFoundError.status = 404;
+        throw notFoundError;
       }
 
-      latitude = parseFloat(response.data[0].lat);
-      longitude = parseFloat(response.data[0].lon);
+      latitude = parseFloat(location.lat);
+      longitude = parseFloat(location.lng);
 
       if (isNaN(latitude) || isNaN(longitude)) {
-        const error = new Error("Invalid coordinates returned from geocoding service");
-        error.status = 502;
-        throw error;
+        const coordError = new Error("Invalid coordinates returned from geocoding service");
+        coordError.status = 502;
+        throw coordError;
       }
     } catch (error) {
       // Si c'est déjà une erreur avec un statut, la relancer

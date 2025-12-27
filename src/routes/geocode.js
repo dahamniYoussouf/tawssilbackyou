@@ -7,6 +7,22 @@ const router = express.Router();
 
 const geocodeProviders = [
   {
+    name: "pluscodes",
+    url: "https://plus.codes/api",
+    enabled: (address) => address.includes("+"),
+    params: (address) => ({ address }),
+    extract: (data) => {
+      const plus = data?.plus_code;
+      const location = plus?.geometry?.location;
+      if (!location?.lat || !location?.lng) return null;
+      return {
+        lat: location.lat,
+        lng: location.lng,
+        display_name: plus.global_code || plus.compound_code || null
+      };
+    }
+  },
+  {
     name: "nominatim",
     url: "https://nominatim.openstreetmap.org/search",
     params: (address) => ({ q: address, format: "json", limit: 1 }),
@@ -54,8 +70,12 @@ const geocodeProviders = [
 
 const tryGeocodeFromProviders = async (address) => {
   let lastError = null;
+  let hadNoResult = false;
 
   for (const provider of geocodeProviders) {
+    if (provider.enabled && !provider.enabled(address)) {
+      continue;
+    }
     try {
       const response = await axios.get(provider.url, {
         params: provider.params(address),
@@ -67,11 +87,28 @@ const tryGeocodeFromProviders = async (address) => {
       if (location) {
         return { location, provider: provider.name };
       }
+      hadNoResult = true;
+      lastError = null;
     } catch (err) {
+      const status = err?.response?.status || err?.status;
+      if (status === 401 || status === 403) {
+        const authError = new Error("Service de geocodage indisponible (authorization).");
+        authError.status = 503;
+        lastError = authError;
+        continue;
+      }
+      if (status === 400 || status === 404) {
+        hadNoResult = true;
+        lastError = null;
+        continue;
+      }
       lastError = err;
     }
   }
 
+  if (hadNoResult) {
+    return { location: null, error: null };
+  }
   return { location: null, error: lastError };
 };
 
@@ -95,8 +132,12 @@ router.post("/geocode", geocodeValidator, validate, async (req, res, next) => {
       display_name: location.display_name
     });
   } catch (err) {
-    if (err.status || err.statusCode) {
-      return next(err);
+    const status = err?.response?.status || err?.status || err?.statusCode;
+
+    if (status === 401 || status === 403) {
+      const authError = new Error("Service de geocodage indisponible (authorization).");
+      authError.status = 503;
+      return next(authError);
     }
 
     if (err.code === "ECONNABORTED" || err.message.includes("timeout")) {
@@ -105,16 +146,19 @@ router.post("/geocode", geocodeValidator, validate, async (req, res, next) => {
       return next(timeoutError);
     }
 
-    if (err.code === "ENOTFOUND" || err.code === "ECONNREFUSED" || err.response?.status >= 500) {
+    if (err.code === "ENOTFOUND" || err.code === "ECONNREFUSED" || status >= 500) {
       const serviceError = new Error("Service de géocodage indisponible. Veuillez réessayer plus tard.");
       serviceError.status = 503;
       return next(serviceError);
     }
 
-    if (err.response?.status === 429) {
+    if (status === 429) {
       const rateLimitError = new Error("Trop de requêtes de géocodage. Veuillez réessayer plus tard.");
       rateLimitError.status = 429;
       return next(rateLimitError);
+    }
+    if (status) {
+      return next(err);
     }
 
     const geocodeError = new Error("Impossible de géocoder l'adresse. Veuillez vérifier l'adresse.");
